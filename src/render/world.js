@@ -1,6 +1,8 @@
 // 夜の西池袋（ミニチュア）シーン構築
 import * as THREE from 'three';
-import { NODES, ROADS, POIS, geo } from '../data/map.js';
+import { NODES, ROADS, POIS, geo, roadPolyline } from '../data/map.js';
+import { TownDetail } from './townDetail.js';
+import { WestExit } from './westExit.js';
 import { townCorridor } from '../physics/track.js';
 import { buildEdges } from './edges.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
@@ -163,38 +165,26 @@ export class World {
     const asphalt = asphaltTex();
     const roadMat = new THREE.MeshLambertMaterial({ map: asphalt, color: 0xb0b4c0 });
     const walkMat = new THREE.MeshLambertMaterial({ color: 0x24262c });
-    const lineMat = new THREE.MeshBasicMaterial({ color: 0xcfcfc4 });
-    const deg = {};
-    for (const r of ROADS) for (const id of r.nodes) deg[id] = (deg[id] || 0) + 1;
-
     for (const r of ROADS) {
-      const pts = r.nodes.map((id) => NODES[id]);
-      for (let i = 0; i < pts.length - 1; i++) {
-        const seg = [pts[i], pts[i + 1]];
-        S.add(ribbon(seg, r.width / 2 + 3.2, 0.01, walkMat));
-        const rd = ribbon(seg, r.width / 2, 0.02, roadMat, 0.08);
-        S.add(rd);
-        // センターライン（破線）
-        const a = pts[i], b = pts[i + 1];
-        const len = Math.hypot(b.x - a.x, b.z - a.z);
-        const trimA = deg[r.nodes[i]] > 1 ? r.width * 0.7 : 2, trimB = deg[r.nodes[i + 1]] > 1 ? r.width * 0.7 : 2;
-        const dash = r.width >= 11 ? 5 : 3, gap = r.width >= 11 ? 5 : 4;
-        for (let s = trimA; s < len - trimB - dash; s += dash + gap) {
-          const p0 = { x: a.x + ((b.x - a.x) * s) / len, z: a.z + ((b.z - a.z) * s) / len };
-          const p1 = { x: a.x + ((b.x - a.x) * (s + dash)) / len, z: a.z + ((b.z - a.z) * (s + dash)) / len };
-          S.add(ribbon([p0, p1], 0.08, 0.035, lineMat));
-        }
-      }
-      // 交差点の円盤
-      for (const p of pts) {
-        const disc = new THREE.Mesh(new THREE.CircleGeometry(r.width / 2, 20), roadMat);
+      const pts = roadPolyline(r);
+      S.add(ribbon(pts, r.width / 2 + 3.2, 0.01, walkMat));
+      S.add(ribbon(pts, r.width / 2, 0.02, roadMat, 0.08));
+      // 折れ点・交差点の円盤（継ぎ目を埋める）
+      pts.forEach((p, i) => {
+        const isNode = r.nodes.some((id) => NODES[id].x === p.x && NODES[id].z === p.z) || i === 0 || i === pts.length - 1;
+        if (!isNode && r.smooth) return;
+        const disc = new THREE.Mesh(new THREE.CircleGeometry(r.width / 2, 24), roadMat);
         disc.rotation.x = -Math.PI / 2; disc.position.set(p.x, 0.021, p.z);
         S.add(disc);
-        const wd = new THREE.Mesh(new THREE.CircleGeometry(r.width / 2 + 3.2, 20), walkMat);
+        const wd = new THREE.Mesh(new THREE.CircleGeometry(r.width / 2 + 3.2, 24), walkMat);
         wd.rotation.x = -Math.PI / 2; wd.position.set(p.x, 0.011, p.z);
         S.add(wd);
-      }
+      });
     }
+    // 車線・分離帯・横断歩道・信号・首都高・歩道橋
+    this.detail = new TownDetail(S);
+    // 池袋駅西口のランドマーク
+    this.westExit = new WestExit(S);
 
     // 歩道の段差・ガードレール・植え込み（当たり判定の境界に配置）
     this.townEdges = buildEdges(this.corridor);
@@ -219,11 +209,12 @@ export class World {
         const q = this.corridor.query(px, pz);
         const d = q.far ? 40 : q.d;
         if (d < 6.5) continue;
+        if (this.westExit.excludes(px, pz, 6)) continue;
         if (POIS.some((poi) => { const pp = this.poiPos(poi); return Math.hypot(pp.x - px, pp.z - pz) < 34; })) continue;
         const s = Math.min(8, d - 3.2);
         const w = s * (1.2 + r() * 0.8), dd = s * (1.2 + r() * 0.8);
         const nearSt = Math.max(0, 1 - Math.hypot(px - (station.x + 120), pz - station.z) / 500);
-        const hgt = 6 + r() * 18 + (r() < 0.12 ? 25 : 0) + nearSt * (20 + r() * 45);
+        const hgt = 6 + r() * 18 + (r() < 0.12 ? 25 : 0) + nearSt * (10 + r() * 25);
         items.push({ px, pz, w, d: dd, h: hgt, rot: (r() - 0.5) * 0.2 });
       }
     }
@@ -263,19 +254,23 @@ export class World {
   buildStreetLights() {
     const poles = [], pools = [];
     for (const r of ROADS) {
-      for (let i = 0; i < r.nodes.length - 1; i++) {
-        const a = NODES[r.nodes[i]], b = NODES[r.nodes[i + 1]];
+      if (r.alley) continue;
+      const P = roadPolyline(r);
+      let side = 1, acc = 10;
+      for (let i = 0; i < P.length - 1; i++) {
+        const a = P[i], b = P[i + 1];
         const len = Math.hypot(b.x - a.x, b.z - a.z);
         const tx = (b.x - a.x) / len, tz = (b.z - a.z) / len;
         const rx = -tz, rz = tx;
-        let side = 1;
-        for (let s = 10; s < len - 6; s += 26) {
+        for (let s = acc; s < len; s += 26) {
+          acc = s + 26 - len;
           const o = (r.width / 2 + 2.4) * side;
           const x = a.x + tx * s + rx * o, z = a.z + tz * s + rz * o;
           poles.push({ x, z, side, rx, rz });
           pools.push({ x: x - rx * side * 4.2, z: z - rz * side * 4.2 });
           side = -side;
         }
+        if (acc >= len) acc -= len;
       }
     }
     const poleGeo = new THREE.CylinderGeometry(0.08, 0.1, 7, 6);
@@ -358,12 +353,6 @@ export class World {
       this.blinkers = this.blinkers || [];
       this.blinkers.push(l);
     }
-    const st = geo(35.7300, 139.7122);
-    const station = new THREE.Mesh(new THREE.BoxGeometry(70, 34, 150), buildingMaterial());
-    station.material.color = new THREE.Color(0x3a3f49);
-    station.position.set(st.x + 40, 0, st.z);
-    station.geometry.translate(0, 17, 0);
-    this.scene.add(station);
   }
 
   buildStars() {
@@ -384,6 +373,7 @@ export class World {
   setCourse(path) {
     if (this.courseGroup) { this.scene.remove(this.courseGroup); this.courseGroup = null; }
     this.townEdges.visible = !path;
+    this.detail.setCourseMode(!!path);
     if (!path) return;
     const g = new THREE.Group();
     const pts = [];
@@ -420,6 +410,8 @@ export class World {
   }
 
   update(t) {
+    this.detail.update(t);
+    this.westExit.update(t);
     if (this.blinkers) for (const b of this.blinkers) b.visible = Math.sin(t * 3) > 0;
     if (this.poiMarkers) for (const m of this.poiMarkers) m.ring.material.opacity = 0.6 + 0.3 * Math.sin(t * 4);
   }

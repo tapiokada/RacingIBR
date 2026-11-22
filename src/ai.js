@@ -1,5 +1,8 @@
 // AIドライバー（レース用 / 街流し用）
-import { NODES } from './data/map.js';
+import { NODES, townRoadBetween, laneOffset, roadPolyline } from './data/map.js';
+
+const polyCache = new Map();
+function cachedPoly(r) { if (!polyCache.has(r)) polyCache.set(r, roadPolyline(r)); return polyCache.get(r); }
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
@@ -91,54 +94,143 @@ export class CruiseAI {
   constructor(car, graph, from, to, cruise = 13) {
     this.car = car; this.graph = graph;
     this.a = from; this.b = to; this.c = this.pick(to, from);
-    this.cruise = cruise; this.lane = 2.6;
+    this.cruise = cruise;
     this.paused = false;
     this.stuck = 0; this.reverseT = 0;
+    this.build();
   }
 
   pick(at, prev) {
-    const opts = (this.graph[at] || []).map((e) => e.to).filter((x) => x !== prev);
+    let opts = (this.graph[at] || []).map((e) => e.to).filter((x) => x !== prev);
     if (!opts.length) return prev;
+    // 鋭角（Uターンに近い）曲がりは避ける
+    const P = NODES[prev], A = NODES[at];
+    if (P && A) {
+      const ux = A.x - P.x, uz = A.z - P.z, ul = Math.hypot(ux, uz) || 1;
+      const ok = opts.filter((o) => { const B = NODES[o]; const vx = B.x - A.x, vz = B.z - A.z; return (ux * vx + uz * vz) / (ul * (Math.hypot(vx, vz) || 1)) > -0.35; });
+      if (ok.length) opts = ok;
+    }
     return opts[Math.floor(Math.random() * opts.length)];
   }
 
-  laneOffsetPt(a, b, t) {
+  // 左側車線の中心線 a→b（道路の折れ線に沿う）
+  laneLine(a, b) {
+    const r = townRoadBetween(a, b);
     const A = NODES[a], B = NODES[b];
-    const dx = B.x - A.x, dz = B.z - A.z, l = Math.hypot(dx, dz) || 1;
-    const fx = dx / l, fz = dz / l;
-    // 左 = -right, right=(-fz, fx)
-    const lx = fz, lz = -fx;
-    return { x: A.x + dx * t + lx * this.lane, z: A.z + dz * t + lz * this.lane, len: l, fx, fz };
+    let P = [A, B];
+    if (r) {
+      const poly = cachedPoly(r);
+      const near = (n) => { let bi = 0, bd = 1e18; poly.forEach((p, i) => { const d = (p.x - n.x) ** 2 + (p.z - n.z) ** 2; if (d < bd) { bd = d; bi = i; } }); return bi; };
+      const ia = near(A), ib = near(B);
+      P = ia <= ib ? poly.slice(ia, ib + 1) : poly.slice(ib, ia + 1).reverse();
+      if (P.length < 2) P = [A, B];
+    }
+    // 複数車線は内側（右）車線を走る（交差点で縁石に寄りすぎないため）
+    const o = r ? (r.lanes >= 2 ? r.median / 2 + r.laneW * 0.5 : laneOffset(r)) : 0;
+    const out = [];
+    for (let i = 0; i < P.length; i++) {
+      const p0 = P[Math.max(0, i - 1)], p1 = P[Math.min(P.length - 1, i + 1)];
+      const dx = p1.x - p0.x, dz = p1.z - p0.z, l = Math.hypot(dx, dz) || 1;
+      out.push({ x: P[i].x + (dz / l) * o, z: P[i].z - (dx / l) * o }); // 左 = (fz, -fx)
+    }
+    const cum = [0];
+    for (let i = 1; i < out.length; i++) cum.push(cum[i - 1] + Math.hypot(out[i].x - out[i - 1].x, out[i].z - out[i - 1].z));
+    const L = cum[cum.length - 1];
+    const at = (d) => {
+      d = Math.max(0, Math.min(L, d));
+      let i = 0;
+      while (i < cum.length - 2 && cum[i + 1] < d) i++;
+      const t = (d - cum[i]) / ((cum[i + 1] - cum[i]) || 1);
+      const a0 = out[i], a1 = out[i + 1];
+      return { x: a0.x + (a1.x - a0.x) * t, z: a0.z + (a1.z - a0.z) * t, fx: (a1.x - a0.x) / ((cum[i + 1] - cum[i]) || 1), fz: (a1.z - a0.z) / ((cum[i + 1] - cum[i]) || 1) };
+    };
+    return { pts: out, cum, len: L, at };
+  }
+
+  // a→b の車線 → 交差点bの曲がり（2次ベジェ）→ b→c の車線 の折れ線を作る
+  build() {
+    const L1 = this.laneLine(this.a, this.b), L2 = this.laneLine(this.b, this.c);
+    const e1 = L1.at(L1.len), s2 = L2.at(0);
+    const cos = e1.fx * s2.fx + e1.fz * s2.fz;
+    let R = 14 + (1 - cos) * 6;
+    R = Math.min(R, L1.len * 0.45, L2.len * 0.45);
+    const E = L1.at(L1.len - R), X = L2.at(R);
+    let C;
+    if (cos < -0.9) {
+      C = { x: (E.x + X.x) / 2 + E.fx * R * 1.2, z: (E.z + X.z) / 2 + E.fz * R * 1.2 };
+    } else {
+      const den = E.fx * X.fz - E.fz * X.fx;
+      if (Math.abs(den) < 0.05) C = { x: (E.x + X.x) / 2, z: (E.z + X.z) / 2 };
+      else {
+        const t = ((X.x - E.x) * X.fz - (X.z - E.z) * X.fx) / den;
+        C = { x: E.x + E.fx * t, z: E.z + E.fz * t };
+        // 交点が離れすぎる場合は中点寄りに
+        const mx = (E.x + X.x) / 2, mz = (E.z + X.z) / 2;
+        if (Math.hypot(C.x - mx, C.z - mz) > R * 2) C = { x: mx, z: mz };
+      }
+    }
+    const pts = [];
+    for (let i = 0; i < L1.pts.length && L1.cum[i] < L1.len - R; i++) pts.push(L1.pts[i]);
+    pts.push(E);
+    const turnStart = pts.length - 1;
+    for (let k = 1; k < 10; k++) {
+      const u = k / 10;
+      pts.push({ x: (1 - u) * (1 - u) * E.x + 2 * (1 - u) * u * C.x + u * u * X.x, z: (1 - u) * (1 - u) * E.z + 2 * (1 - u) * u * C.z + u * u * X.z });
+    }
+    pts.push(X);
+    const exitIdx = pts.length - 1;
+    for (let i = 0; i < L2.pts.length; i++) if (L2.cum[i] > R) pts.push(L2.pts[i]);
+    if (pts.length === exitIdx + 1) pts.push(L2.at(L2.len));
+    this.pts = pts;
+    this.cum = [0];
+    for (let i = 1; i < pts.length; i++) this.cum.push(this.cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
+    this.exitS = this.cum[exitIdx];
+    this.turnS0 = this.cum[turnStart];
+    this.turnCos = cos;
+    this.turnLen = this.exitS - this.turnS0;
+  }
+
+  project(x, z) {
+    let best = 0, bd = 1e18;
+    for (let i = 0; i < this.pts.length - 1; i++) {
+      const a = this.pts[i], b = this.pts[i + 1];
+      const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz || 1;
+      const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / l2));
+      const px = a.x + dx * t, pz = a.z + dz * t;
+      const d = (px - x) ** 2 + (pz - z) ** 2;
+      if (d < bd) { bd = d; best = this.cum[i] + Math.sqrt(l2) * t; }
+    }
+    return best;
+  }
+
+  pointAt(s) {
+    const c = this.cum;
+    if (s >= c[c.length - 1]) { const p = this.pts[this.pts.length - 1]; return { x: p.x, z: p.z }; }
+    let i = 0;
+    while (i < c.length - 2 && c[i + 1] < s) i++;
+    const a = this.pts[i], b = this.pts[i + 1];
+    const t = (s - c[i]) / ((c[i + 1] - c[i]) || 1);
+    return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t };
   }
 
   update(dt, others = []) {
     const car = this.car;
     if (this.paused) { car.input = { throttle: 0, brake: 1, steer: 0 }; return; }
-    const A = NODES[this.a], B = NODES[this.b];
-    const dx = B.x - A.x, dz = B.z - A.z, l2 = dx * dx + dz * dz;
-    const l = Math.sqrt(l2);
-    let t = ((car.x - A.x) * dx + (car.z - A.z) * dz) / l2;
-    const remain = (1 - t) * l;
-    if (remain < 9) {
+    let s = this.project(car.x, car.z);
+    if (s >= this.exitS) {
       this.a = this.b; this.b = this.c; this.c = this.pick(this.b, this.a);
-      return this.update(dt, others);
+      this.build();
+      s = this.project(car.x, car.z);
     }
-    const look = 7 + car.speed * 0.5;
-    let tgt;
-    if (remain > look) tgt = this.laneOffsetPt(this.a, this.b, t + look / l);
-    else {
-      const N = NODES[this.c], Bn = NODES[this.b];
-      const l3 = Math.hypot(N.x - Bn.x, N.z - Bn.z) || 1;
-      tgt = this.laneOffsetPt(this.b, this.c, Math.min(1, (look - remain) / l3));
-    }
+    const look = 5 + car.speed * 0.45;
+    const tgt = this.pointAt(s + look);
     const steer = steerToward(car, tgt.x, tgt.z);
-    // 次の交差点の曲がり角に応じて減速
-    const C = NODES[this.c];
-    const ux = dx / l, uz = dz / l;
-    const vx = C.x - B.x, vz = C.z - B.z, lv = Math.hypot(vx, vz) || 1;
-    const cos = (ux * vx + uz * vz) / lv;
-    const vTurn = cos < -0.5 ? 4 : cos < 0.3 ? 7 : cos < 0.85 ? 10 : this.cruise;
-    let vt = Math.min(this.cruise, Math.sqrt(vTurn * vTurn + 2 * 3.0 * Math.max(0, remain - 8)));
+    // 曲がりの手前で減速（曲がりの鋭さと半径から）
+    const cos = this.turnCos;
+    const vTurn = cos > 0.9 ? this.cruise : Math.max(3, Math.min(this.cruise, Math.sqrt(4.5 * Math.max(3, this.turnLen * 0.45))));
+    const toTurn = this.turnS0 - s;
+    let vt = this.cruise;
+    if (s < this.exitS) vt = Math.min(vt, toTurn > 0 ? Math.sqrt(vTurn * vTurn + 2 * 2.2 * toTurn) : vTurn);
     // 前方車
     const f0 = Math.sin(car.h), f1 = Math.cos(car.h);
     for (const o of others) {

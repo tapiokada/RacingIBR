@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { DriveSession } from '../session.js';
 import { Hud } from '../ui/hud.js';
 import { el, Menu, panel } from '../ui/ui.js';
-import { NODES, POIS, START_SPOT, LAYOUTS, COURSES } from '../data/map.js';
+import { NODES, POIS, START_SPOT, LAYOUTS, COURSES, townRoadBetween, laneOffset } from '../data/map.js';
 import { RIVALS } from '../data/rivals.js';
 import { CARS, PLAYER } from '../data/cars.js';
 import { CruiseAI } from '../ai.js';
@@ -85,7 +85,8 @@ export class TownMode {
       const len = Math.hypot(B.x - A.x, B.z - A.z);
       const fx = (B.x - A.x) / len, fz = (B.z - A.z) / len;
       const e = s.addCar({ carId: r.car, equipped: r.parts, color: r.color, name: r.name });
-      e.car.place(x + fz * 2.6, z - fx * 2.6, Math.atan2(fx, fz), 9);
+      const lo = laneOffset(townRoadBetween(a, b));
+      e.car.place(x + fz * lo, z - fx * lo, Math.atan2(fx, fz), 9);
       e.ai = new CruiseAI(e.car, this.graph, a, b, 11 + Math.random() * 5);
       e.rival = r;
       e.rating = buildSpec(r.car, r.parts).rating;

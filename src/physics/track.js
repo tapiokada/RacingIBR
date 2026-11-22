@@ -1,24 +1,32 @@
 // 走行可能領域（道路カプセルの和集合）とコース中心線
-import { NODES, ROADS, roadWidthBetween } from '../data/map.js';
+import { NODES, ROADS, roadWidthBetween, roadPolyline } from '../data/map.js';
 
 // ---------------- 走行可能領域 ----------------
 export class Corridor {
-  constructor(segs, cell = 24) {
+  constructor(segs, cell = 24, obstacles = []) {
     this.segs = segs; // {ax,az,bx,bz,hw}
+    this.obs = obstacles; // 道路内の障害物（中央分離帯など）
     this.cell = cell;
-    this.grid = new Map();
+    this.grid = this.makeGrid(segs, 8);
+    this.ogrid = this.makeGrid(obstacles, 2);
+  }
+
+  makeGrid(segs, padExtra) {
+    const cell = this.cell;
+    const grid = new Map();
     for (let i = 0; i < segs.length; i++) {
       const s = segs[i];
-      const pad = s.hw + 8;
+      const pad = s.hw + padExtra;
       const x0 = Math.floor((Math.min(s.ax, s.bx) - pad) / cell), x1 = Math.floor((Math.max(s.ax, s.bx) + pad) / cell);
       const z0 = Math.floor((Math.min(s.az, s.bz) - pad) / cell), z1 = Math.floor((Math.max(s.az, s.bz) + pad) / cell);
       for (let gx = x0; gx <= x1; gx++) for (let gz = z0; gz <= z1; gz++) {
         const k = gx * 73856093 ^ gz * 19349663;
-        let arr = this.grid.get(k);
-        if (!arr) this.grid.set(k, (arr = []));
+        let arr = grid.get(k);
+        if (!arr) grid.set(k, (arr = []));
         arr.push(i);
       }
     }
+    return grid;
   }
 
   // 符号付き距離（負=道路内）と外向き法線
@@ -42,6 +50,21 @@ export class Corridor {
         if (dist > 1e-6) { bnx = ex / dist; bnz = ez / dist; } else { bnx = 0; bnz = 0; }
       }
     }
+    // 障害物：内側にいれば境界の外扱い（法線は障害物の中心側）
+    const oarr = this.ogrid.get(k);
+    if (oarr) {
+      for (const i of oarr) {
+        const s = this.obs[i];
+        const dx = s.bx - s.ax, dz = s.bz - s.az;
+        const l2 = dx * dx + dz * dz;
+        let t = l2 > 0 ? ((x - s.ax) * dx + (z - s.az) * dz) / l2 : 0;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const ex = x - (s.ax + dx * t), ez = z - (s.az + dz * t);
+        const dist = Math.hypot(ex, ez);
+        const pen = s.hw - dist;
+        if (pen > best && dist > 1e-6) { best = pen; bnx = -ex / dist; bnz = -ez / dist; }
+      }
+    }
     return { d: best, nx: bnx, nz: bnz, far: false };
   }
 }
@@ -60,20 +83,57 @@ export function resolveWalls(car, corridor) {
 }
 
 // ---------------- 街の道路網 ----------------
+// 交差点・道路端のノード（中央分離帯を切る、横断歩道を置く位置）
+export function townJunctions() {
+  const deg = {}, ends = new Set();
+  for (const r of ROADS) {
+    r.nodes.forEach((id, i) => {
+      deg[id] = (deg[id] || 0) + (i === 0 || i === r.nodes.length - 1 ? 1 : 2);
+      if (i === 0 || i === r.nodes.length - 1) ends.add(id);
+    });
+  }
+  return Object.keys(deg).filter((id) => deg[id] >= 3 || ends.has(id));
+}
+
+// 中央分離帯（交差点の手前 MEDIAN_TRIM m は右折レーンのため切る）
+export const MEDIAN_TRIM = 30;
+export function townMedians() {
+  const J = townJunctions().map((id) => NODES[id]);
+  const out = [];
+  for (const r of ROADS) {
+    if (!r.median) continue;
+    const P = roadPolyline(r);
+    for (let i = 0; i < P.length - 1; i++) {
+      const a = P[i], b = P[i + 1];
+      const len = Math.hypot(b.x - a.x, b.z - a.z);
+      const m = Math.max(1, Math.ceil(len / 4));
+      for (let k = 0; k < m; k++) {
+        const p0 = { x: a.x + ((b.x - a.x) * k) / m, z: a.z + ((b.z - a.z) * k) / m };
+        const p1 = { x: a.x + ((b.x - a.x) * (k + 1)) / m, z: a.z + ((b.z - a.z) * (k + 1)) / m };
+        const mx = (p0.x + p1.x) / 2, mz = (p0.z + p1.z) / 2;
+        if (J.some((j) => Math.hypot(j.x - mx, j.z - mz) < MEDIAN_TRIM)) continue;
+        out.push({ ax: p0.x, az: p0.z, bx: p1.x, bz: p1.z, hw: r.median / 2, road: r });
+      }
+    }
+  }
+  return out;
+}
+
 export function townCorridor() {
   const segs = [];
   for (const r of ROADS) {
-    for (let i = 0; i < r.nodes.length - 1; i++) {
-      const a = NODES[r.nodes[i]], b = NODES[r.nodes[i + 1]];
-      segs.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, hw: r.width / 2, road: r.name });
+    const P = roadPolyline(r);
+    for (let i = 0; i < P.length - 1; i++) {
+      segs.push({ ax: P[i].x, az: P[i].z, bx: P[i + 1].x, bz: P[i + 1].z, hw: r.width / 2, road: r.name });
     }
   }
-  return new Corridor(segs);
+  return new Corridor(segs, 24, townMedians());
 }
 
 export function townGraph() {
   const adj = {};
   for (const r of ROADS) {
+    if (!r.ai) continue;
     for (let i = 0; i < r.nodes.length - 1; i++) {
       const a = r.nodes[i], b = r.nodes[i + 1];
       (adj[a] ||= []).push({ to: b, w: r.width });

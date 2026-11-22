@@ -5,6 +5,7 @@ import { hasSave, loadGame, newGameState, fmtMoney, loadRecords, fmtTime } from 
 import { LAYOUTS } from '../data/map.js';
 import { TownMode } from './town.js';
 import { PracticeMode } from './practice.js';
+import { TownFreeMode } from './townfree.js';
 import { ReplayMode } from './replay.js';
 import { getReplay } from '../save.js';
 import { CARS, PLAYER } from '../data/cars.js';
@@ -84,7 +85,9 @@ export class TitleMode {
 
   pickLayout(kind) {
     const recs = loadRecords();
+    const town = kind === 'free' ? [{ label: '西池袋タウン（全道路）', sub: '池袋駅西口・西口公園・西一番街を含む街全体を自由に走行', action: () => this.pickSetup('town', null) }] : [];
     this.setMenu([
+      ...town,
       ...LAYOUTS.map((L) => ({
         label: L.name,
         sub: `${L.course.desc}　BEST ${fmtTime(recs[L.key]?.[0]?.best)}`,
@@ -99,13 +102,15 @@ export class TitleMode {
     const car = save ? save.garage[save.active] : null;
     const start = (equipped, color) => {
       const g = this.game;
-      g.transition(() => g.setMode(new PracticeMode(g, { layout: L, kind, carId: PLAYER.car, equipped, color })));
+      g.transition(() => g.setMode(kind === 'town'
+        ? new TownFreeMode(g, { carId: PLAYER.car, equipped, color })
+        : new PracticeMode(g, { layout: L, kind, carId: PLAYER.car, equipped, color })));
     };
     this.setMenu([
       { label: 'ストーリーのマシン', disabled: !car, sub: car ? 'セーブデータのチューニング状態で走行' : 'セーブデータなし', action: () => start(car.equipped, car.color) },
       { label: 'ノーマル 86-GR', sub: CARS[PLAYER.car].ref + ' 相当', action: () => start({ ...CARS[PLAYER.car].stock }, PLAYER.color) },
-      { label: '戻る', action: () => this.pickLayout(kind) },
-    ], () => this.pickLayout(kind), `${L.name} — マシン選択`);
+      { label: '戻る', action: () => this.pickLayout(kind === 'town' ? 'free' : kind) },
+    ], () => this.pickLayout(kind === 'town' ? 'free' : kind), `${L ? L.name : '西池袋タウン'} — マシン選択`);
   }
 
   showRecords(L) {
