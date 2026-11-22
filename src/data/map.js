@@ -38,7 +38,9 @@ const N = {
   // 都道441号の曲がりを細かく（添付画像のトレース）
   T441_A: [35.72912, 139.70501], T441_B: [35.72902, 139.70198], T441_C: [35.72827, 139.69858],
   // 池袋駅西口ロータリー
-  RT_W: [35.73007, 139.70975], RT_A: [35.7304, 139.70975], RT_B: [35.7304, 139.71035], RT_C: [35.72965, 139.71035], RT_D: [35.72965, 139.70975],
+  // 八角形（角を落としたロータリー。車が回れる半径を確保）
+  RT_W: [35.73007, 139.70975], RT_A0: [35.73024, 139.70975], RT_A1: [35.7304, 139.70994], RT_B0: [35.7304, 139.71016], RT_B1: [35.73024, 139.71035],
+  RT_C0: [35.72981, 139.71035], RT_C1: [35.72965, 139.71016], RT_D0: [35.72965, 139.70994], RT_D1: [35.72981, 139.70975],
   // 西一番街（路地。西口通りの途中に接続）
   NI_S: [35.73124, 139.71054], NI_N: [35.73267, 139.71054],
 };
@@ -81,7 +83,9 @@ export const ROADS = [
   { name: '西口公園通り', lanes: 1, laneW: 3.0, median: 0, shoulder: 1.5, nodes: ['W_SW', 'W_S1', 'EPOS'] },
   { name: '文化通り', lanes: 1, laneW: 3.0, median: 0, shoulder: 2.0, nodes: ['K3', 'E_EN', 'E1', 'KUREYON'] },
   { name: '南口通り', lanes: 1, laneW: 3.0, median: 0, shoulder: 2.0, nodes: ['W_S2', 'S_MID', 'EDIT'] },
-  { name: '西口ロータリー', lanes: 0, laneW: 7.0, median: 0, shoulder: 0.5, nodes: ['S_MID', 'RT_W', 'RT_A', 'RT_B', 'RT_C', 'RT_D', 'RT_W'] },
+  { name: 'ロータリー入口', lanes: 1, laneW: 3.5, median: 0, shoulder: 1.0, nodes: ['S_MID', 'RT_W'] },
+  // ロータリーは時計回りの一方通行（ノード順）
+  { name: '西口ロータリー', lanes: 0, laneW: 9.0, median: 0, shoulder: 0.5, oneway: true, nodes: ['RT_W', 'RT_A0', 'RT_A1', 'RT_B0', 'RT_B1', 'RT_C0', 'RT_C1', 'RT_D0', 'RT_D1', 'RT_W'] },
   { name: '西一番街', lanes: 0, laneW: 5.0, median: 0, shoulder: 0.5, ai: false, alley: true, nodes: ['NI_S', 'NI_N'] },
 ];
 for (const r of ROADS) {

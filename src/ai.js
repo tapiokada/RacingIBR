@@ -91,8 +91,9 @@ export class RaceAI {
 
 // 街を流すAI（道路グラフをランダムに巡回、左側通行）
 export class CruiseAI {
-  constructor(car, graph, from, to, cruise = 13) {
+  constructor(car, graph, from, to, cruise = 13, corridor = null) {
     this.car = car; this.graph = graph;
+    this.corridor = corridor; // 曲がりのパスが道路からはみ出さないかの確認用
     this.a = from; this.b = to; this.c = this.pick(to, from);
     this.cruise = cruise;
     this.paused = false;
@@ -103,6 +104,9 @@ export class CruiseAI {
   pick(at, prev) {
     let opts = (this.graph[at] || []).map((e) => e.to).filter((x) => x !== prev);
     if (!opts.length) return prev;
+    // 行き止まり（ショップ前など）には入らない
+    const through = opts.filter((o) => (this.graph[o] || []).length > 1);
+    if (through.length) opts = through;
     // 鋭角（Uターンに近い）曲がりは避ける
     const P = NODES[prev], A = NODES[at];
     if (P && A) {
@@ -118,7 +122,7 @@ export class CruiseAI {
     const r = townRoadBetween(a, b);
     const A = NODES[a], B = NODES[b];
     let P = [A, B];
-    if (r) {
+    if (r && r.smooth) { // 曲線補間した道路だけ折れ線を辿る（ループ道路で同じノードが2回出るため）
       const poly = cachedPoly(r);
       const near = (n) => { let bi = 0, bd = 1e18; poly.forEach((p, i) => { const d = (p.x - n.x) ** 2 + (p.z - n.z) ** 2; if (d < bd) { bd = d; bi = i; } }); return bi; };
       const ia = near(A), ib = near(B);
@@ -152,9 +156,56 @@ export class CruiseAI {
     const L1 = this.laneLine(this.a, this.b), L2 = this.laneLine(this.b, this.c);
     const e1 = L1.at(L1.len), s2 = L2.at(0);
     const cos = e1.fx * s2.fx + e1.fz * s2.fz;
-    let R = 14 + (1 - cos) * 6;
-    R = Math.min(R, L1.len * 0.45, L2.len * 0.45);
+    const Rmax = Math.min(14 + (1 - cos) * 6, L1.len * 0.45, L2.len * 0.45);
+    // 道路（縁石の内側）に収まる最大の R を探す
+    const search = () => {
+      let b = null;
+      for (let R = Rmax; R >= 1.5; R *= 0.82) {
+        const cand = this.turnCurve(L1, L2, R, cos);
+        if (!this.corridor || cand.curve.every((p) => this.corridor.query(p.x, p.z).d < -2.2)) return { ...cand, ok: true };
+        if (!b || cand.worst < b.worst) b = cand;
+      }
+      return b;
+    };
+    this.swing = 0;
+    let best = search();
+    // 収まらない鋭い曲がり（分離帯のない狭い道）は、外側へ膨らんでから曲がる
+    const r1 = townRoadBetween(this.a, this.b), r2 = townRoadBetween(this.b, this.c);
+    if (!best.ok && cos < -0.3 && r1 && r2 && !r1.median && !r2.median) {
+      const cross = e1.fx * s2.fz - e1.fz * s2.fx; // 正＝右折
+      const hw = Math.min(r1.width, r2.width) / 2;
+      const o = laneOffset(r1);
+      this.swing = (cross > 0 ? 1 : -1) * Math.max(0, hw - 2.1) - o; // 左の法線方向
+      const alt = search();
+      if (alt.ok || alt.worst < best.worst) best = alt; else this.swing = 0;
+    }
+    const { R, E, X, curve } = best;
+    const pts = [];
+    for (let i = 0; i < L1.pts.length && L1.cum[i] < L1.len - R - (this.swing ? 10 : 0); i++) pts.push(L1.pts[i]);
+    pts.push(E);
+    const turnStart = pts.length - 1;
+    pts.push(...curve);
+    pts.push(X);
+    const exitIdx = pts.length - 1;
+    for (let i = 0; i < L2.pts.length; i++) if (L2.cum[i] > R) pts.push(L2.pts[i]);
+    if (pts.length === exitIdx + 1) pts.push(L2.at(L2.len));
+    this.pts = pts;
+    this.cum = [0];
+    for (let i = 1; i < pts.length; i++) this.cum.push(this.cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
+    this.exitS = this.cum[exitIdx];
+    this.turnS0 = this.cum[turnStart];
+    this.turnCos = cos;
+    this.turnLen = this.exitS - this.turnS0;
+    this.turnR = R;
+  }
+
+  turnCurve(L1, L2, R, cos) {
     const E = L1.at(L1.len - R), X = L2.at(R);
+    if (this.swing) {
+      // 左の法線 = (fz, -fx)
+      E.x += E.fz * this.swing; E.z -= E.fx * this.swing;
+      X.x += X.fz * this.swing; X.z -= X.fx * this.swing;
+    }
     let C;
     if (cos < -0.9) {
       C = { x: (E.x + X.x) / 2 + E.fx * R * 1.2, z: (E.z + X.z) / 2 + E.fz * R * 1.2 };
@@ -169,25 +220,14 @@ export class CruiseAI {
         if (Math.hypot(C.x - mx, C.z - mz) > R * 2) C = { x: mx, z: mz };
       }
     }
-    const pts = [];
-    for (let i = 0; i < L1.pts.length && L1.cum[i] < L1.len - R; i++) pts.push(L1.pts[i]);
-    pts.push(E);
-    const turnStart = pts.length - 1;
-    for (let k = 1; k < 10; k++) {
-      const u = k / 10;
-      pts.push({ x: (1 - u) * (1 - u) * E.x + 2 * (1 - u) * u * C.x + u * u * X.x, z: (1 - u) * (1 - u) * E.z + 2 * (1 - u) * u * C.z + u * u * X.z });
+    const curve = [];
+    for (let k = 1; k < 12; k++) {
+      const u = k / 12;
+      curve.push({ x: (1 - u) * (1 - u) * E.x + 2 * (1 - u) * u * C.x + u * u * X.x, z: (1 - u) * (1 - u) * E.z + 2 * (1 - u) * u * C.z + u * u * X.z });
     }
-    pts.push(X);
-    const exitIdx = pts.length - 1;
-    for (let i = 0; i < L2.pts.length; i++) if (L2.cum[i] > R) pts.push(L2.pts[i]);
-    if (pts.length === exitIdx + 1) pts.push(L2.at(L2.len));
-    this.pts = pts;
-    this.cum = [0];
-    for (let i = 1; i < pts.length; i++) this.cum.push(this.cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
-    this.exitS = this.cum[exitIdx];
-    this.turnS0 = this.cum[turnStart];
-    this.turnCos = cos;
-    this.turnLen = this.exitS - this.turnS0;
+    let worst = -1e9;
+    if (this.corridor) for (const p of [E, ...curve, X]) worst = Math.max(worst, this.corridor.query(p.x, p.z).d);
+    return { R, E, X, curve, worst };
   }
 
   project(x, z) {
@@ -227,17 +267,30 @@ export class CruiseAI {
     const steer = steerToward(car, tgt.x, tgt.z);
     // 曲がりの手前で減速（曲がりの鋭さと半径から）
     const cos = this.turnCos;
-    const vTurn = cos > 0.9 ? this.cruise : Math.max(3, Math.min(this.cruise, Math.sqrt(4.5 * Math.max(3, this.turnLen * 0.45))));
+    const rad = this.turnR / Math.max(0.3, Math.tan(Math.max(0.05, Math.acos(Math.max(-1, Math.min(1, cos)))) / 2));
+    const vTurn = cos > 0.95 ? this.cruise : Math.max(2.5, Math.min(this.cruise, Math.sqrt(4.0 * Math.max(2, rad))));
     const toTurn = this.turnS0 - s;
     let vt = this.cruise;
     if (s < this.exitS) vt = Math.min(vt, toTurn > 0 ? Math.sqrt(vTurn * vTurn + 2 * 2.2 * toTurn) : vTurn);
-    // 前方車
+    // 進行方向とパスの向きがずれている間（曲がった直後など）は加速しない
+    const p0 = this.pointAt(s), p1 = this.pointAt(s + 3);
+    const ang = Math.atan2(p1.x - p0.x, p1.z - p0.z);
+    let herr = Math.abs(((car.h - ang + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+    if (herr > 0.25) vt = Math.min(vt, Math.max(2.5, 9 * (1 - (herr - 0.25) / 0.8)));
+    // 前方の同じ向きの車には追従。待ちが長いときは横をすり抜ける（デッドロック防止）
     const f0 = Math.sin(car.h), f1 = Math.cos(car.h);
-    for (const o of others) {
-      const ox = o.x - car.x, oz = o.z - car.z;
-      const u = ox * f0 + oz * f1, w = ox * -f1 + oz * f0;
-      if (u > 0 && u < 22 && Math.abs(w) < 2.6) vt = Math.min(vt, Math.max(0, (u - 7) * 0.6));
+    let blocked = false;
+    if (this.squeeze > 0) this.squeeze -= dt;
+    else {
+      for (const o of others) {
+        const ox = o.x - car.x, oz = o.z - car.z;
+        const u = ox * f0 + oz * f1, w = ox * -f1 + oz * f0;
+        const same = Math.cos(o.h - car.h) > 0.3;
+        if (u > 0 && u < 22 && Math.abs(w) < 2.6 && (same || u < 9)) { vt = Math.min(vt, Math.max(0, (u - 7) * 0.6)); blocked = true; }
+      }
     }
+    this.wait = blocked && car.speed < 1 ? (this.wait || 0) + dt : 0;
+    if (this.wait > 4) { this.wait = 0; this.squeeze = 3; }
     const err = vt - car.speed;
     let throttle = clamp(0.2 + err * 0.3, 0, 0.75);
     let brake = clamp(-err * 0.25, 0, 1);

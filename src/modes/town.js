@@ -71,7 +71,7 @@ export class TownMode {
     const pc = s.player.car;
     // 出現位置：プレイヤーから離れた道路上
     const edges = [];
-    for (const [a, list] of Object.entries(this.graph)) for (const e of list) edges.push([a, e.to]);
+    for (const [a, list] of Object.entries(this.graph)) for (const e of list) if ((this.graph[e.to] || []).length > 1) edges.push([a, e.to]); // 行き止まりへ向かう辺には出さない
     for (let tries = 0; tries < 40; tries++) {
       const [a, b] = edges[Math.floor(Math.random() * edges.length)];
       const A = NODES[a], B = NODES[b];
@@ -85,7 +85,7 @@ export class TownMode {
       const e = s.addCar({ carId: r.car, equipped: r.parts, color: r.color, name: r.name });
       const lo = laneOffset(townRoadBetween(a, b));
       e.car.place(x + fz * lo, z - fx * lo, Math.atan2(fx, fz), 9);
-      e.ai = new CruiseAI(e.car, this.graph, a, b, 11 + Math.random() * 5);
+      e.ai = new CruiseAI(e.car, this.graph, a, b, 11 + Math.random() * 5, this.game.world.corridor);
       e.rival = r;
       e.rating = buildSpec(r.car, r.parts).rating;
       e.mapColor = '#ff4d6d';

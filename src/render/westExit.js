@@ -231,9 +231,8 @@ export class WestExit {
 
   // ---- 西口ロータリーの島（バス乗り場） ----
   buildRotaryIsland() {
-    const A = NODES.RT_A, C = NODES.RT_C;
-    const x0 = Math.min(A.x, C.x) + 4.5, x1 = Math.max(A.x, C.x) - 4.5;
-    const z0 = Math.min(A.z, C.z) + 4.5, z1 = Math.max(A.z, C.z) - 4.5;
+    const x0 = NODES.RT_W.x + 6, x1 = NODES.RT_B1.x - 6;
+    const z0 = NODES.RT_A1.z + 6, z1 = NODES.RT_C1.z - 6;
     const w = x1 - x0, d = z1 - z0;
     if (w <= 2 || d <= 2) return;
     const base = new THREE.Mesh(new THREE.BoxGeometry(w, 0.2, d), new THREE.MeshLambertMaterial({ color: 0x9a9ca2 }));

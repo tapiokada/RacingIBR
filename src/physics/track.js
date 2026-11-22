@@ -119,8 +119,26 @@ export function townMedians() {
   return out;
 }
 
+// 狭い道の鋭い曲がり角の隅切り（車が曲がれるよう角を丸く広げる）
+export function townCornerPads() {
+  const pads = [];
+  for (const r of ROADS) {
+    if (r.width >= 12) continue;
+    const P = roadPolyline(r);
+    for (let i = 1; i < P.length - 1; i++) {
+      const a = P[i - 1], b = P[i], c = P[i + 1];
+      const ux = b.x - a.x, uz = b.z - a.z, vx = c.x - b.x, vz = c.z - b.z;
+      const cos = (ux * vx + uz * vz) / ((Math.hypot(ux, uz) * Math.hypot(vx, vz)) || 1);
+      if (cos > -0.35) continue; // 110°以上曲がる角だけ
+      pads.push({ x: b.x, z: b.z, r: r.width / 2 + 2.8 });
+    }
+  }
+  return pads;
+}
+
 export function townCorridor() {
   const segs = [];
+  for (const p of townCornerPads()) segs.push({ ax: p.x, az: p.z, bx: p.x, bz: p.z, hw: p.r, road: 'corner' });
   for (const r of ROADS) {
     const P = roadPolyline(r);
     for (let i = 0; i < P.length - 1; i++) {
@@ -137,7 +155,8 @@ export function townGraph() {
     for (let i = 0; i < r.nodes.length - 1; i++) {
       const a = r.nodes[i], b = r.nodes[i + 1];
       (adj[a] ||= []).push({ to: b, w: r.width });
-      (adj[b] ||= []).push({ to: a, w: r.width });
+      if (!r.oneway) (adj[b] ||= []).push({ to: a, w: r.width });
+      else adj[b] ||= [];
     }
   }
   return adj;

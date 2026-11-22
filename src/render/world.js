@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { NODES, ROADS, POIS, geo, roadPolyline } from '../data/map.js';
 import { TownDetail } from './townDetail.js';
 import { WestExit } from './westExit.js';
-import { townCorridor, boxClearOfCourse, courseClearance } from '../physics/track.js';
+import { townCorridor, boxClearOfCourse, courseClearance, townCornerPads } from '../physics/track.js';
 import { buildEdges } from './edges.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
@@ -180,6 +180,14 @@ export class World {
         wd.rotation.x = -Math.PI / 2; wd.position.set(p.x, 0.011, p.z);
         S.add(wd);
       });
+    }
+    // 隅切り（狭い道の鋭い角を丸く広げた部分）
+    for (const p of townCornerPads()) {
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(p.r, 28), roadMat);
+      disc.rotation.x = -Math.PI / 2; disc.position.set(p.x, 0.0205, p.z);
+      const wd = new THREE.Mesh(new THREE.CircleGeometry(p.r + 3.2, 28), walkMat);
+      wd.rotation.x = -Math.PI / 2; wd.position.set(p.x, 0.0105, p.z);
+      S.add(disc, wd);
     }
     // 車線・分離帯・横断歩道・信号・首都高・歩道橋
     this.detail = new TownDetail(S);
