@@ -1,0 +1,42 @@
+module.exports = async (pg, OUT) => {
+  const fps = await pg.evaluate(() => new Promise(r => { let n=0; const t0=performance.now(); const f=()=>{n++; if(performance.now()-t0<2000) requestAnimationFrame(f); else r(n/2);}; requestAnimationFrame(f); }));
+  console.log('fps', fps);
+  await pg.keyboard.press('Enter'); await pg.waitForTimeout(300);
+  await pg.keyboard.press('Enter'); await pg.waitForTimeout(2000);
+  await pg.screenshot({ path: OUT + '/02_town_start.png' });
+  await pg.keyboard.down('KeyF');
+  await pg.evaluate(() => window.__dbg.game.debugStep(3));
+  await pg.keyboard.press('KeyE');
+  await pg.evaluate(() => window.__dbg.game.debugStep(3));
+  await pg.waitForTimeout(300);
+  await pg.screenshot({ path: OUT + '/03_town_drive.png' });
+  const st = await pg.evaluate(() => { const m = window.__dbg.game.mode; const c = m.session.player.car; return { kmh: c.kmh, gear: c.gear, x: c.x, z: c.z }; });
+  console.log(JSON.stringify(st));
+  await pg.keyboard.up('KeyF');
+  await pg.keyboard.press('KeyI'); await pg.waitForTimeout(400);
+  await pg.screenshot({ path: OUT + '/04_cockpit.png' });
+  await pg.keyboard.press('KeyI'); await pg.keyboard.press('KeyI'); await pg.waitForTimeout(300);
+  // テレポートしてライバルの後ろへ→パッシング
+  const r = await pg.evaluate(() => { const g = window.__dbg.game, m = g.mode; const e = m.session.entries.find(x=>x.rival); const c = m.session.player.car; const [f0,f1]=e.car.fwd(); c.place(e.car.x - f0*18, e.car.z - f1*18, e.car.h, e.car.speed); return e.rival.name; });
+  console.log('target', r);
+  await pg.waitForTimeout(100);
+  await pg.screenshot({ path: OUT + '/07_behind_rival.png' });
+  await pg.keyboard.press('KeyH');
+  await pg.waitForTimeout(100);
+  await pg.evaluate(() => window.__dbg.game.debugStep(1));
+  await pg.waitForTimeout(500);
+  await pg.screenshot({ path: OUT + '/08_encounter.png' });
+  await pg.keyboard.press('Enter'); await pg.waitForTimeout(1500);
+  await pg.screenshot({ path: OUT + '/09_battle_grid.png' });
+  await pg.evaluate(() => window.__dbg.game.debugStep(6));
+  await pg.keyboard.down('KeyF');
+  await pg.evaluate(() => window.__dbg.game.debugStep(5));
+  await pg.waitForTimeout(300);
+  await pg.screenshot({ path: OUT + '/10_battle_run.png' });
+  await pg.keyboard.up('KeyF');
+  const b = await pg.evaluate(() => { const m = window.__dbg.game.mode; return { state: m.state, tp: m.tp.dist, tr: m.tr.dist, layout: m.opts.layout.key }; });
+  console.log(JSON.stringify(b));
+  // let AI drive player car to finish quickly
+  const res = await pg.evaluate(async () => { const g = window.__dbg.game, m = g.mode; const { RaceAI } = window.__dbg || {}; return !!RaceAI; });
+  console.log('dbg', res);
+};

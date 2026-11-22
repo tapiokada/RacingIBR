@@ -1,0 +1,21 @@
+const { chromium } = require('playwright');
+const http = require('http'); const fs = require('fs'); const path = require('path');
+const root = process.cwd();
+const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.mp3':'audio/mpeg', '.map':'application/json' };
+const srv = http.createServer((q, r) => { let p = path.join(root, decodeURIComponent(q.url.split('?')[0])); if (p.endsWith('/')) p += 'index.html';
+  fs.readFile(p, (e, d) => { if (e) { r.writeHead(404); r.end(); return; } r.writeHead(200, { 'Content-Type': types[path.extname(p)] || 'application/octet-stream' }); r.end(d); }); });
+const OUT = process.env.OUT;
+srv.listen(8123, async () => {
+  const b = await chromium.launch({ args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
+  const pg = await b.newPage({ viewport: { width: 1280, height: 720 } });
+  const errs = [];
+  pg.on('pageerror', e => errs.push('PAGEERR ' + e.message));
+  pg.on('console', m => { if (m.type() === 'error' || m.type()==='warning') errs.push(m.type()+': ' + m.text()); });
+  await pg.goto('http://localhost:8123/index.html?debug');
+  await pg.waitForTimeout(2500);
+  await pg.screenshot({ path: OUT + '/01_title.png' });
+  const script = process.env.SCRIPT ? require(path.resolve(process.env.SCRIPT)) : null;
+  if (script) await script(pg, OUT);
+  console.log(errs.slice(0, 30).join('\n') || 'no errors');
+  await b.close(); srv.close();
+});

@@ -1,0 +1,95 @@
+// 西池袋ミニチュアマップ
+// 添付のGoogleマップ画像（経由地座標・画面上の経路）から主要道路の折れ点を緯度経度で起こしたもの。
+// MAP_SCALE倍に縮小した「ミニチュア版」の街として扱う（道幅・車両は実寸）。
+
+export const MAP_SCALE = 0.7;
+const LAT0 = 35.734, LON0 = 139.704;
+const M_LAT = 110950, M_LON = 90360; // 緯度35.73°付近の1度あたりメートル
+
+// x: 東(+) / z: 南(+)
+export function geo(lat, lon) {
+  return { x: (lon - LON0) * M_LON * MAP_SCALE, z: (LAT0 - lat) * M_LAT * MAP_SCALE };
+}
+
+const N = {
+  // 山手通り
+  Y0: [35.72805, 139.69688], Y_RK: [35.73065, 139.6983], Y_KN: [35.733132, 139.699497],
+  Y2: [35.73521, 139.7006], Y3: [35.73938, 139.70538], KUMANO: [35.74139, 139.70675],
+  // 川越街道
+  K1: [35.74012, 139.70841], AXIA: [35.7386, 139.71061], K3: [35.73843, 139.71165], K4: [35.7381, 139.7126],
+  // 劇場通り
+  G1: [35.73714, 139.70997], G2: [35.73446, 139.70942], G3: [35.73215, 139.7088],
+  BUKURO: [35.73162, 139.70846], GOSA: [35.73125, 139.70826], W_SW: [35.73082, 139.70804], G5: [35.72835, 139.70666],
+  // 都道441号
+  R441_1: [35.72924, 139.70354], R441_2: [35.72865, 139.70042], S441: [35.72776, 139.70826], EDIT: [35.72744, 139.70931],
+  // 立教通り
+  R1: [35.73037, 139.69903], R2: [35.73043, 139.70004], R3: [35.73074, 139.70236], R4: [35.73112, 139.70507],
+  TIPTOP: [35.73116, 139.70546], RK_E: [35.73175, 139.70713], HP: [35.73207, 139.70706],
+  // 要町通り
+  QB: [35.73186, 139.70663], Q1: [35.73212, 139.70584], Q2: [35.73253, 139.70499], NIKKEN: [35.73284, 139.7039],
+  Q3: [35.73291, 139.70329], Q4: [35.73288, 139.70081], YUBIN: [35.73305, 139.69987],
+  // 西口（池袋WGP）
+  EPOS: [35.73066, 139.70882], W_S2: [35.73065, 139.70935], W_A: [35.73092, 139.70969], W_B: [35.73151, 139.71002],
+  W_C: [35.73126, 139.71028], HOSEI: [35.73121, 139.71084], W_E1: [35.73155, 139.71112], W_E2: [35.73163, 139.71096],
+  KUREYON: [35.73268, 139.71085], W_N: [35.73262, 139.70952], MIYAKE: [35.73161, 139.70947], W_S1: [35.73068, 139.7084],
+  // 東側（北池袋方面）
+  E_EN: [35.7362, 139.7116], E1: [35.73407, 139.71155], S_MID: [35.73007, 139.70935],
+};
+
+export const NODES = Object.fromEntries(Object.entries(N).map(([k, [la, lo]]) => [k, geo(la, lo)]));
+
+export const ROADS = [
+  { name: '山手通り', width: 16, nodes: ['Y0', 'Y_RK', 'Y_KN', 'Y2', 'Y3', 'KUMANO'] },
+  { name: '川越街道', width: 14, nodes: ['KUMANO', 'K1', 'AXIA', 'K3', 'K4'] },
+  { name: '劇場通り', width: 12, nodes: ['AXIA', 'G1', 'G2', 'G3', 'BUKURO', 'GOSA', 'W_SW', 'G5'] },
+  { name: '都道441号', width: 12, nodes: ['Y0', 'R441_2', 'R441_1', 'G5', 'S441', 'EDIT'] },
+  { name: '立教通り', width: 9, nodes: ['Y_RK', 'R1', 'R2', 'R3', 'R4', 'TIPTOP', 'RK_E', 'GOSA'] },
+  { name: '要町通り', width: 11, nodes: ['Y_KN', 'YUBIN', 'Q4', 'Q3', 'NIKKEN', 'Q2', 'Q1', 'QB', 'HP', 'RK_E'] },
+  { name: '西口通り', width: 9, nodes: ['EPOS', 'W_S2', 'W_A', 'W_B', 'W_C', 'HOSEI', 'W_E1', 'W_E2', 'KUREYON', 'W_N', 'MIYAKE', 'BUKURO'] },
+  { name: '西口公園通り', width: 9, nodes: ['W_SW', 'W_S1', 'EPOS'] },
+  { name: '文化通り', width: 10, nodes: ['K3', 'E_EN', 'E1', 'KUREYON'] },
+  { name: '南口通り', width: 10, nodes: ['W_S2', 'S_MID', 'EDIT'] },
+];
+
+// 施設
+export const POIS = [
+  { id: 'shop', type: 'shop', name: 'ドン・キホーテ 北池袋店（チューニングショップ）', short: 'TUNE SHOP', node: 'K4', offset: [0, 0] },
+  { id: 'gs', type: 'gs', name: 'ENEOS セルフ池袋（セーブポイント）', short: 'GS / SAVE', node: 'E_EN', offset: [0, 0] },
+];
+
+// コース（ノード列のループ。先頭ノードがスタート/フィニッシュ）
+export const COURSES = [
+  {
+    id: 'speedway', name: '西池袋スピードウェイ', laps: 1, radius: 22,
+    nodes: ['Y_RK', 'Y_KN', 'Y2', 'Y3', 'KUMANO', 'K1', 'AXIA', 'G1', 'G2', 'G3', 'BUKURO', 'GOSA', 'W_SW', 'G5', 'R441_1', 'R441_2', 'Y0'],
+    desc: '山手通り・川越街道・劇場通り・441号を周回する高速コース',
+  },
+  {
+    id: 'wgp', name: '池袋WGP', laps: 3, radius: 7, wide: { W_B: 13, W_E2: 12 },
+    nodes: ['EPOS', 'W_S2', 'W_A', 'W_B', 'W_C', 'HOSEI', 'W_E1', 'W_E2', 'KUREYON', 'W_N', 'MIYAKE', 'BUKURO', 'GOSA', 'W_SW', 'W_S1'],
+    desc: '池袋駅西口の狭い路地を駆け抜けるテクニカルコース',
+  },
+  {
+    id: 'rikkyo', name: '立教通りサーキット', laps: 2, radius: 12, wide: { RK_E: 13, HP: 14 },
+    nodes: ['R3', 'R4', 'TIPTOP', 'RK_E', 'HP', 'QB', 'Q1', 'Q2', 'NIKKEN', 'Q3', 'Q4', 'YUBIN', 'Y_KN', 'Y_RK', 'R1', 'R2'],
+    desc: '立教通りと要町通りを結ぶ、ヘアピンが名物の中速コース',
+  },
+];
+
+// 順走/逆走を含めた6レイアウト
+export const LAYOUTS = COURSES.flatMap((c) => [
+  { key: `${c.id}_f`, course: c, reverse: false, name: `${c.name}（順走）` },
+  { key: `${c.id}_r`, course: c, reverse: true, name: `${c.name}（逆走）` },
+]);
+
+export function roadWidthBetween(a, b) {
+  for (const r of ROADS) {
+    for (let i = 0; i < r.nodes.length - 1; i++) {
+      if ((r.nodes[i] === a && r.nodes[i + 1] === b) || (r.nodes[i] === b && r.nodes[i + 1] === a)) return r.width;
+    }
+  }
+  return 10;
+}
+
+// 主人公の初期位置（GS前）
+export const START_SPOT = { node: 'E_EN', heading: Math.PI };
