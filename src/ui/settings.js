@@ -40,6 +40,15 @@ export function openSettings(game, onClose) {
     opt('トランスミッション', () => (s.transmission === 'MT' ? 'MT（マニュアル）' : 'AT（オートマ）'), () => { s.transmission = s.transmission === 'MT' ? 'AT' : 'MT'; });
     opt('ABS', () => (s.abs ? 'ON' : 'OFF'), () => { s.abs = !s.abs; });
     opt('トラクションコントロール', () => (s.tcs ? 'ON' : 'OFF'), () => { s.tcs = !s.tcs; });
+    list.appendChild(el('div', { class: 'key-sep' }, '画面'));
+    {
+      const lbl = el('span', { class: 'key-val' }, `${Math.round(s.brightness * 100)}%`);
+      const range = el('input', { type: 'range', min: 0.5, max: 2, step: 0.05, value: s.brightness });
+      range.oninput = () => { s.brightness = parseFloat(range.value); lbl.textContent = `${Math.round(s.brightness * 100)}%`; game.applyBrightness(); saveSettings(s); };
+      const row = el('div', { class: 'key-row' }, el('span', { class: 'key-name' }, '明るさ'), el('span', {}, lbl, ' ', range));
+      rows.push({ row, act: () => {}, left: () => { range.value = Math.max(0.5, s.brightness - 0.05); range.oninput(); }, right: () => { range.value = Math.min(2, s.brightness + 0.05); range.oninput(); } });
+      list.appendChild(row);
+    }
     list.appendChild(el('div', { class: 'key-sep' }, 'サウンド'));
     vol('BGM音量', 'bgm');
     vol('効果音・エンジン音量', 'se');

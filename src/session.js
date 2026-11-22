@@ -53,19 +53,25 @@ export class DriveSession {
     const steer = (inp.held('right') ? 1 : 0) - (inp.held('left') ? 1 : 0);
     const ramp = (a, b, r) => a + Math.max(-r * dt, Math.min(r * dt, b - a));
     car.input = { throttle: ramp(prev.throttle, tT, tT > prev.throttle ? 7 : 12), brake: ramp(prev.brake, tB, 10), steer };
-    if (inp.hit('reset')) { this.resetPlayer(); return; }
+    if (inp.hit('reset')) {
+      // resetRule: 'battle' = 10km/h以下のときだけ、10m後方へ
+      if (this.resetRule === 'battle') {
+        if (Math.abs(car.vu) * 3.6 > 10) { this.onResetDenied && this.onResetDenied(); }
+        else { this.resetPlayer(-10); return; }
+      } else { this.resetPlayer(); return; }
+    }
     if (inp.hit('shiftUp')) car.shiftUp();
     if (inp.hit('shiftDown')) car.shiftDown();
   }
 
   // 車両リセット：進行方向前向き・道路中央・0km/h
-  resetPlayer() {
+  resetPlayer(back = 0) {
     const car = this.player.car;
     let x, z, h;
     if (this.path) {
       const pr = this.path.project(car.x, car.z, -1);
-      const p = this.path.posAt(pr.s, 0);
-      x = p.x; z = p.z; h = Math.atan2(this.path.tx[pr.i], this.path.tz[pr.i]);
+      const p = this.path.posAt(pr.s + back, 0);
+      x = p.x; z = p.z; h = p.h;
     } else {
       let best = null, bd = 1e18;
       for (const sg of this.corridor.segs) {

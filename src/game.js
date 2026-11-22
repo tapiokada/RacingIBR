@@ -15,7 +15,7 @@ export class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.4;
+    this.applyBrightness();
     container.appendChild(this.renderer.domElement);
     this.ui = el('div', { class: 'ui-root' });
     container.appendChild(this.ui);
@@ -35,6 +35,11 @@ export class Game {
     window.addEventListener('keydown', unlock);
     window.addEventListener('pointerdown', unlock);
     requestAnimationFrame(() => this.loop());
+  }
+
+  // 明るさ（設定の倍率 × 基準露出）
+  applyBrightness() {
+    this.renderer.toneMappingExposure = 1.4 * (this.settings.brightness || 1);
   }
 
   resize() {

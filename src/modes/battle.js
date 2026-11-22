@@ -45,6 +45,10 @@ export class BattleMode {
     g.rig.reset();
     this.hud = new Hud(g.ui);
     this.hud.setMapCourse(path);
+    // バトル中のリセットは10km/h以下のときだけ、10m後方へ
+    this.session.resetRule = 'battle';
+    this.session.onResetDenied = () => this.hud.flash('', 1.2, 'リセットは10km/h以下で使用できます');
+    this.session.onReset = () => this.hud.flash('RESET', 0.8, '10m後方から再スタート');
     this.t = 0;
     this.raceT = 0;
     this.state = 'intro';

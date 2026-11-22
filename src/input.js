@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS = {
   keys: Object.fromEntries(ACTIONS.map((a) => [a.id, a.def])),
   bgm: 0.6, se: 0.7, transmission: 'AT', abs: true, tcs: true, mirror: true,
   defaultsRev: 2,
+  brightness: 1.0,
 };
 
 export function loadSettings() {
