@@ -7,7 +7,7 @@ import { NODES, POIS, START_SPOT, LAYOUTS, COURSES, townRoadBetween, laneOffset 
 import { RIVALS } from '../data/rivals.js';
 import { CARS, PLAYER } from '../data/cars.js';
 import { CruiseAI } from '../ai.js';
-import { townGraph, CoursePath } from '../physics/track.js';
+import { townGraph, getCoursePath } from '../physics/track.js';
 import { buildSpec } from '../physics/spec.js';
 import { saveGame, activeCar, fmtMoney } from '../save.js';
 import { openShop } from '../ui/shop.js';
@@ -15,10 +15,8 @@ import { VIEW_NAMES } from '../render/cameras.js';
 import { BattleMode } from './battle.js';
 import { TitleMode } from './title.js';
 
-const pathCache = {};
 export function coursePath(layout) {
-  if (!pathCache[layout.key]) pathCache[layout.key] = new CoursePath(layout);
-  return pathCache[layout.key];
+  return getCoursePath(layout);
 }
 
 const MAX_RIVALS = 4;

@@ -1,5 +1,5 @@
 // 走行可能領域（道路カプセルの和集合）とコース中心線
-import { NODES, ROADS, roadWidthBetween, roadPolyline } from '../data/map.js';
+import { NODES, ROADS, roadWidthBetween, roadPolyline, LAYOUTS } from '../data/map.js';
 
 // ---------------- 走行可能領域 ----------------
 export class Corridor {
@@ -390,4 +390,33 @@ export class CoursePath {
     }
     return v;
   }
+}
+
+// ---------------- コース共通 ----------------
+const pathCache = {};
+export function getCoursePath(layout) {
+  if (!pathCache[layout.key]) pathCache[layout.key] = new CoursePath(layout);
+  return pathCache[layout.key];
+}
+
+// 全6レイアウトのコース走行範囲までの距離（負＝コース上）。景観オブジェクトの配置チェック用
+export function courseClearance(x, z) {
+  let d = 1e9;
+  for (const L of LAYOUTS) {
+    const q = getCoursePath(L).corridor.query(x, z);
+    if (!q.far && q.d < d) d = q.d;
+  }
+  return d;
+}
+
+// 回転した矩形（中心・幅w(x)・奥行d(z)・回転rot）がコースから margin 以上離れているか
+export function boxClearOfCourse(cx, cz, w, d, rot = 0, margin = 2.5) {
+  const c = Math.cos(rot), s = Math.sin(rot);
+  const n = 4;
+  for (let i = 0; i <= n; i++) for (let j = 0; j <= n; j++) {
+    const lx = (i / n - 0.5) * w, lz = (j / n - 0.5) * d;
+    const x = cx + lx * c + lz * s, z = cz - lx * s + lz * c;
+    if (courseClearance(x, z) < margin) return false;
+  }
+  return true;
 }

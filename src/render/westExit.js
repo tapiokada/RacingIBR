@@ -2,6 +2,7 @@
 // 施設名・店名はすべて架空。形・配置・色は実在の街並みを参考にしている。
 import * as THREE from 'three';
 import { NODES, LANDMARKS, geo, MAP_SCALE } from '../data/map.js';
+import { boxClearOfCourse, courseClearance } from '../physics/track.js';
 
 const S = MAP_SCALE;
 
@@ -164,6 +165,7 @@ export class WestExit {
     const trunk = new THREE.MeshLambertMaterial({ color: 0x4a3828 });
     const leaf = new THREE.MeshLambertMaterial({ color: 0x2c5a2e, emissive: 0x081208 });
     const tree = (x, z, s = 1) => {
+      if (courseClearance(x, z) < 2.5 * s) return;
       const t = new THREE.Mesh(new THREE.CylinderGeometry(0.15 * s, 0.22 * s, 3 * s, 6), trunk);
       t.position.set(x, 1.5 * s, z);
       const f = new THREE.Mesh(new THREE.SphereGeometry(2.0 * s, 10, 8), leaf);
@@ -176,6 +178,7 @@ export class WestExit {
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * Math.PI * 2;
       const x = cx + Math.cos(a) * 15, z = cz + Math.sin(a) * 15 * 0.7;
+      if (courseClearance(x, z) < 1) continue;
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 4, 6), new THREE.MeshLambertMaterial({ color: 0x555b66 }));
       pole.position.set(x, 2, z);
       const l = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), lampMat);
@@ -266,6 +269,7 @@ export class WestExit {
     // アーチ看板（南の入口）
     const gate = new THREE.Group();
     gate.position.set(x, 0, zS - 6.5);
+    gate.visible = courseClearance(x - 3.9, zS - 6.5) > 0.8 && courseClearance(x + 3.9, zS - 6.5) > 0.8;
     const postMat = new THREE.MeshLambertMaterial({ color: 0x9da3ab, emissive: 0x1a1a1a });
     for (const sx of [-1, 1]) {
       const p = new THREE.Mesh(new THREE.BoxGeometry(0.4, 6.4, 0.4), postMat);
@@ -288,6 +292,7 @@ export class WestExit {
       for (let z = zN + 5; z < zS - 6; z += 8) {
         const w = 7.5, h = 8 + ((n * 37) % 15), dpt = 10;
         const bx = x + side * (3.0 + 1.6 + dpt / 2);
+        if (!boxClearOfCourse(bx, z + w / 2, dpt + 1.6, w, 0, 2.5)) continue; // 池袋WGPの車道に被る店は置かない
         const col = new THREE.Color().setHSL(((n * 0.13) % 1), 0.15, 0.22 + ((n * 7) % 5) * 0.03);
         const b = new THREE.Mesh(new THREE.BoxGeometry(dpt, h, w - 0.4), new THREE.MeshLambertMaterial({ color: col }));
         b.position.set(bx, h / 2, z + w / 2);
@@ -313,6 +318,7 @@ export class WestExit {
     lg.scale(1, 1.3, 1);
     for (let z = zN + 3; z < zS - 7; z += 3.5) {
       for (const sx of [-1, 1]) {
+        if (courseClearance(x + sx * 3.4, z) < 1.5) continue;
         const l = new THREE.Mesh(lg, lantern);
         l.position.set(x + sx * 3.4, 3.6, z);
         this.g.add(l);

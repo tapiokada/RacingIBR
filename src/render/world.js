@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { NODES, ROADS, POIS, geo, roadPolyline } from '../data/map.js';
 import { TownDetail } from './townDetail.js';
 import { WestExit } from './westExit.js';
-import { townCorridor } from '../physics/track.js';
+import { townCorridor, boxClearOfCourse, courseClearance } from '../physics/track.js';
 import { buildEdges } from './edges.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
@@ -215,7 +215,9 @@ export class World {
         const w = s * (1.2 + r() * 0.8), dd = s * (1.2 + r() * 0.8);
         const nearSt = Math.max(0, 1 - Math.hypot(px - (station.x + 120), pz - station.z) / 500);
         const hgt = 6 + r() * 18 + (r() < 0.12 ? 25 : 0) + nearSt * (10 + r() * 25);
-        items.push({ px, pz, w, d: dd, h: hgt, rot: (r() - 0.5) * 0.2 });
+        const rot = (r() - 0.5) * 0.2;
+        if (!boxClearOfCourse(px, pz, w, dd, rot, 3.0)) continue; // レースコースに被らない
+        items.push({ px, pz, w, d: dd, h: hgt, rot });
       }
     }
     const geoB = new THREE.BoxGeometry(1, 1, 1);
@@ -266,6 +268,7 @@ export class World {
           acc = s + 26 - len;
           const o = (r.width / 2 + 2.4) * side;
           const x = a.x + tx * s + rx * o, z = a.z + tz * s + rz * o;
+          if (courseClearance(x, z) < 1.2) continue;
           poles.push({ x, z, side, rx, rz });
           pools.push({ x: x - rx * side * 4.2, z: z - rz * side * 4.2 });
           side = -side;

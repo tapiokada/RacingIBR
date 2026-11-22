@@ -1,7 +1,7 @@
 // 街の道路ディテール：車線区分線・中央分離帯・右折レーン矢印・横断歩道・停止線・信号機・首都高・歩道橋
 import * as THREE from 'three';
 import { NODES, ROADS, roadPolyline } from '../data/map.js';
-import { townJunctions, townMedians, MEDIAN_TRIM } from '../physics/track.js';
+import { townJunctions, townMedians, MEDIAN_TRIM, boxClearOfCourse, courseClearance } from '../physics/track.js';
 
 // ---- 共通ヘルパ ----
 function cumulate(P) {
@@ -291,6 +291,7 @@ export class TownDetail {
       const p = sampleAt(P, S, d);
       if (avoid.some((n) => Math.hypot(n.x - p.x, n.z - p.z) < 28)) continue;
       const span = r.width / 2 + 2.1;
+      if ([-1, 1].some((sg) => courseClearance(p.x + p.rx * span * sg, p.z + p.rz * span * sg) < 1.2)) continue; // コースに被る橋脚は省略
       for (const sg of [-1, 1]) {
         const c = new THREE.Mesh(colGeo, pierMat);
         c.position.set(p.x + p.rx * span * sg, 0, p.z + p.rz * span * sg);
@@ -329,6 +330,12 @@ export class TownDetail {
       const cx = A.x + (B.x - A.x) * t, cz = A.z + (B.z - A.z) * t;
       const span = r.width + 6.4;
       const H = 5.3;
+      // 階段がコースに被る場合は設置しない
+      const stairsOk = [-1, 1].every((sz) => {
+        const o = sz * (span / 2 - 1.1);
+        return boxClearOfCourse(cx - ux * 4.5 + rx * o, cz - uz * 4.5 + rz * o, 1.8, 9.4, Math.atan2(ux, uz), 0.8);
+      });
+      if (!stairsOk) continue;
       const g = new THREE.Group();
       g.position.set(cx, 0, cz);
       g.rotation.y = Math.atan2(rx, rz); // ローカルzを道路の横断方向へ
