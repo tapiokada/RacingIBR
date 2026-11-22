@@ -15,7 +15,7 @@ export class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = 1.4;
     container.appendChild(this.renderer.domElement);
     this.ui = el('div', { class: 'ui-root' });
     container.appendChild(this.ui);

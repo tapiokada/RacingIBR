@@ -24,7 +24,7 @@ const N = {
   R441_1: [35.72924, 139.70354], R441_2: [35.72865, 139.70042], S441: [35.72776, 139.70826], EDIT: [35.72744, 139.70931],
   // 立教通り
   R1: [35.73037, 139.69903], R2: [35.73043, 139.70004], R3: [35.73074, 139.70236], R4: [35.73112, 139.70507],
-  TIPTOP: [35.73116, 139.70546], RK_E: [35.73175, 139.70713], HP: [35.73207, 139.70706],
+  TIPTOP: [35.73116, 139.70546], RK_E: [35.73175, 139.70713],
   // 要町通り
   QB: [35.73186, 139.70663], Q1: [35.73212, 139.70584], Q2: [35.73253, 139.70499], NIKKEN: [35.73284, 139.7039],
   Q3: [35.73291, 139.70329], Q4: [35.73288, 139.70081], YUBIN: [35.73305, 139.69987],
@@ -44,7 +44,7 @@ export const ROADS = [
   { name: '劇場通り', width: 12, nodes: ['AXIA', 'G1', 'G2', 'G3', 'BUKURO', 'GOSA', 'W_SW', 'G5'] },
   { name: '都道441号', width: 12, nodes: ['Y0', 'R441_2', 'R441_1', 'G5', 'S441', 'EDIT'] },
   { name: '立教通り', width: 9, nodes: ['Y_RK', 'R1', 'R2', 'R3', 'R4', 'TIPTOP', 'RK_E', 'GOSA'] },
-  { name: '要町通り', width: 11, nodes: ['Y_KN', 'YUBIN', 'Q4', 'Q3', 'NIKKEN', 'Q2', 'Q1', 'QB', 'HP', 'RK_E'] },
+  { name: '要町通り', width: 11, nodes: ['Y_KN', 'YUBIN', 'Q4', 'Q3', 'NIKKEN', 'Q2', 'Q1', 'QB', 'RK_E'] },
   { name: '西口通り', width: 9, nodes: ['EPOS', 'W_S2', 'W_A', 'W_B', 'W_C', 'HOSEI', 'W_E1', 'W_E2', 'KUREYON', 'W_N', 'MIYAKE', 'BUKURO'] },
   { name: '西口公園通り', width: 9, nodes: ['W_SW', 'W_S1', 'EPOS'] },
   { name: '文化通り', width: 10, nodes: ['K3', 'E_EN', 'E1', 'KUREYON'] },
@@ -65,13 +65,13 @@ export const COURSES = [
     desc: '山手通り・川越街道・劇場通り・441号を周回する高速コース',
   },
   {
-    id: 'wgp', name: '池袋WGP', laps: 3, radius: 7, wide: { W_B: 13, W_E2: 12 },
+    id: 'wgp', name: '池袋WGP', laps: 3, radius: 7,
     nodes: ['EPOS', 'W_S2', 'W_A', 'W_B', 'W_C', 'HOSEI', 'W_E1', 'W_E2', 'KUREYON', 'W_N', 'MIYAKE', 'BUKURO', 'GOSA', 'W_SW', 'W_S1'],
     desc: '池袋駅西口の狭い路地を駆け抜けるテクニカルコース',
   },
   {
-    id: 'rikkyo', name: '立教通りサーキット', laps: 2, radius: 12, wide: { RK_E: 13, HP: 14 },
-    nodes: ['R3', 'R4', 'TIPTOP', 'RK_E', 'HP', 'QB', 'Q1', 'Q2', 'NIKKEN', 'Q3', 'Q4', 'YUBIN', 'Y_KN', 'Y_RK', 'R1', 'R2'],
+    id: 'rikkyo', name: '立教通りサーキット', laps: 2, radius: 12,
+    nodes: ['R3', 'R4', 'TIPTOP', 'RK_E', 'QB', 'Q1', 'Q2', 'NIKKEN', 'Q3', 'Q4', 'YUBIN', 'Y_KN', 'Y_RK', 'R1', 'R2'],
     desc: '立教通りと要町通りを結ぶ、ヘアピンが名物の中速コース',
   },
 ];

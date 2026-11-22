@@ -65,7 +65,7 @@ export function townCorridor() {
   for (const r of ROADS) {
     for (let i = 0; i < r.nodes.length - 1; i++) {
       const a = NODES[r.nodes[i]], b = NODES[r.nodes[i + 1]];
-      segs.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, hw: r.width / 2 + 1.0, road: r.name });
+      segs.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, hw: r.width / 2, road: r.name });
     }
   }
   return new Corridor(segs);
@@ -84,6 +84,11 @@ export function townGraph() {
 }
 
 // ---------------- コース ----------------
+const CORNER_MIN_ANGLE = 0.3; // これ以上曲がるノードをコーナーとして拡幅[rad]
+const WIDEN_HOLD = 14; // コーナー前後で全幅拡げる距離[m]
+const WIDEN_TAPER = 14; // 元の幅へ戻す距離[m]
+const HAIRPIN_ANGLE = 2.0; // これ以上曲がり、かつ半径が小さいとヘアピン扱い[rad]
+const HAIRPIN_R = 4.8; // ヘアピンでの想定旋回半径[m]
 // layout: { course, reverse }
 export class CoursePath {
   constructor(layout) {
@@ -109,8 +114,8 @@ export class CoursePath {
       const th = Math.acos(cos);
       if (i === 0 || th < 0.02) { fillet.push({ t: 0, u1, u2, th: 0 }); continue; }
       let t = c.radius * Math.tan(th / 2);
-      t = Math.min(t, 0.45 * l1, 0.45 * l2);
-      fillet.push({ t, u1, u2, th });
+      t = Math.min(t, 0.48 * l1, 0.48 * l2);
+      fillet.push({ t, u1, u2, th, right: u1[0] * u2[1] - u1[1] * u2[0] > 0, tight: th > HAIRPIN_ANGLE && t / Math.tan(th / 2) < 6 });
     }
     for (let i = 0; i < n; i++) {
       const c0 = P[i], nx = P[(i + 1) % n];
@@ -122,14 +127,12 @@ export class CoursePath {
         const b = { x: c0.x + f0.u2[0] * f0.t, z: c0.z + f0.u2[1] * f0.t };
         // 2次ベジェで近似した円弧
         const arcLen = f0.t * 2;
-        const m = Math.max(2, Math.ceil(arcLen / step));
+        const m = Math.max(2, Math.ceil(arcLen / step), Math.ceil(f0.th / 0.08));
         for (let k = 0; k < m; k++) {
           const s = k / m;
           const x = (1 - s) * (1 - s) * a.x + 2 * (1 - s) * s * c0.x + s * s * b.x;
           const z = (1 - s) * (1 - s) * a.z + 2 * (1 - s) * s * c0.z + s * s * b.z;
-          const wb = wIn + (wOut - wIn) * s;
-          const ww = c.wide?.[ids[i]];
-          pts.push({ x, z, w: ww ? Math.max(wb, wb + (ww - wb) * Math.sin(Math.PI * Math.min(1, s * 1.4))) : wb });
+          pts.push({ x, z, w: wIn + (wOut - wIn) * s, corner: i });
         }
       }
       // 直線
@@ -139,7 +142,7 @@ export class CoursePath {
       const m = Math.max(1, Math.ceil(len / step));
       for (let k = 0; k < m; k++) {
         const s = k / m;
-        pts.push({ x: sx + (ex - sx) * s, z: sz + (ez - sz) * s, w: wOut });
+        pts.push({ x: sx + (ex - sx) * s, z: sz + (ez - sz) * s, w: wOut, corner: k === 0 && f0.th > 0 ? i : -1 });
       }
     }
     this.n = pts.length;
@@ -153,6 +156,32 @@ export class CoursePath {
       this.s[i] = acc;
     }
     this.length = acc + Math.hypot(pts[0].x - pts[this.n - 1].x, pts[0].z - pts[this.n - 1].z);
+    // コーナー付近の拡幅（イン・アウト両側へ。合計 3〜5m）
+    const corners = {};
+    for (let i = 0; i < this.n; i++) {
+      const ci = pts[i].corner;
+      if (ci == null || ci < 0) continue;
+      const th = fillet[ci].th;
+      if (th < CORNER_MIN_ANGLE) continue;
+      const c0 = corners[ci] || (corners[ci] = { s0: this.s[i], s1: this.s[i], extra: 3 + 2 * Math.min(1, (th - CORNER_MIN_ANGLE) / 1.4), th, right: fillet[ci].right, tight: fillet[ci].tight });
+      c0.s1 = this.s[i];
+    }
+    this.corners = Object.values(corners);
+    this.extra = new Float32Array(this.n);
+    for (let i = 0; i < this.n; i++) {
+      let e = 0;
+      for (const c1 of this.corners) {
+        let d = 0;
+        const si = this.s[i];
+        const before = c1.s0 - si, after = si - c1.s1;
+        if (before > 0) d = Math.min(before, this.length - before);
+        else if (after > 0) d = Math.min(after, this.length - after);
+        const k = d <= WIDEN_HOLD ? 1 : d >= WIDEN_HOLD + WIDEN_TAPER ? 0 : 0.5 + 0.5 * Math.cos(((d - WIDEN_HOLD) / WIDEN_TAPER) * Math.PI);
+        e = Math.max(e, c1.extra * k);
+      }
+      this.extra[i] = e;
+      this.hw[i] += e / 2;
+    }
     for (let i = 0; i < this.n; i++) {
       const a = (i - 1 + this.n) % this.n, b = (i + 1) % this.n;
       const dx = this.x[b] - this.x[a], dz = this.z[b] - this.z[a];
@@ -220,7 +249,17 @@ export class CoursePath {
     const lx = new Float32Array(n), lz = new Float32Array(n);
     const nrm = [];
     for (let i = 0; i < n; i++) nrm.push(this.normal(i));
-    const margin = 1.8;
+    const margin = 2.2;
+    // 鋭角コーナー（ヘアピン）は頂点の外側を回り込むラインに固定
+    const fixed = new Uint8Array(n);
+    for (const c of this.corners || []) {
+      if (!c.tight) continue;
+      const sign = c.right ? -1 : 1; // 右コーナーの外側は左(負)
+      for (let i = 0; i < n; i++) {
+        const si = this.s[i];
+        if (si >= c.s0 - 8 && si <= c.s1 + 8) { fixed[i] = 1; off[i] = sign * Math.max(0, this.hw[i] - 2.5); }
+      }
+    }
     for (const span of [12, 6, 3]) {
       for (let it = 0; it < 120; it++) {
         for (let i = 0; i < n; i++) {
@@ -228,6 +267,7 @@ export class CoursePath {
           lz[i] = this.z[i] + nrm[i][1] * off[i];
         }
         for (let i = 0; i < n; i++) {
+          if (fixed[i]) continue;
           const a = (i - span + n) % n, b = (i + span) % n;
           const mx = (lx[a] + lx[b]) / 2, mz = (lz[a] + lz[b]) / 2;
           const d = (mx - this.x[i]) * nrm[i][0] + (mz - this.z[i]) * nrm[i][1];
@@ -243,16 +283,22 @@ export class CoursePath {
       this.lx[i] = this.x[i] + nrm[i][0] * off[i];
       this.lz[i] = this.z[i] + nrm[i][1] * off[i];
     }
+    this.lseg = new Float32Array(n); // i→i+1 のライン上距離
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      this.lseg[i] = Math.hypot(this.lx[j] - this.lx[i], this.lz[j] - this.lz[i]);
+    }
     // 曲率（符号: 右旋回正）
     this.curv = new Float32Array(n);
-    const k = 4;
     for (let i = 0; i < n; i++) {
-      const a = (i - k + n) % n, b = (i + k) % n;
+      let a = i, b = i, da = 0, db = 0;
+      while (da < 7 && a !== (i + 1) % n) { a = (a - 1 + n) % n; da += this.lseg[a]; }
+      while (db < 7 && b !== (i - 1 + n) % n) { db += this.lseg[b]; b = (b + 1) % n; }
       const ax = this.lx[i] - this.lx[a], az = this.lz[i] - this.lz[a];
       const bx = this.lx[b] - this.lx[i], bz = this.lz[b] - this.lz[i];
       const la = Math.hypot(ax, az), lb = Math.hypot(bx, bz);
       const cross = ax * bz - az * bx; // z-down座標で正=時計回り=右
-      const ang = Math.asin(Math.max(-1, Math.min(1, cross / (la * lb || 1))));
+      const ang = Math.atan2(cross, ax * bx + az * bz);
       this.curv[i] = ang / ((la + lb) / 2 || 1);
     }
   }
@@ -261,12 +307,18 @@ export class CoursePath {
   speedProfile(spec, skill) {
     const n = this.n;
     const v = new Float32Array(n);
-    const mu = spec.mu * (0.78 + 0.2 * skill);
+    const mu = spec.mu * (0.74 + 0.2 * skill);
     const q = (0.5 * 1.2 * spec.area * (spec.clF + spec.clR)) / spec.mass;
     for (let i = 0; i < n; i++) {
       const k = Math.abs(this.curv[i]);
       const denom = k - mu * q;
       v[i] = denom <= 1e-5 ? 90 : Math.min(90, Math.sqrt((mu * 9.81) / denom));
+    }
+    // ヘアピンは頂点を回り込む小半径で速度を制限
+    for (const c of this.corners || []) {
+      if (!c.tight) continue;
+      const vh = Math.sqrt(mu * 9.81 * HAIRPIN_R);
+      for (let i = 0; i < n; i++) if (this.s[i] >= c.s0 - 4 && this.s[i] <= c.s1 + 4) v[i] = Math.min(v[i], vh);
     }
     const brakeA = mu * 9.81 * (0.62 + 0.25 * skill) * Math.min(1.25, spec.brakeTorque / (spec.mass * 3.4));
     for (let pass = 0; pass < 2; pass++) {

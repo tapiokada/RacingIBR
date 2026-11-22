@@ -2,7 +2,7 @@
 import { Vehicle, collideCars } from './physics/vehicle.js';
 import { resolveWalls } from './physics/track.js';
 import { buildSpec } from './physics/spec.js';
-import { buildCarModel, syncCarModel } from './render/carModel.js';
+import { buildCarModel, syncCarModel, addHeadlights } from './render/carModel.js';
 import { CARS } from './data/cars.js';
 
 const PHYS_DT = 1 / 500;
@@ -27,6 +27,7 @@ export class DriveSession {
     const car = new Vehicle(spec, { auto: isPlayer ? s.transmission === 'AT' : true, abs: isPlayer ? s.abs : true, tcs: isPlayer ? s.tcs : false });
     const model = buildCarModel(CARS[carId], color, { aero: equipped.aero, wing: equipped.aero === 'aero_wing' || equipped.aero === 'aero_full' ? 'gt' : undefined });
     this.game.world.scene.add(model);
+    if (isPlayer) addHeadlights(model);
     const engine = this.game.audio.createEngine(spec);
     const e = { car, model, engine, isPlayer, name, ai, color, carId, equipped, flash: 0 };
     this.entries.push(e);
@@ -52,8 +53,38 @@ export class DriveSession {
     const steer = (inp.held('right') ? 1 : 0) - (inp.held('left') ? 1 : 0);
     const ramp = (a, b, r) => a + Math.max(-r * dt, Math.min(r * dt, b - a));
     car.input = { throttle: ramp(prev.throttle, tT, tT > prev.throttle ? 7 : 12), brake: ramp(prev.brake, tB, 10), steer };
+    if (inp.hit('reset')) { this.resetPlayer(); return; }
     if (inp.hit('shiftUp')) car.shiftUp();
     if (inp.hit('shiftDown')) car.shiftDown();
+  }
+
+  // 車両リセット：進行方向前向き・道路中央・0km/h
+  resetPlayer() {
+    const car = this.player.car;
+    let x, z, h;
+    if (this.path) {
+      const pr = this.path.project(car.x, car.z, -1);
+      const p = this.path.posAt(pr.s, 0);
+      x = p.x; z = p.z; h = Math.atan2(this.path.tx[pr.i], this.path.tz[pr.i]);
+    } else {
+      let best = null, bd = 1e18;
+      for (const sg of this.corridor.segs) {
+        const dx = sg.bx - sg.ax, dz = sg.bz - sg.az, l2 = dx * dx + dz * dz;
+        const t = Math.max(0, Math.min(1, ((car.x - sg.ax) * dx + (car.z - sg.az) * dz) / l2));
+        const px = sg.ax + dx * t, pz = sg.az + dz * t;
+        const d = (px - car.x) ** 2 + (pz - car.z) ** 2;
+        if (d < bd) { bd = d; best = { px, pz, dx, dz }; }
+      }
+      const [f0, f1] = car.fwd();
+      const sgn = best.dx * f0 + best.dz * f1 >= 0 ? 1 : -1;
+      x = best.px; z = best.pz; h = Math.atan2(best.dx * sgn, best.dz * sgn);
+    }
+    car.place(x, z, h, 0);
+    car.input = { throttle: 0, brake: 0, steer: 0 };
+    car.steer = 0;
+    car.gear = 1;
+    this.game.rig.reset();
+    this.onReset && this.onReset();
   }
 
   update(dt) {

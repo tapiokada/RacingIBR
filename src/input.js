@@ -10,13 +10,15 @@ export const ACTIONS = [
   { id: 'view', name: '視点切り替え', def: 'KeyI' },
   { id: 'flash', name: 'パッシング', def: 'KeyH' },
   { id: 'interact', name: '決定／入店', def: 'Enter' },
+  { id: 'reset', name: '車両リセット', def: 'KeyR' },
 ];
 
 const SETTINGS_KEY = 'ibr.settings.v1';
 
 export const DEFAULT_SETTINGS = {
   keys: Object.fromEntries(ACTIONS.map((a) => [a.id, a.def])),
-  bgm: 0.6, se: 0.7, transmission: 'MT', abs: true, tcs: false, mirror: true,
+  bgm: 0.6, se: 0.7, transmission: 'AT', abs: true, tcs: true, mirror: true,
+  defaultsRev: 2,
 };
 
 export function loadSettings() {
@@ -24,7 +26,12 @@ export function loadSettings() {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) {
       const s = JSON.parse(raw);
-      return { ...DEFAULT_SETTINGS, ...s, keys: { ...DEFAULT_SETTINGS.keys, ...(s.keys || {}) } };
+      // v0.1.1でデフォルトをAT・トラコンONに変更（旧設定にも反映）
+      if (!s.defaultsRev || s.defaultsRev < 2) { s.transmission = 'AT'; s.tcs = true; s.defaultsRev = 2; }
+      const keys = { ...DEFAULT_SETTINGS.keys, ...(s.keys || {}) };
+      // 追加アクションのデフォルトキーが既存の割当と重複したら未割当にする
+      for (const a of ACTIONS) if (!(s.keys || {})[a.id] && Object.entries(keys).some(([id, c]) => id !== a.id && c === keys[a.id])) keys[a.id] = '';
+      return { ...DEFAULT_SETTINGS, ...s, keys };
     }
   } catch (e) { /* ignore */ }
   return structuredClone(DEFAULT_SETTINGS);

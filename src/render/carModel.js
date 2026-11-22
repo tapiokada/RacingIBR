@@ -239,3 +239,19 @@ export function syncCarModel(model, car, extra = {}) {
   const flash = extra.flash || 0;
   for (const l of u.lightsFront) l.material.emissiveIntensity = 1.4 + flash * 6;
 }
+
+// ヘッドライト（プレイヤー車のみ。路面と障害物を照らす）
+export function addHeadlights(model) {
+  const u = model.userData;
+  const light = new THREE.SpotLight(0xfff1d6, 900, 110, 0.55, 0.55, 2);
+  light.position.set(0, 0.75, u.L / 2 - 0.1);
+  const target = new THREE.Object3D();
+  target.position.set(0, 0, u.L / 2 + 22);
+  u.body.add(light, target);
+  light.target = target;
+  const fill = new THREE.PointLight(0xffe8c8, 25, 14, 2);
+  fill.position.set(0, 1.2, u.L / 2 + 3);
+  u.body.add(fill);
+  u.headlight = light;
+  return light;
+}

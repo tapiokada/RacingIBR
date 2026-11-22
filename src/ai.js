@@ -47,8 +47,9 @@ export class RaceAI {
     }
     this.offTarget += (want - this.offTarget) * Math.min(1, dt * 1.5);
 
-    const look = Math.round((5 + v * 0.42) / 2);
-    const ti = (pr.i + look) % n;
+    const Ld = 4 + v * 0.4;
+    let ti = pr.i, acc = 0;
+    while (acc < Ld) { acc += path.lseg[ti]; ti = (ti + 1) % n; }
     const [rx, rz] = path.normal(ti);
     const lim = Math.max(0, path.hw[ti] - 1.4);
     const extra = clamp(this.offTarget, -lim - path.lineOff[ti], lim - path.lineOff[ti]);
@@ -57,7 +58,7 @@ export class RaceAI {
 
     // 速度
     let vt = 1e9;
-    for (let k = 1; k <= 4; k++) vt = Math.min(vt, this.profile[(pr.i + k) % n]);
+    for (let k = 1, d = 0; d < 8; k++) { const j = (pr.i + k) % n; vt = Math.min(vt, this.profile[j]); d += path.lseg[j]; }
     vt *= this.boost;
     const err = vt - v;
     let throttle = clamp(0.35 + err * 0.35, 0, 1);

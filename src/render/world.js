@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { NODES, ROADS, POIS, geo } from '../data/map.js';
 import { townCorridor } from '../physics/track.js';
+import { buildEdges } from './edges.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 function rng(seed) {
@@ -149,7 +150,7 @@ export class World {
 
   build() {
     const S = this.scene;
-    S.add(new THREE.HemisphereLight(0x7088c0, 0x1a1a22, 0.9));
+    S.add(new THREE.HemisphereLight(0x8aa0d8, 0x2a2a34, 1.45));
     const moon = new THREE.DirectionalLight(0x9fb4ff, 0.5);
     moon.position.set(-200, 300, -100);
     S.add(moon);
@@ -195,6 +196,9 @@ export class World {
       }
     }
 
+    // 歩道の段差・ガードレール・植え込み（当たり判定の境界に配置）
+    this.townEdges = buildEdges(this.corridor);
+    S.add(this.townEdges);
     this.buildBuildings();
     this.buildStreetLights();
     this.buildPOIs();
@@ -266,10 +270,10 @@ export class World {
         const rx = -tz, rz = tx;
         let side = 1;
         for (let s = 10; s < len - 6; s += 26) {
-          const o = (r.width / 2 + 1.4) * side;
+          const o = (r.width / 2 + 2.4) * side;
           const x = a.x + tx * s + rx * o, z = a.z + tz * s + rz * o;
           poles.push({ x, z, side, rx, rz });
-          pools.push({ x: x - rx * side * 3.2, z: z - rz * side * 3.2 });
+          pools.push({ x: x - rx * side * 4.2, z: z - rz * side * 4.2 });
           side = -side;
         }
       }
@@ -379,6 +383,7 @@ export class World {
   // コース装飾（ガードレール・スタートライン）
   setCourse(path) {
     if (this.courseGroup) { this.scene.remove(this.courseGroup); this.courseGroup = null; }
+    this.townEdges.visible = !path;
     if (!path) return;
     const g = new THREE.Group();
     const pts = [];
@@ -386,28 +391,12 @@ export class World {
     const roadTex = asphaltTex();
     const surf = ribbon([...pts, pts[0]], (i) => path.hw[i % path.n] + 0.2, 0.028, new THREE.MeshLambertMaterial({ map: roadTex, color: 0xb6b9c4 }), 0.08);
     g.add(surf);
-    // 白線
-    const edgeMat = new THREE.MeshBasicMaterial({ color: 0xe8e8e8 });
-    for (const sgn of [-1, 1]) {
-      const ep = [];
-      for (let i = 0; i <= path.n; i++) {
-        const k = i % path.n;
-        const [rx, rz] = path.normal(k);
-        const o = sgn * (path.hw[k] - 0.4);
-        ep.push({ x: path.x[k] + rx * o, z: path.z[k] + rz * o });
-      }
-      g.add(ribbon(ep, 0.1, 0.04, edgeMat));
-    }
-    const railTex = canvasTex(256, 32, (c, w, h) => {
-      c.fillStyle = '#d8d8d8'; c.fillRect(0, 0, w, h);
-      c.fillStyle = '#c0202a';
-      for (let x = 0; x < w; x += 64) c.fillRect(x, 0, 32, h);
-      c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(0, h * 0.45, w, 3);
-    });
-    const railMat = new THREE.MeshLambertMaterial({ map: railTex, side: THREE.DoubleSide, emissive: 0x222222 });
-    for (const sgn of [-1, 1]) {
-      g.add(wallRibbon(pts, (i) => sgn * (path.hw[i] + 0.15), 0.9, railMat));
-    }
+    // 縁石（低い段差）＋ガードレール：衝突境界に沿って配置。コーナー付近は紅白
+    let hint = -1;
+    g.add(buildEdges(path.corridor, {
+      course: true,
+      isCorner: (x, z) => { const pr = path.project(x, z, hint); hint = pr.i; return path.extra[pr.i] > 0.5; },
+    }));
     // スタートライン
     const st = path.posAt(0, 0);
     const chk = canvasTex(128, 32, (c, w, h) => {

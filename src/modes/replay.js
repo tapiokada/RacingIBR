@@ -1,5 +1,5 @@
 // リプレイ再生（運転席 / 後方 / ボンネット / ギャラリー）
-import { buildCarModel, syncCarModel } from '../render/carModel.js';
+import { buildCarModel, syncCarModel, addHeadlights } from '../render/carModel.js';
 import { CARS } from '../data/cars.js';
 import { buildSpec } from '../physics/spec.js';
 import { Hud } from '../ui/hud.js';
@@ -23,6 +23,7 @@ export class ReplayMode {
     const spec = buildSpec(replay.carId, replay.equipped);
     this.model = buildCarModel(CARS[replay.carId], replay.color, { aero: replay.equipped.aero, wing: replay.equipped.aero === 'aero_wing' || replay.equipped.aero === 'aero_full' ? 'gt' : undefined });
     g.world.scene.add(this.model);
+    addHeadlights(this.model);
     const L = spec.wheelbase;
     const b = L * spec.frontWeight;
     this.ghost = {
