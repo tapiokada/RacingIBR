@@ -3,8 +3,8 @@ import * as THREE from 'three';
 import { DriveSession } from '../session.js';
 import { Hud } from '../ui/hud.js';
 import { el, Menu, panel } from '../ui/ui.js';
-import { NODES, POIS, START_SPOT, LAYOUTS, COURSES, townRoadBetween, laneOffset } from '../data/map.js';
-import { RIVALS } from '../data/rivals.js';
+import { NODES, AREAS, LAYOUTS, COURSES, townRoadBetween, laneOffset, areaStart, arriveSpot } from '../data/map.js';
+import { ALL_RIVALS } from '../data/rivals.js';
 import { CARS, PLAYER } from '../data/cars.js';
 import { CruiseAI } from '../ai.js';
 import { townGraph, getCoursePath } from '../physics/track.js';
@@ -29,20 +29,24 @@ export class TownMode {
     const g = this.game;
     const st = g.story;
     g.audio.playBgm('town');
+    // エリア：引数 → 戻り位置 → セーブデータの順に決める
+    const area = (this.area = this.opts.area || this.opts.returnPos?.area || st.area || 'west');
+    st.area = area;
+    g.setArea(area);
     g.world.setCourse(null);
-    this.graph = townGraph();
+    this.graph = townGraph(area);
     this.session = new DriveSession(g, { corridor: g.world.corridor });
     const mine = activeCar(st);
     const p = this.session.addCar({ carId: mine.carId, equipped: mine.equipped, color: mine.color, isPlayer: true, name: PLAYER.name });
-    const pos = this.opts.returnPos || st.pos;
-    if (pos) p.car.place(pos.x, pos.z, pos.h, 0);
-    else { const n = NODES[START_SPOT.node]; p.car.place(n.x - 2.5, n.z + 22, START_SPOT.heading, 0); }
+    const saved = st.pos && (st.pos.area || 'west') === area ? st.pos : null;
+    const pos = this.opts.returnPos || saved || areaStart(area);
+    p.car.place(pos.x, pos.z, pos.h, 0);
     p.color = '#33e1ff';
     g.mirrorModel = p.model;
     g.rig.mode = this.opts.view || 'chase';
     g.rig.reset();
     this.hud = new Hud(g.ui);
-    this.hud.setMapCourse(null);
+    this.hud.setMapCourse(null, area);
     this.labels = el('div', { class: 'labels' });
     g.ui.appendChild(this.labels);
     this.dialog = null;
@@ -51,12 +55,12 @@ export class TownMode {
     this.encounter = null;
     this.poiCool = 0;
     for (let i = 0; i < MAX_RIVALS; i++) this.spawnRival(true);
-    this.hud.flash(this.opts.message || '西池袋', 2.2, this.opts.message ? '' : 'ライバルの後ろでパッシング（' + keyName(g, 'flash') + '）してバトルを挑め！');
+    this.hud.flash(this.opts.message || AREAS[area].name, 2.2, this.opts.message ? '' : 'ライバルの後ろでパッシング（' + keyName(g, 'flash') + '）してバトルを挑め！');
   }
 
   availableRivals() {
     const w = this.game.story.wins;
-    return RIVALS.filter((r) => r.minWins <= w);
+    return ALL_RIVALS.filter((r) => r.area === this.area && r.minWins <= w);
   }
 
   spawnRival(initial = false) {
@@ -137,6 +141,13 @@ export class TownMode {
       if (this.encounter.t <= 0) this.openEncounter(this.encounter.e);
     }
 
+    // エリア出口（境界の看板の先まで走ると暗転して移動）
+    if (!this.dialog && !this.leaving) {
+      for (const gm of g.world.gateMarkers) {
+        if (Math.hypot(gm.x - P.car.x, gm.z - P.car.z) < 9) { this.changeArea(gm.gate.to, arriveSpot(gm.gate)); break; }
+      }
+    }
+
     // 施設
     this.poiCool -= dt;
     let near = null;
@@ -156,7 +167,7 @@ export class TownMode {
     // HUD
     this.hud.update(dt);
     this.hud.drawTach(P.car);
-    this.hud.tl.innerHTML = `<div class="who">${PLAYER.name}　<span>${CARS[P.carId].name}</span></div><div>所持金 <b>${fmtMoney(st.money)}</b></div><div>戦績 <b>${st.wins}</b>勝 ${st.losses}敗</div>`;
+    this.hud.tl.innerHTML = `<div class="who">${PLAYER.name}　<span>${CARS[P.carId].name}</span></div><div>エリア <b>${AREAS[this.area].name}</b></div><div>所持金 <b>${fmtMoney(st.money)}</b></div><div>戦績 <b>${st.wins}</b>勝 ${st.losses}敗</div>`;
     const cars = s.entries.map((e) => ({ x: e.car.x, z: e.car.z, h: e.car.h, color: e.isPlayer ? '#33e1ff' : '#ff4d6d' }));
     const pois = g.world.poiMarkers.map((m) => ({ x: m.x, z: m.z, color: m.poi.type === 'shop' ? '#ff3b6b' : '#2ee6a8', label: m.poi.type === 'shop' ? 'SHOP' : 'GS' }));
     this.hud.drawMap(cars, pois);
@@ -202,6 +213,7 @@ export class TownMode {
   pickLayout(car) {
     let best = null;
     for (const c of COURSES) {
+      if (c.area !== this.area) continue;
       const L = LAYOUTS.find((l) => l.key === `${c.id}_f`);
       const path = coursePath(L);
       const pr = path.project(car.x, car.z, -1);
@@ -248,8 +260,17 @@ export class TownMode {
   startBattle(e, layout) {
     const g = this.game;
     const P = this.session.player.car;
-    const ret = { x: P.x, z: P.z, h: P.h };
+    const ret = { x: P.x, z: P.z, h: P.h, area: this.area };
     g.transition(() => g.setMode(new BattleMode(g, { rival: e.rival, layout, returnPos: ret })));
+  }
+
+  // エリア移動（暗転→向こうのエリアの対応する道路に速度0で出る）
+  changeArea(to, pos) {
+    const g = this.game;
+    this.leaving = true;
+    this.session.controlsEnabled = false;
+    g.story.area = to;
+    g.transition(() => g.setMode(new TownMode(g, { area: to, returnPos: pos, message: `${AREAS[to].name}エリア`, view: g.rig.mode })), 450);
   }
 
   openShop() {
@@ -261,8 +282,8 @@ export class TownMode {
     openShop(g, g.story, () => {
       // 装着変更を反映して再構築
       const P = this.session.player;
-      const pos = { x: P.car.x, z: P.car.z, h: P.car.h };
-      g.setMode(new TownMode(g, { returnPos: pos, message: 'セッティング完了', view: g.rig.mode }));
+      const pos = { x: P.car.x, z: P.car.z, h: P.car.h, area: this.area };
+      g.setMode(new TownMode(g, { area: this.area, returnPos: pos, message: 'セッティング完了', view: g.rig.mode }));
     });
   }
 
@@ -277,7 +298,8 @@ export class TownMode {
       {
         label: 'セーブする', action: () => {
           const P = s.player.car;
-          g.story.pos = { x: P.x, z: P.z, h: P.h };
+          g.story.pos = { x: P.x, z: P.z, h: P.h, area: this.area };
+          g.story.area = this.area;
           close(saveGame(g.story) ? 'セーブしました' : 'セーブに失敗しました');
         },
       },
@@ -294,11 +316,15 @@ export class TownMode {
     const st = g.story;
     const box = panel('PAUSE',
       el('div', { class: 'hint' }, `所持金 ${fmtMoney(st.money)}　/　${st.wins}勝${st.losses}敗　/　プレイ時間 ${Math.floor(st.playtime / 60)}分`),
-      el('div', { class: 'hint' }, 'セーブはGS（ENEOSセルフ池袋）で行えます'));
+      el('div', { class: 'hint' }, `現在地：${AREAS[this.area].name}エリア　／　セーブは各エリアのGSで行えます`));
     const dlg = el('div', { class: 'screen dialog' }, box);
     const resume = () => { g.input.pressed.clear(); menu.destroy(); dlg.remove(); this.paused = false; };
     const menu = new Menu(g, [
       { label: '再開', action: resume },
+      ...Object.values(AREAS).filter((a) => a.id !== this.area).map((a) => ({
+        label: `エリア切り替え：${a.name}へ`, sub: `${a.name}エリアの開始地点（GS前）へ移動します`,
+        action: () => { menu.destroy(); dlg.remove(); this.paused = false; this.changeArea(a.id, areaStart(a.id)); },
+      })),
       { label: 'タイトルへ戻る', sub: '未セーブの進行は失われます', action: () => { menu.destroy(); g.transition(() => g.setMode(new TitleMode(g))); } },
     ], { onBack: resume });
     box.appendChild(menu.root);

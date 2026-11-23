@@ -17,7 +17,8 @@ export function newGameState() {
     garage: [{ carId: PLAYER.car, color: PLAYER.color, equipped: stock }],
     active: 0,
     defeated: {},
-    pos: null, // null = GS前
+    area: 'west', // 現在のエリア
+    pos: null, // null = GS前（{x,z,h,area}）
     playtime: 0,
     savedAt: null,
   };

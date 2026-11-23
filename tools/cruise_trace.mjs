@@ -5,11 +5,13 @@ import { buildSpec, stockEquip } from '../src/physics/spec.js';
 import { Vehicle } from '../src/physics/vehicle.js';
 import { CruiseAI } from '../src/ai.js';
 const [a, b, c, T = 20] = process.argv.slice(2);
-const cor = townCorridor(), G = townGraph(); const dt = 1/500;
+const AREA = process.env.AREA || 'west';
+const cor = townCorridor(AREA), G = townGraph(AREA); const dt = 1/500;
 const A = NODES[a], B = NODES[b];
 const len = Math.hypot(B.x-A.x,B.z-A.z), fx=(B.x-A.x)/len, fz=(B.z-A.z)/len, lo = laneOffset(townRoadBetween(a,b));
 const car = new Vehicle(buildSpec('86-GR', stockEquip('86-GR')), { auto: true });
-car.place(A.x + (B.x-A.x)*0.3 + fz*lo, A.z + (B.z-A.z)*0.3 - fx*lo, Math.atan2(fx, fz), 5);
+const T0 = +(process.env.T0 || 0.3);
+car.place(A.x + (B.x-A.x)*T0 + fz*lo, A.z + (B.z-A.z)*T0 - fx*lo, Math.atan2(fx, fz), 5);
 const ai = new CruiseAI(car, G, a, b, 13, cor); ai.c = c; ai.build();
 console.log('turnR', ai.turnR.toFixed(1), 'pts', ai.pts.map(p => `${p.x.toFixed(0)},${p.z.toFixed(0)}:${cor.query(p.x,p.z).d.toFixed(1)}`).join(' '));
 for (let t = 0, f = 0; t < +T; t += 1/60, f++) {

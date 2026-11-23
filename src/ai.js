@@ -90,6 +90,9 @@ export class RaceAI {
 }
 
 // 街を流すAI（道路グラフをランダムに巡回、左側通行）
+// 曲がりのパスが縁石・分離帯から最低限とるべき距離（車線そのものがこれより狭いときは車線の余裕まで）
+const TURN_MARGIN = -2.2;
+
 export class CruiseAI {
   constructor(car, graph, from, to, cruise = 13, corridor = null) {
     this.car = car; this.graph = graph;
@@ -129,8 +132,8 @@ export class CruiseAI {
       P = ia <= ib ? poly.slice(ia, ib + 1) : poly.slice(ib, ia + 1).reverse();
       if (P.length < 2) P = [A, B];
     }
-    // 複数車線は内側（右）車線を走る（交差点で縁石に寄りすぎないため）
-    const o = r ? (r.lanes >= 2 ? r.median / 2 + r.laneW * 0.5 : laneOffset(r)) : 0;
+    // 分離帯のある道路は左側（走行）車線、分離帯のない複数車線道路は内側車線を走る
+    const o = r ? (r.lanes >= 2 && !r.median ? r.laneW * 0.5 : laneOffset(r)) : 0;
     const out = [];
     for (let i = 0; i < P.length; i++) {
       const p0 = P[Math.max(0, i - 1)], p1 = P[Math.min(P.length - 1, i + 1)];
@@ -162,13 +165,18 @@ export class CruiseAI {
       let b = null;
       for (let R = Rmax; R >= 1.5; R *= 0.82) {
         const cand = this.turnCurve(L1, L2, R, cos);
-        if (!this.corridor || cand.curve.every((p) => this.corridor.query(p.x, p.z).d < -2.2)) return { ...cand, ok: true };
+        let need = TURN_MARGIN;
+        if (this.corridor) need = Math.max(TURN_MARGIN, Math.max(this.corridor.query(cand.E.x, cand.E.z).d, this.corridor.query(cand.X.x, cand.X.z).d) - 0.05);
+        if (!this.corridor || cand.curve.every((p) => this.corridor.query(p.x, p.z).d < need)) return { ...cand, ok: true };
         if (!b || cand.worst < b.worst) b = cand;
       }
       return b;
     };
     this.swing = 0;
-    let best = search();
+    // 同じ道路のゆるい折れ（交差点ではない）は、車線をそのまま折り曲げる（分離帯の角を切らない）
+    const rA = townRoadBetween(this.a, this.b), rB = townRoadBetween(this.b, this.c);
+    const midBend = rA && rA === rB && cos > 0.3 && rA.nodes.indexOf(this.b) > 0 && rA.nodes.indexOf(this.b) < rA.nodes.length - 1;
+    let best = midBend ? this.turnCurve(L1, L2, 0.01, cos) : search();
     // 収まらない鋭い曲がり（分離帯のない狭い道）は、外側へ膨らんでから曲がる
     const r1 = townRoadBetween(this.a, this.b), r2 = townRoadBetween(this.b, this.c);
     if (!best.ok && cos < -0.3 && r1 && r2 && !r1.median && !r2.median) {
@@ -290,7 +298,7 @@ export class CruiseAI {
       }
     }
     this.wait = blocked && car.speed < 1 ? (this.wait || 0) + dt : 0;
-    if (this.wait > 4) { this.wait = 0; this.squeeze = 3; }
+    if (this.wait > 2.5) { this.wait = 0; this.squeeze = 3; }
     const err = vt - car.speed;
     let throttle = clamp(0.2 + err * 0.3, 0, 0.75);
     let brake = clamp(-err * 0.25, 0, 1);

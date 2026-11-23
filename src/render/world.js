@@ -1,8 +1,9 @@
 // 夜の西池袋（ミニチュア）シーン構築
 import * as THREE from 'three';
-import { NODES, ROADS, POIS, geo, roadPolyline } from '../data/map.js';
+import { NODES, AREAS, geo, roadPolyline } from '../data/map.js';
 import { TownDetail } from './townDetail.js';
 import { WestExit } from './westExit.js';
+import { EastSide, buildSunshineTower } from './eastSide.js';
 import { townCorridor, boxClearOfCourse, courseClearance, townCornerPads } from '../physics/track.js';
 import { buildEdges } from './edges.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
@@ -137,14 +138,16 @@ function textSprite(text, color = '#fff', bg = 'rgba(0,0,0,0)', size = 64, glow 
 }
 
 export class World {
-  constructor(renderer) {
+  constructor(renderer, area = 'west') {
+    this.area = area;
+    this.areaDef = AREAS[area];
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x070a14);
     this.scene.fog = new THREE.Fog(0x0b1020, 80, 820);
     const pm = new THREE.PMREMGenerator(renderer);
     this.scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
     this.scene.environmentIntensity = 0.35;
-    this.corridor = townCorridor();
+    this.corridor = townCorridor(area);
     this.renderer = renderer;
     this.courseGroup = null;
     this.build();
@@ -165,7 +168,7 @@ export class World {
     const asphalt = asphaltTex();
     const roadMat = new THREE.MeshLambertMaterial({ map: asphalt, color: 0xb0b4c0 });
     const walkMat = new THREE.MeshLambertMaterial({ color: 0x24262c });
-    for (const r of ROADS) {
+    for (const r of this.areaDef.roads) {
       const pts = roadPolyline(r);
       S.add(ribbon(pts, r.width / 2 + 3.2, 0.01, walkMat));
       S.add(ribbon(pts, r.width / 2, 0.02, roadMat, 0.08));
@@ -182,7 +185,7 @@ export class World {
       });
     }
     // 隅切り（狭い道の鋭い角を丸く広げた部分）
-    for (const p of townCornerPads()) {
+    for (const p of townCornerPads(this.area)) {
       const disc = new THREE.Mesh(new THREE.CircleGeometry(p.r, 28), roadMat);
       disc.rotation.x = -Math.PI / 2; disc.position.set(p.x, 0.0205, p.z);
       const wd = new THREE.Mesh(new THREE.CircleGeometry(p.r + 3.2, 28), walkMat);
@@ -190,9 +193,9 @@ export class World {
       S.add(disc, wd);
     }
     // 車線・分離帯・横断歩道・信号・首都高・歩道橋
-    this.detail = new TownDetail(S);
-    // 池袋駅西口のランドマーク
-    this.westExit = new WestExit(S);
+    this.detail = new TownDetail(S, this.area);
+    // 駅前のランドマーク（西口／東口・サンシャイン）
+    this.westExit = this.area === 'west' ? new WestExit(S) : new EastSide(S);
 
     // 歩道の段差・ガードレール・植え込み（当たり判定の境界に配置）
     this.townEdges = buildEdges(this.corridor);
@@ -200,6 +203,7 @@ export class World {
     this.buildBuildings();
     this.buildStreetLights();
     this.buildPOIs();
+    this.buildGates();
     this.buildLandmarks();
     this.buildStars();
   }
@@ -207,10 +211,10 @@ export class World {
   buildBuildings() {
     const r = rng(42);
     let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
-    for (const n of Object.values(NODES)) { minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x); minZ = Math.min(minZ, n.z); maxZ = Math.max(maxZ, n.z); }
+    for (const r of this.areaDef.roads) for (const id of r.nodes) { const n = NODES[id]; minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x); minZ = Math.min(minZ, n.z); maxZ = Math.max(maxZ, n.z); }
     const M = 220;
     const items = [];
-    const station = geo(35.7295, 139.7109);
+    const station = this.area === 'west' ? geo(35.7295, 139.7109) : geo(35.7295, 139.7141);
     for (let x = minX - M; x < maxX + M; x += 15) {
       for (let z = minZ - M; z < maxZ + M; z += 15) {
         const px = x + (r() - 0.5) * 5, pz = z + (r() - 0.5) * 5;
@@ -218,13 +222,13 @@ export class World {
         const d = q.far ? 40 : q.d;
         if (d < 6.5) continue;
         if (this.westExit.excludes(px, pz, 6)) continue;
-        if (POIS.some((poi) => { const pp = this.poiPos(poi); return Math.hypot(pp.x - px, pp.z - pz) < 34; })) continue;
+        if (this.areaDef.pois.some((poi) => { const pp = this.poiPos(poi); return Math.hypot(pp.x - px, pp.z - pz) < 34; })) continue;
         const s = Math.min(8, d - 3.2);
         const w = s * (1.2 + r() * 0.8), dd = s * (1.2 + r() * 0.8);
         const nearSt = Math.max(0, 1 - Math.hypot(px - (station.x + 120), pz - station.z) / 500);
         const hgt = 6 + r() * 18 + (r() < 0.12 ? 25 : 0) + nearSt * (10 + r() * 25);
         const rot = (r() - 0.5) * 0.2;
-        if (!boxClearOfCourse(px, pz, w, dd, rot, 3.0)) continue; // レースコースに被らない
+        if (!boxClearOfCourse(px, pz, w, dd, rot, 3.0, this.area)) continue; // レースコースに被らない
         items.push({ px, pz, w, d: dd, h: hgt, rot });
       }
     }
@@ -263,7 +267,7 @@ export class World {
 
   buildStreetLights() {
     const poles = [], pools = [];
-    for (const r of ROADS) {
+    for (const r of this.areaDef.roads) {
       if (r.alley) continue;
       const P = roadPolyline(r);
       let side = 1, acc = 10;
@@ -276,7 +280,7 @@ export class World {
           acc = s + 26 - len;
           const o = (r.width / 2 + 2.4) * side;
           const x = a.x + tx * s + rx * o, z = a.z + tz * s + rz * o;
-          if (courseClearance(x, z) < 1.2) continue;
+          if (courseClearance(x, z, this.area) < 1.2) continue;
           poles.push({ x, z, side, rx, rz });
           pools.push({ x: x - rx * side * 4.2, z: z - rz * side * 4.2 });
           side = -side;
@@ -313,14 +317,20 @@ export class World {
 
   buildPOIs() {
     this.poiMarkers = [];
-    for (const poi of POIS) {
+    for (const poi of this.areaDef.pois) {
       const p = this.poiPos(poi);
       const g = new THREE.Group();
       g.position.set(p.x, 0, p.z);
+      // 引き込み道路の奥向きにローカル+xを合わせる
+      const F = NODES[poi.from], T = NODES[poi.node];
+      g.rotation.y = Math.atan2(-(T.z - F.z), T.x - F.x);
+      const label = new THREE.Group(); // 看板は回転させない
+      label.rotation.y = -g.rotation.y;
+      g.add(label);
       const col = poi.type === 'shop' ? 0xff3b6b : 0x2ee6a8;
       const ring = new THREE.Mesh(new THREE.RingGeometry(5, 6, 40), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
       ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06;
-      g.add(ring);
+      label.add(ring);
       const beam = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 5.5, 30, 24, 1, true), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.08, side: THREE.DoubleSide, depthWrite: false }));
       beam.position.y = 15;
       g.add(beam);
@@ -328,41 +338,65 @@ export class World {
       const tex = textSprite(poi.short, '#ffffff', 'rgba(10,10,20,0.85)', 92, poi.type === 'shop' ? '#ff3b6b' : '#2ee6a8');
       const sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false }));
       sign.scale.set(16, 2.5, 1); sign.position.y = 11;
-      g.add(sign);
+      label.add(sign);
       if (poi.type === 'gs') {
         const canopy = new THREE.Mesh(new THREE.BoxGeometry(16, 0.8, 12), new THREE.MeshLambertMaterial({ color: 0xdddddd, emissive: 0x335544 }));
-        canopy.position.set(16, 6, 0); g.add(canopy);
-        for (const [dx, dz] of [[10, -4], [10, 4], [22, -4], [22, 4]]) {
+        canopy.position.set(13, 6, 0); g.add(canopy);
+        for (const [dx, dz] of [[7, -5], [7, 5], [19, -5], [19, 5]]) {
           const pole = new THREE.Mesh(new THREE.BoxGeometry(0.5, 6, 0.5), new THREE.MeshLambertMaterial({ color: 0x999999 }));
           pole.position.set(dx, 3, dz); g.add(pole);
         }
         const under = new THREE.Mesh(new THREE.PlaneGeometry(16, 12), new THREE.MeshBasicMaterial({ color: 0xfff6dd, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false }));
-        under.rotation.x = -Math.PI / 2; under.position.set(16, 0.04, 0); g.add(under);
+        under.rotation.x = -Math.PI / 2; under.position.set(13, 0.04, 0); g.add(under);
+        const shopBox = new THREE.Mesh(new THREE.BoxGeometry(10, 5, 9), new THREE.MeshLambertMaterial({ color: 0xe8e8e8, emissive: 0x333333 }));
+        shopBox.position.set(26, 2.5, 0); g.add(shopBox);
       } else {
         const bld = new THREE.Mesh(new THREE.BoxGeometry(22, 14, 18), new THREE.MeshLambertMaterial({ color: 0x2a2030, emissive: 0x220818 }));
-        bld.position.set(14, 7, 0); g.add(bld);
+        bld.position.set(17, 7, 0); g.add(bld);
         const band = new THREE.Mesh(new THREE.BoxGeometry(22.2, 1.6, 18.2), new THREE.MeshBasicMaterial({ color: 0xff3b6b }));
-        band.position.set(14, 12, 0); g.add(band);
+        band.position.set(17, 12, 0); g.add(band);
       }
       this.scene.add(g);
       this.poiMarkers.push({ poi, group: g, ring, x: p.x, z: p.z });
     }
   }
 
+  // エリア出口の門型看板
+  buildGates() {
+    this.gateMarkers = [];
+    for (const gt of this.areaDef.gates) {
+      const A = NODES[gt.from], B = NODES[gt.node];
+      const len = Math.hypot(B.x - A.x, B.z - A.z);
+      const ux = (B.x - A.x) / len, uz = (B.z - A.z) / len;
+      const road = this.areaDef.roads.find((r) => r.nodes.includes(gt.node));
+      const hw = road.width / 2;
+      const g = new THREE.Group();
+      g.position.set(A.x + ux * len * 0.55, 0, A.z + uz * len * 0.55);
+      g.rotation.y = Math.atan2(ux, uz); // ローカル+zを出口方向へ
+      const mat = new THREE.MeshLambertMaterial({ color: 0x2b5c3a, emissive: 0x0d2414 });
+      for (const sx of [-1, 1]) {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 7, 0.5), mat);
+        post.position.set(sx * (hw + 1.2), 3.5, 0); g.add(post);
+      }
+      const board = new THREE.Mesh(new THREE.PlaneGeometry(hw * 2 + 2, 2.2), new THREE.MeshBasicMaterial({ map: textSprite(`${gt.label}  →`, '#ffffff', '#1f6b3a', 86, '#a6ffbf'), side: THREE.DoubleSide }));
+      board.position.set(0, 6.4, 0); board.rotation.y = Math.PI; g.add(board);
+      // 出口の光の帯
+      const glow = new THREE.Mesh(new THREE.PlaneGeometry(hw * 2, 3), new THREE.MeshBasicMaterial({ color: 0x7dffb0, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      glow.position.set(0, 1.5, len * 0.4);
+      g.add(glow);
+      this.scene.add(g);
+      this.gateMarkers.push({ gate: gt, x: B.x, z: B.z, group: g });
+    }
+  }
+
   buildLandmarks() {
-    // 東に見える高層ビル（サンシャイン風の架空タワー）と駅ビル
-    const t = geo(35.7295, 139.7186);
-    const tower = new THREE.Mesh(new THREE.BoxGeometry(46, 170, 30), buildingMaterial());
-    tower.position.set(t.x, 85, t.z);
-    tower.material.color = new THREE.Color(0x30343c);
-    this.scene.add(tower);
-    const red = new THREE.MeshBasicMaterial({ color: 0xff2020 });
-    for (const [dx, dz] of [[-20, -12], [20, -12], [-20, 12], [20, 12]]) {
-      const l = new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 6), red);
-      l.position.set(t.x + dx, 171, t.z + dz);
-      this.scene.add(l);
-      this.blinkers = this.blinkers || [];
-      this.blinkers.push(l);
+    // 西池袋からは東に見えるサンライズ60（東池袋エリアでは EastSide が本体を作る）
+    if (this.area === 'west') {
+      const g = buildSunshineTower();
+      this.scene.add(g);
+      this.blinkers = g.userData.blinkers;
+    } else {
+      this.blinkers = this.westExit.blinkers;
     }
   }
 
@@ -384,6 +418,7 @@ export class World {
   setCourse(path) {
     if (this.courseGroup) { this.scene.remove(this.courseGroup); this.courseGroup = null; }
     this.townEdges.visible = !path;
+    for (const gm of this.gateMarkers || []) gm.group.visible = !path;
     this.detail.setCourseMode(!!path);
     if (!path) return;
     const g = new THREE.Group();

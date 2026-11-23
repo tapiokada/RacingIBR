@@ -9,6 +9,7 @@ import { activeCar, addPart, fmtMoney, fmtTime } from '../save.js';
 import { VIEW_NAMES } from '../render/cameras.js';
 import { LapTracker, Countdown, pauseMenu } from './common.js';
 import { coursePath, TownMode } from './town.js';
+import { areaOfLayout } from '../data/map.js';
 
 const SNAP_GAP = 200; // ちぎり判定距離[m]
 
@@ -20,6 +21,8 @@ export class BattleMode {
     const { rival, layout } = this.opts;
     const path = coursePath(layout);
     this.path = path;
+    this.area = areaOfLayout(layout);
+    g.setArea(this.area);
     g.audio.playBgm('battle');
     g.world.setCourse(path);
     g.rig.setGallerySpots(path);
@@ -44,7 +47,7 @@ export class BattleMode {
     g.rig.mode = g.rig.mode === 'gallery' ? 'chase' : g.rig.mode;
     g.rig.reset();
     this.hud = new Hud(g.ui);
-    this.hud.setMapCourse(path);
+    this.hud.setMapCourse(path, this.area);
     // バトル中のリセットは10km/h以下のときだけ、10m後方へ
     this.session.resetRule = 'battle';
     this.session.onResetDenied = () => this.hud.flash('', 1.2, 'リセットは10km/h以下で使用できます');

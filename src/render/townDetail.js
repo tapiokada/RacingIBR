@@ -1,6 +1,20 @@
 // 街の道路ディテール：車線区分線・中央分離帯・右折レーン矢印・横断歩道・停止線・信号機・首都高・歩道橋
 import * as THREE from 'three';
-import { NODES, ROADS, roadPolyline } from '../data/map.js';
+import { NODES, AREAS, roadPolyline } from '../data/map.js';
+
+// エリアごとの首都高・歩道橋の設定
+const AREA_CFG = {
+  west: {
+    highway: ['KUMANO', 'K1', 'AXIA', 'K3', 'K4'], highwayAvoid: ['KUMANO', 'AXIA', 'K3', 'K1'], highwayWidth: 17,
+    bridges: [['山手通り', 'Y_RK', 'Y_KN', 0.5], ['劇場通り', 'G1', 'G2', 0.55], ['要町通り', 'Q4', 'Q3', 0.4]],
+  },
+  east: {
+    // 首都高5号：護国寺から都道435号の上を北上し、六ツ又（春日通り）から池袋大橋方面へ
+    highway: ['J4', 'T435_1', 'HELLO', 'T435_2', 'J5', 'J6', 'S60E', 'N1', 'J1', 'V0', 'GATE_K'],
+    highwayAvoid: ['J4', 'T435_2', 'J5', 'J6', 'S60E', 'J1', 'V0', 'GATE_K'], highwayWidth: 17,
+    bridges: [['春日通り', 'KG1', 'EG_E', 0.45], ['不忍通り', 'SB1', 'SB2', 0.5], ['グリーン大通り', 'GR0', 'J6', 0.4]],
+  },
+};
 import { townJunctions, townMedians, MEDIAN_TRIM, boxClearOfCourse, courseClearance } from '../physics/track.js';
 
 // ---- 共通ヘルパ ----
@@ -66,13 +80,16 @@ function arrowTexture(kind) {
 }
 
 export class TownDetail {
-  constructor(scene) {
+  constructor(scene, area = 'west') {
+    this.area = area;
+    this.cfg = AREA_CFG[area];
+    const ROADS = (this.roads = AREAS[area].roads);
     this.scene = scene;
     this.paint = new THREE.Group(); // 路面表示＋分離帯＋信号（コース走行時は非表示）
     this.always = new THREE.Group(); // 首都高・歩道橋（常に表示）
     this.signals = [];
     scene.add(this.paint, this.always);
-    this.junctions = townJunctions();
+    this.junctions = townJunctions(area);
     this.jr = {};
     for (const id of this.junctions) {
       let r = 0;
@@ -98,7 +115,7 @@ export class TownDetail {
   buildLines() {
     const white = new QuadBatch(), yellow = new QuadBatch();
     const STEP = 1.0;
-    for (const r of ROADS) {
+    for (const r of this.roads) {
       if (r.lanes === 0) continue;
       const P = roadPolyline(r);
       const S = cumulate(P);
@@ -133,7 +150,7 @@ export class TownDetail {
 
   // ---- 中央分離帯（縁石＋植え込み） ----
   buildMedians() {
-    const meds = townMedians();
+    const meds = townMedians(this.area);
     const curbGeo = new THREE.BoxGeometry(1, 0.22, 1).translate(0, 0.11, 0);
     const hedgeGeo = new THREE.BoxGeometry(1, 0.6, 1).translate(0, 0.52, 0);
     const curb = new THREE.InstancedMesh(curbGeo, new THREE.MeshLambertMaterial({ color: 0xc9ccd2, emissive: 0x3a3a3a }), meds.length);
@@ -165,7 +182,7 @@ export class TownDetail {
       const J = NODES[id];
       const jr = this.jr[id];
       const approaches = [];
-      for (const r of ROADS) {
+      for (const r of this.roads) {
         const idx = r.nodes.indexOf(id);
         if (idx < 0) continue;
         const P = roadPolyline(r);
@@ -245,9 +262,8 @@ export class TownDetail {
 
   // ---- 首都高5号池袋線（川越街道の上空） ----
   buildHighway() {
-    const r = ROADS.find((x) => x.highway);
-    if (!r) return;
-    let P = roadPolyline(r);
+    const r = { width: this.cfg.highwayWidth };
+    let P = this.cfg.highway.map((id) => ({ x: NODES[id].x, z: NODES[id].z }));
     const ext = (a, b, d) => { const l = Math.hypot(a.x - b.x, a.z - b.z); return { x: a.x + ((a.x - b.x) / l) * d, z: a.z + ((a.z - b.z) / l) * d }; };
     P = [ext(P[0], P[1], 320), ...P, ext(P[P.length - 1], P[P.length - 2], 320)];
     const S = cumulate(P);
@@ -286,12 +302,12 @@ export class TownDetail {
     // 門型橋脚（柱は歩道側。熊野町・コーナー付近は避ける）
     const colGeo = new THREE.BoxGeometry(1.1, Y - 1.4, 1.1).translate(0, (Y - 1.4) / 2, 0);
     const pierMat = new THREE.MeshLambertMaterial({ color: 0x8b9098 });
-    const avoid = ['KUMANO', 'AXIA', 'K3', 'K1'].map((id) => NODES[id]);
+    const avoid = this.cfg.highwayAvoid.map((id) => NODES[id]);
     for (let d = 16; d < L; d += 34) {
       const p = sampleAt(P, S, d);
       if (avoid.some((n) => Math.hypot(n.x - p.x, n.z - p.z) < 28)) continue;
       const span = r.width / 2 + 2.1;
-      if ([-1, 1].some((sg) => courseClearance(p.x + p.rx * span * sg, p.z + p.rz * span * sg) < 1.2)) continue; // コースに被る橋脚は省略
+      if ([-1, 1].some((sg) => courseClearance(p.x + p.rx * span * sg, p.z + p.rz * span * sg, this.area) < 1.2)) continue; // コースに被る橋脚は省略
       for (const sg of [-1, 1]) {
         const c = new THREE.Mesh(colGeo, pierMat);
         c.position.set(p.x + p.rx * span * sg, 0, p.z + p.rz * span * sg);
@@ -319,11 +335,11 @@ export class TownDetail {
 
   // ---- 歩道橋 ----
   buildFootbridges() {
-    const spots = [['山手通り', 'Y_RK', 'Y_KN', 0.5], ['劇場通り', 'G1', 'G2', 0.55], ['要町通り', 'Q4', 'Q3', 0.4]];
+    const spots = this.cfg.bridges;
     const mat = new THREE.MeshLambertMaterial({ color: 0x5f8fb0, emissive: 0x0d1a24 });
     const rail = new THREE.MeshLambertMaterial({ color: 0xd8dde3, emissive: 0x222222 });
     for (const [name, a, b, t] of spots) {
-      const r = ROADS.find((x) => x.name === name);
+      const r = this.roads.find((x) => x.name === name);
       const A = NODES[a], B = NODES[b];
       const len = Math.hypot(B.x - A.x, B.z - A.z);
       const ux = (B.x - A.x) / len, uz = (B.z - A.z) / len, rx = -uz, rz = ux;
@@ -333,7 +349,7 @@ export class TownDetail {
       // 階段がコースに被る場合は設置しない
       const stairsOk = [-1, 1].every((sz) => {
         const o = sz * (span / 2 - 1.1);
-        return boxClearOfCourse(cx - ux * 4.5 + rx * o, cz - uz * 4.5 + rz * o, 1.8, 9.4, Math.atan2(ux, uz), 0.8);
+        return boxClearOfCourse(cx - ux * 4.5 + rx * o, cz - uz * 4.5 + rz * o, 2.4, 10.4, Math.atan2(ux, uz), 1.5, this.area);
       });
       if (!stairsOk) continue;
       const g = new THREE.Group();

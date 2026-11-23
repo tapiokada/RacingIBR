@@ -23,7 +23,8 @@ export class Game {
     container.appendChild(this.overlay);
     this.input = new Input(this.settings);
     this.audio = new AudioSys(this.settings);
-    this.world = new World(this.renderer);
+    this.worlds = {};
+    this.setArea('west');
     this.rig = new CameraRig(window.innerWidth / window.innerHeight);
     this.mode = null;
     this.mirrorOn = false;
@@ -46,6 +47,14 @@ export class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.rig.camera.aspect = window.innerWidth / window.innerHeight;
     this.rig.camera.updateProjectionMatrix();
+  }
+
+  // エリア（西池袋／東池袋）の3Dワールドを切り替える。初回は生成する
+  setArea(area) {
+    if (!this.worlds[area]) this.worlds[area] = new World(this.renderer, area);
+    this.world = this.worlds[area];
+    this.area = area;
+    return this.world;
   }
 
   setMode(m) {

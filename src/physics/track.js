@@ -1,5 +1,7 @@
 // 走行可能領域（道路カプセルの和集合）とコース中心線
-import { NODES, ROADS, roadWidthBetween, roadPolyline, LAYOUTS } from '../data/map.js';
+import { NODES, AREAS, roadWidthBetween, roadPolyline, LAYOUTS, areaOfLayout } from '../data/map.js';
+
+const roadsOf = (area) => AREAS[area || 'west'].roads;
 
 // ---------------- 走行可能領域 ----------------
 export class Corridor {
@@ -84,7 +86,8 @@ export function resolveWalls(car, corridor) {
 
 // ---------------- 街の道路網 ----------------
 // 交差点・道路端のノード（中央分離帯を切る、横断歩道を置く位置）
-export function townJunctions() {
+export function townJunctions(area = 'west') {
+  const ROADS = roadsOf(area);
   const deg = {}, ends = new Set();
   for (const r of ROADS) {
     r.nodes.forEach((id, i) => {
@@ -97,8 +100,9 @@ export function townJunctions() {
 
 // 中央分離帯（交差点の手前 MEDIAN_TRIM m は右折レーンのため切る）
 export const MEDIAN_TRIM = 30;
-export function townMedians() {
-  const J = townJunctions().map((id) => NODES[id]);
+export function townMedians(area = 'west') {
+  const ROADS = roadsOf(area);
+  const J = townJunctions(area).map((id) => NODES[id]);
   const out = [];
   for (const r of ROADS) {
     if (!r.median) continue;
@@ -120,7 +124,8 @@ export function townMedians() {
 }
 
 // 狭い道の鋭い曲がり角の隅切り（車が曲がれるよう角を丸く広げる）
-export function townCornerPads() {
+export function townCornerPads(area = 'west') {
+  const ROADS = roadsOf(area);
   const pads = [];
   for (const r of ROADS) {
     if (r.width >= 12) continue;
@@ -136,19 +141,21 @@ export function townCornerPads() {
   return pads;
 }
 
-export function townCorridor() {
+export function townCorridor(area = 'west') {
+  const ROADS = roadsOf(area);
   const segs = [];
-  for (const p of townCornerPads()) segs.push({ ax: p.x, az: p.z, bx: p.x, bz: p.z, hw: p.r, road: 'corner' });
+  for (const p of townCornerPads(area)) segs.push({ ax: p.x, az: p.z, bx: p.x, bz: p.z, hw: p.r, road: 'corner' });
   for (const r of ROADS) {
     const P = roadPolyline(r);
     for (let i = 0; i < P.length - 1; i++) {
       segs.push({ ax: P[i].x, az: P[i].z, bx: P[i + 1].x, bz: P[i + 1].z, hw: r.width / 2, road: r.name });
     }
   }
-  return new Corridor(segs, 24, townMedians());
+  return new Corridor(segs, 24, townMedians(area));
 }
 
-export function townGraph() {
+export function townGraph(area = 'west') {
+  const ROADS = roadsOf(area);
   const adj = {};
   for (const r of ROADS) {
     if (!r.ai) continue;
@@ -419,9 +426,10 @@ export function getCoursePath(layout) {
 }
 
 // 全6レイアウトのコース走行範囲までの距離（負＝コース上）。景観オブジェクトの配置チェック用
-export function courseClearance(x, z) {
+export function courseClearance(x, z, area = null) {
   let d = 1e9;
   for (const L of LAYOUTS) {
+    if (area && areaOfLayout(L) !== area) continue;
     const q = getCoursePath(L).corridor.query(x, z);
     if (!q.far && q.d < d) d = q.d;
   }
@@ -429,13 +437,13 @@ export function courseClearance(x, z) {
 }
 
 // 回転した矩形（中心・幅w(x)・奥行d(z)・回転rot）がコースから margin 以上離れているか
-export function boxClearOfCourse(cx, cz, w, d, rot = 0, margin = 2.5) {
+export function boxClearOfCourse(cx, cz, w, d, rot = 0, margin = 2.5, area = null) {
   const c = Math.cos(rot), s = Math.sin(rot);
   const n = 4;
   for (let i = 0; i <= n; i++) for (let j = 0; j <= n; j++) {
     const lx = (i / n - 0.5) * w, lz = (j / n - 0.5) * d;
     const x = cx + lx * c + lz * s, z = cz - lx * s + lz * c;
-    if (courseClearance(x, z) < margin) return false;
+    if (courseClearance(x, z, area) < margin) return false;
   }
   return true;
 }

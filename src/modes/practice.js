@@ -6,6 +6,7 @@ import { fmtTime, addRecord, putReplay, loadRecords } from '../save.js';
 import { VIEW_NAMES } from '../render/cameras.js';
 import { LapTracker, Countdown, pauseMenu } from './common.js';
 import { coursePath } from './town.js';
+import { areaOfLayout } from '../data/map.js';
 import { TitleMode } from './title.js';
 import { ReplayMode } from './replay.js';
 
@@ -20,6 +21,8 @@ export class PracticeMode {
     this.ta = kind === 'ta';
     const path = coursePath(layout);
     this.path = path;
+    this.area = areaOfLayout(layout);
+    g.setArea(this.area);
     g.audio.playBgm(this.ta ? 'battle' : 'town');
     g.world.setCourse(path);
     g.rig.setGallerySpots(path);
@@ -34,7 +37,7 @@ export class PracticeMode {
     if (g.rig.mode === 'gallery') g.rig.mode = 'chase';
     g.rig.reset();
     this.hud = new Hud(g.ui);
-    this.hud.setMapCourse(path);
+    this.hud.setMapCourse(path, this.area);
     this.t = 0;
     this.state = 'count';
     this.session.frozen = true;

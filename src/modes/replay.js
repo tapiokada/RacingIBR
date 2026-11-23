@@ -6,6 +6,7 @@ import { Hud } from '../ui/hud.js';
 import { fmtTime } from '../save.js';
 import { VIEW_NAMES } from '../render/cameras.js';
 import { coursePath } from './town.js';
+import { areaOfLayout } from '../data/map.js';
 import { keyLabel } from '../input.js';
 
 const VIEWS = ['chase', 'cockpit', 'hood', 'gallery'];
@@ -16,6 +17,7 @@ export class ReplayMode {
   enter() {
     const g = this.game;
     const { layout, replay } = this.opts;
+    g.setArea(areaOfLayout(layout));
     this.path = coursePath(layout);
     g.world.setCourse(this.path);
     g.rig.setGallerySpots(this.path);
@@ -41,7 +43,7 @@ export class ReplayMode {
     g.rig.reset();
     g.mirrorModel = this.model;
     this.hud = new Hud(g.ui);
-    this.hud.setMapCourse(this.path);
+    this.hud.setMapCourse(this.path, areaOfLayout(layout));
     this.hud.flash('REPLAY', 1.5, layout.name);
     this.hud.setView(VIEW_NAMES[g.rig.mode]);
   }

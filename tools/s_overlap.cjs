@@ -1,11 +1,15 @@
 // コース走行時に、地上付近の可視オブジェクトがコースの走行範囲に入っていないか検査
 module.exports = async (pg) => {
-  const res = await pg.evaluate(() => {
-    const THREE = window.__dbgTHREE, clear = window.__dbgClear, g = window.__dbg.game;
+ for (const AREA of ['west', 'east']) {
+  const res = await pg.evaluate((AREA) => {
+    const THREE = window.__dbgTHREE, g = window.__dbg.game;
+    const clear = (x, z) => window.__dbgClear(x, z, AREA);
+    g.setArea(AREA);
     const { LAYOUTS } = window.__dbgMap;
     g.world.setCourse({ ...{}, n: 0 } && null);
     // コース表示時の可視状態を再現（町の縁石・路面表示を非表示）
     g.world.townEdges.visible = false; g.world.detail.setCourseMode(true);
+    for (const gm of g.world.gateMarkers) gm.group.visible = false;
     const bad = [];
     const box = new THREE.Box3(), m = new THREE.Matrix4(), v = new THREE.Vector3();
     const check = (obj, b, label) => {
@@ -31,9 +35,10 @@ module.exports = async (pg) => {
       }
     });
     return bad;
-  });
+  }, AREA);
   const byType = {};
   for (const b of res) { const k = b[0].split('#')[0]; byType[k] = (byType[k] || 0) + 1; }
-  console.log('overlaps', res.length, JSON.stringify(byType));
-  console.log(JSON.stringify(res.slice(0, 15)));
+  console.log(AREA, 'overlaps', res.length, JSON.stringify(byType));
+  if (res.length) console.log(JSON.stringify(res.slice(0, 15)));
+ }
 };

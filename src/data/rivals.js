@@ -67,4 +67,61 @@ export const RIVALS = [
   },
 ];
 
-export const RIVAL_BY_ID = Object.fromEntries(RIVALS.map((r) => [r.id, r]));
+// ===== 東池袋のライバル（area: 'east'）。勝利数は西・東の合計 =====
+export const EAST_RIVALS = [
+  {
+    id: 'riku', name: '早乙女リク', team: '六ツ又ボーイズ', car: 'BRZ-ZD', color: 0x1f4fbf, minWins: 0, skill: 0.82, reward: 70000,
+    parts: tune('BRZ-ZD', { muffler: 'muf_sport', tire: 'tire_high' }),
+    lines: { meet: '86乗りか。兄弟対決といこうぜ。', win: '同じFAでも、こうも違うのか…', lose: '水平対向は俺の方が分かってる。' },
+  },
+  {
+    id: 'kanade', name: '三上カナデ', team: '六ツ又ボーイズ', car: 'S2K-AP', color: 0xd7d9dc, minWins: 0, skill: 0.84, reward: 90000,
+    parts: tune('S2K-AP', { suspension: 'sus_street' }),
+    lines: { meet: '8000回転の向こう側、見に行く？', win: 'VTECが入る前に置いていかれた…', lose: 'オープンの風は気持ちいいでしょ？' },
+  },
+  {
+    id: 'daichi', name: '霧島ダイチ', team: '護国寺ランサーズ', car: 'EVO-IX', color: 0xc8102e, minWins: 2, skill: 0.85, reward: 110000,
+    parts: tune('EVO-IX', { muffler: 'muf_sport' }),
+    lines: { meet: '首都高下の立ち上がり、四駆に勝てるかな。', win: 'AYCが効く前に抜かれた…', lose: 'これがランエボの立ち上がりだ。' },
+  },
+  {
+    id: 'sakura', name: '宮城サクラ', team: 'SUNRISE GIRLS', car: 'BRZ-ZD', color: 0xf3a6c3, minWins: 3, skill: 0.87, reward: 120000,
+    parts: tune('BRZ-ZD', { turbo: 'tb_small', intercooler: 'ic_large', tire: 'tire_high', suspension: 'sus_street', aero: 'aero_lip' }),
+    lines: { meet: 'かわいい色だからって油断した？', win: 'ターボでも届かないなんて…', lose: 'サンシャインの夜景、後ろから見てなさい。' },
+  },
+  {
+    id: 'tetsu', name: '大門テツ', team: '春日通りGT', car: 'Z-32', color: 0x8a0f16, minWins: 4, skill: 0.86, reward: 140000,
+    parts: tune('Z-32', { muffler: 'muf_sport', tire: 'tire_high' }),
+    lines: { meet: '春日通りの直線はZの庭だ。', win: '古いZじゃ、もう敵わねえか…', lose: 'ツインターボの伸び、覚えとけ。' },
+  },
+  {
+    id: 'rui', name: '天城ルイ', team: 'SUNRISE GIRLS', car: 'S2K-AP', color: 0xf2c40f, minWins: 5, skill: 0.89, reward: 160000,
+    parts: tune('S2K-AP', { turbo: 'tb_sc', intercooler: 'ic_large', boreup: 'bore_1', tire: 'tire_high', suspension: 'sus_circuit', aero: 'aero_wing' }),
+    lines: { meet: 'NAの鋭さに過給を足したら、どうなると思う？', win: '…あなた、本物ね。', lose: 'スーパーチャージャーは裏切らないの。' },
+  },
+  {
+    id: 'kenji', name: '獅堂ケンジ', team: '春日通りGT', car: 'R34-GTR', color: 0x2b3f9c, minWins: 6, skill: 0.89, reward: 200000,
+    parts: tune('R34-GTR', { muffler: 'muf_sport', tire: 'tire_high', brake: 'brk_pad' }),
+    lines: { meet: 'GT-Rの名前、伊達じゃないぜ。', win: 'アテーサでも追いつけなかった…', lose: '直6ツインターボの咆哮、聴こえたか？' },
+  },
+  {
+    id: 'noa', name: '白鷺ノア', team: '護国寺ランサーズ', car: 'EVO-IX', color: 0xeaeaea, minWins: 7, skill: 0.91, reward: 220000,
+    parts: tune('EVO-IX', { turbo: 'tb_mid', intercooler: 'ic_front', boreup: 'bore_2', muffler: 'muf_straight', tire: 'tire_s', suspension: 'sus_circuit', aero: 'aero_wing', brake: 'brk_big' }),
+    lines: { meet: '不忍通りの下りで、全部決める。', win: 'ブレーキ勝負で負けるなんて…', lose: '四駆の本気、見たでしょう？' },
+  },
+  {
+    id: 'sena', name: '久遠セナ', team: '無所属', car: 'Z-32', color: 0x4b4f58, minWins: 9, skill: 0.93, reward: 260000,
+    parts: tune('Z-32', { turbo: 'tb_large', intercooler: 'ic_front', boreup: 'bore_2', muffler: 'muf_straight', tire: 'tire_s', suspension: 'sus_circuit', transmission: 'tm_close', aero: 'aero_full', brake: 'brk_big' }),
+    lines: { meet: 'Zは速いだけじゃない。美しく速いんだ。', win: '……美しい走りだった。', lose: '美しさが足りないね。' },
+  },
+  {
+    id: 'gai', name: '鳳ガイ', team: '東池袋の王', car: 'R34-GTR', color: 0x7a8088, minWins: 11, skill: 0.96, reward: 450000,
+    parts: tune('R34-GTR', { turbo: 'tb_large', intercooler: 'ic_front', boreup: 'bore_3', muffler: 'muf_straight', tire: 'tire_s', suspension: 'sus_circuit', brake: 'brk_big', transmission: 'tm_close', aero: 'aero_full' }),
+    lines: { meet: 'サンシャインの下で、俺に挑むか。', win: '……西の86が、ここまで来たか。', lose: '東池袋は、まだお前の街じゃない。' },
+  },
+];
+for (const r of RIVALS) r.area = 'west';
+for (const r of EAST_RIVALS) r.area = 'east';
+export const ALL_RIVALS = [...RIVALS, ...EAST_RIVALS];
+
+export const RIVAL_BY_ID = Object.fromEntries(ALL_RIVALS.map((r) => [r.id, r]));

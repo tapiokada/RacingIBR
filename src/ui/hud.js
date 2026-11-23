@@ -1,6 +1,6 @@
 // 走行中HUD（速度・タコメーター・ギア・ラップ・ミニマップ）
 import { el } from './ui.js';
-import { NODES, ROADS } from '../data/map.js';
+import { NODES, AREAS } from '../data/map.js';
 
 export class Hud {
   constructor(parent) {
@@ -82,7 +82,7 @@ export class Hud {
   }
 
   // ミニマップ
-  setMapCourse(path) { this.course = path; this.mapBounds = null; }
+  setMapCourse(path, area = 'west') { this.course = path; this.roads = AREAS[area].roads; this.mapBounds = null; }
 
   drawMap(cars, pois = []) {
     const c = this.map.getContext('2d');
@@ -90,7 +90,7 @@ export class Hud {
     c.clearRect(0, 0, W, H);
     if (!this.mapBounds) {
       let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
-      const pts = this.course ? Array.from({ length: this.course.n }, (_, i) => ({ x: this.course.x[i], z: this.course.z[i] })) : Object.values(NODES);
+      const pts = this.course ? Array.from({ length: this.course.n }, (_, i) => ({ x: this.course.x[i], z: this.course.z[i] })) : this.roads.flatMap((r) => r.nodes.map((id) => NODES[id]));
       for (const p of pts) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); }
       const sc = Math.min((W - 30) / (maxX - minX), (H - 30) / (maxZ - minZ));
       this.mapBounds = { sc, ox: W / 2 - ((minX + maxX) / 2) * sc, oz: H / 2 - ((minZ + maxZ) / 2) * sc };
@@ -108,7 +108,7 @@ export class Hud {
       const [sx, sy] = P(this.course.x[0], this.course.z[0]);
       c.fillStyle = '#fff'; c.fillRect(sx - 4, sy - 4, 8, 8);
     } else {
-      for (const r of ROADS) {
+      for (const r of this.roads) {
         c.strokeStyle = 'rgba(170,190,230,0.75)'; c.lineWidth = Math.max(2, r.width * sc * 0.9);
         c.beginPath();
         r.nodes.forEach((id, i) => { const [x, y] = P(NODES[id].x, NODES[id].z); i ? c.lineTo(x, y) : c.moveTo(x, y); });

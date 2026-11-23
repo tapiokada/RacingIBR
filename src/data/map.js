@@ -43,6 +43,32 @@ const N = {
   RT_C0: [35.72981, 139.71035], RT_C1: [35.72965, 139.71016], RT_D0: [35.72965, 139.70994], RT_D1: [35.72981, 139.70975],
   // 西一番街（路地。西口通りの途中に接続）
   NI_S: [35.73124, 139.71054], NI_N: [35.73267, 139.71054],
+  // 施設（実際の位置に合わせて道路から引き込み）
+  DQ_E: [35.74036, 139.7081], DQ_P: [35.74074, 139.7081], // ドン・キホーテ北池袋店（川越街道の北側）
+  GS_E: [35.73775, 139.71163], GS_P: [35.73775, 139.71207], // ENEOSセルフ池袋SS（川越街道と文化通りの角）
+  // 東池袋エリアへの出口
+  K5: [35.73797, 139.71305], EDIT_OUT: [35.72731, 139.70975],
+
+  // ===== 東池袋エリア =====（添付の「東池袋エリア」「東池袋ロングコース」画像からトレース）
+  // 春日通り（国道254号）。GATE_K は池袋大橋の東側
+  GATE_K: [35.73395, 139.7142], GK_OUT: [35.73395, 139.7136], V0: [35.73397, 139.716], J1: [35.73346, 139.71686],
+  KG1: [35.73244, 139.71893], EG_E: [35.73079, 139.72176], KG2: [35.72913, 139.72459], J2: [35.72568, 139.73025],
+  // 大塚の南北の道
+  SN1: [35.72392, 139.73101], ES_E: [35.72277, 139.73137], J3: [35.72162, 139.73173],
+  // 不忍通り（護国寺方面）
+  SB1: [35.721, 139.72938], SB2: [35.72056, 139.7272], J4: [35.71959, 139.72503],
+  // 首都高5号の下の道（都道435号）
+  T435_1: [35.72021, 139.72394], HELLO: [35.72201, 139.72313], T435_2: [35.72392, 139.72252],
+  J5: [35.72602, 139.71908], J6: [35.72736, 139.71686], S60E: [35.729, 139.71684], N1: [35.73129, 139.7168],
+  // 明治通り（池袋駅東口）
+  MJ_OUT: [35.726, 139.7124], MJ_S: [35.72653, 139.7123], MJ_1: [35.7286, 139.71186], GR0: [35.7296, 139.71222],
+  MJ_2: [35.73036, 139.71258], MJ_3: [35.73153, 139.71252], MJ_4: [35.7329, 139.71339],
+  // サンシャイン60通り
+  S60M: [35.72985, 139.7145],
+  // 都電沿いの道（南池袋）
+  MS1: [35.7255, 139.71382], HOSHINO: [35.72461, 139.71535], MS2: [35.7243, 139.71812], MS3: [35.72361, 139.72139],
+  // 東池袋の施設
+  EG_P: [35.73109, 139.72202], ES_P: [35.72277, 139.73184],
 };
 
 // 西口のランドマーク配置（緯度経度の矩形 [南, 西, 北, 東]）
@@ -51,6 +77,11 @@ export const LANDMARKS = {
   park: [35.7295, 139.7085, 35.7304, 139.7092], // 西口公園
   theatre: [35.7288, 139.7076, 35.72975, 139.7084], // 池袋芸術劇場
   plaza: [35.7290, 139.70845, 35.73055, 139.7106], // 西口駅前の開けた空間（ビルを建てない）
+  // --- 東池袋 ---
+  seibu: [35.7283, 139.7106, 35.7306, 139.7115], // 西部デパート（池袋駅東口の駅ビル・架空名）
+  parco: [35.7307, 139.7106, 35.7316, 139.7115], // パルクス（東口北側の商業ビル・架空名）
+  sunshine: [35.7283, 139.7178, 35.7304, 139.7212], // サンライズシティ（サンシャインシティ風・架空名）
+  eplaza: [35.72975, 139.7115, 35.73045, 139.7121], // 東口駅前（ビルを建てない）
 };
 
 export const NODES = Object.fromEntries(Object.entries(N).map(([k, [la, lo]]) => [k, geo(la, lo)]));
@@ -72,7 +103,7 @@ const RACE_ROADS = [
 // 街（Story／FREE RUN タウン）の道路。車線構成は実際の道路を参考にした推定値。
 // lanes: 片側車線数（0=中央線なしの一方通行・路地）/ laneW: 車線幅 / median: 中央分離帯幅
 // shoulder: 路肩幅 / smooth: 折れ点をなめらかな曲線にする / ai: 街流しAIが走るか
-export const ROADS = [
+export const WEST_ROADS = [
   { name: '山手通り', lanes: 2, laneW: 3.25, median: 2.0, shoulder: 0.5, nodes: ['Y0', 'Y_RK', 'Y_KN', 'Y2', 'Y3', 'KUMANO'] },
   { name: '川越街道', lanes: 2, laneW: 3.25, median: 3.0, shoulder: 0.5, highway: true, nodes: ['KUMANO', 'K1', 'AXIA', 'K3', 'K4'] },
   { name: '劇場通り', lanes: 2, laneW: 3.0, median: 0, shoulder: 0.5, smooth: true, nodes: ['AXIA', 'G1', 'G2', 'G3', 'BUKURO', 'GOSA', 'W_SW', 'G5'] },
@@ -87,18 +118,50 @@ export const ROADS = [
   // ロータリーは時計回りの一方通行（ノード順）
   { name: '西口ロータリー', lanes: 0, laneW: 9.0, median: 0, shoulder: 0.5, oneway: true, nodes: ['RT_W', 'RT_A0', 'RT_A1', 'RT_B0', 'RT_B1', 'RT_C0', 'RT_C1', 'RT_D0', 'RT_D1', 'RT_W'] },
   { name: '西一番街', lanes: 0, laneW: 5.0, median: 0, shoulder: 0.5, ai: false, alley: true, nodes: ['NI_S', 'NI_N'] },
+  // 施設への引き込み・エリア出口（街流しAIは入らない）
+  { name: 'ドン・キホーテ駐車場', lanes: 0, laneW: 8.0, median: 0, shoulder: 0.5, ai: false, nodes: ['DQ_E', 'DQ_P'] },
+  { name: 'ENEOS入口', lanes: 0, laneW: 8.0, median: 0, shoulder: 0.5, ai: false, nodes: ['GS_E', 'GS_P'] },
+  { name: '川越街道（東池袋方面）', lanes: 2, laneW: 3.25, median: 0, shoulder: 0.5, ai: false, gate: true, nodes: ['K4', 'K5'] },
+  { name: 'メトロポリタン通り（東池袋方面）', lanes: 1, laneW: 3.25, median: 0, shoulder: 1.5, ai: false, gate: true, nodes: ['EDIT', 'EDIT_OUT'] },
 ];
-for (const r of ROADS) {
+
+export const EAST_ROADS = [
+  { name: '春日通り', lanes: 2, laneW: 3.25, median: 1.5, shoulder: 0.5, nodes: ['GATE_K', 'V0', 'J1', 'KG1', 'EG_E', 'KG2', 'J2'] },
+  { name: '明治通り', lanes: 2, laneW: 3.0, median: 0, shoulder: 1.0, smooth: true, nodes: ['MJ_S', 'MJ_1', 'GR0', 'MJ_2', 'MJ_3', 'MJ_4', 'V0'] },
+  { name: '首都高下の道（都道435号）', lanes: 2, laneW: 3.25, median: 3.0, shoulder: 0.5, highway: true, nodes: ['J4', 'T435_1', 'HELLO', 'T435_2', 'J5'] },
+  { name: '首都高下の道（北）', lanes: 2, laneW: 3.25, median: 3.0, shoulder: 0.5, nodes: ['J6', 'S60E', 'N1', 'J1'] },
+  { name: '不忍通り', lanes: 2, laneW: 3.0, median: 0, shoulder: 0.5, smooth: true, nodes: ['J3', 'SB1', 'SB2', 'J4'] },
+  { name: '大塚の通り', lanes: 1, laneW: 3.25, median: 0, shoulder: 1.5, nodes: ['J2', 'SN1', 'ES_E', 'J3'] },
+  { name: 'グリーン大通り', lanes: 2, laneW: 3.25, median: 4.0, shoulder: 0.5, green: true, nodes: ['GR0', 'J6', 'J5'] },
+  { name: 'サンシャイン60通り', lanes: 1, laneW: 3.0, median: 0, shoulder: 1.5, neon: true, nodes: ['MJ_2', 'S60M', 'S60E'] },
+  { name: '都電沿いの道（南池袋）', lanes: 1, laneW: 3.0, median: 0, shoulder: 1.6, smooth: true, nodes: ['MJ_S', 'MS1', 'HOSHINO', 'MS2', 'MS3', 'T435_2'] },
+  { name: 'サービスステーション入口', lanes: 0, laneW: 8.0, median: 0, shoulder: 0.5, ai: false, nodes: ['EG_E', 'EG_P'] },
+  { name: 'ショップ駐車場', lanes: 0, laneW: 8.0, median: 0, shoulder: 0.5, ai: false, nodes: ['ES_E', 'ES_P'] },
+  { name: '春日通り（西池袋方面）', lanes: 2, laneW: 3.25, median: 0, shoulder: 0.5, ai: false, gate: true, nodes: ['GATE_K', 'GK_OUT'] },
+  { name: '明治通り（西池袋方面）', lanes: 2, laneW: 3.0, median: 0, shoulder: 1.0, ai: false, gate: true, nodes: ['MJ_S', 'MJ_OUT'] },
+];
+for (const r of [...WEST_ROADS, ...EAST_ROADS]) {
   r.width = r.lanes > 0 ? r.lanes * 2 * r.laneW + r.median + r.shoulder * 2 : r.laneW + r.shoulder * 2;
   if (r.ai === undefined) r.ai = true;
 }
+WEST_ROADS.forEach((r) => (r.area = 'west'));
+EAST_ROADS.forEach((r) => (r.area = 'east'));
+// 互換用（西池袋）
+export const ROADS = WEST_ROADS;
+// 東池袋のコース幅は作成時の街の道路幅で固定
+for (const r of EAST_ROADS) if (!r.gate && r.ai) RACE_ROADS.push({ name: r.name, width: r.width, nodes: [...r.nodes] });
 
 
-// 施設
-export const POIS = [
-  { id: 'shop', type: 'shop', name: 'ドン・キホーテ 北池袋店（チューニングショップ）', short: 'TUNE SHOP', node: 'K4', offset: [0, 0] },
-  { id: 'gs', type: 'gs', name: 'ENEOS セルフ池袋（セーブポイント）', short: 'GS / SAVE', node: 'E_EN', offset: [0, 0] },
+// 施設（node = 引き込み道路の奥。from = 道路側のノード）
+export const WEST_POIS = [
+  { id: 'shop', type: 'shop', name: 'ドン・キホーテ 北池袋店（チューニングショップ）', short: 'TUNE SHOP', node: 'DQ_P', from: 'DQ_E', offset: [0, 0] },
+  { id: 'gs', type: 'gs', name: 'ENEOS セルフ池袋SS（セーブポイント）', short: 'GS / SAVE', node: 'GS_P', from: 'GS_E', offset: [0, 0] },
 ];
+export const EAST_POIS = [
+  { id: 'shop_e', type: 'shop', name: '大塚モータース（チューニングショップ・架空）', short: 'TUNE SHOP', node: 'ES_P', from: 'ES_E', offset: [0, 0] },
+  { id: 'gs_e', type: 'gs', name: '東池袋サービスステーション（セーブポイント・架空）', short: 'GS / SAVE', node: 'EG_P', from: 'EG_E', offset: [0, 0] },
+];
+export const POIS = WEST_POIS;
 
 // コース（ノード列のループ。先頭ノードがスタート/フィニッシュ）
 export const COURSES = [
@@ -117,12 +180,29 @@ export const COURSES = [
     nodes: ['R3', 'R4', 'TIPTOP', 'RK_E', 'QB', 'Q1', 'Q2', 'NIKKEN', 'Q3', 'Q4', 'YUBIN', 'Y_KN', 'Y_RK', 'R1', 'R2'],
     desc: '立教通りと要町通りを結ぶ、ヘアピンが名物の中速コース',
   },
+  // ===== 東池袋 =====
+  {
+    id: 'higashi', area: 'east', name: '東池袋ロングコース', laps: 1, radius: 18,
+    nodes: ['KG2', 'J2', 'SN1', 'ES_E', 'J3', 'SB1', 'SB2', 'J4', 'T435_1', 'HELLO', 'T435_2', 'J5', 'J6', 'S60E', 'N1', 'J1', 'KG1', 'EG_E'],
+    desc: '春日通り・大塚・不忍通り・首都高下を巡る東池袋の高速ロングコース',
+  },
+  {
+    id: 'sunshine', area: 'east', name: 'サンシャインサーキット', laps: 2, radius: 9,
+    nodes: ['S60M', 'S60E', 'J6', 'GR0', 'MJ_2'],
+    desc: 'サンシャイン60通り・首都高下・グリーン大通り・東口の明治通りを回るショートコース',
+  },
+  {
+    id: 'minami', area: 'east', name: '南池袋ループ', laps: 2, radius: 12,
+    nodes: ['MS2', 'MS3', 'T435_2', 'J5', 'J6', 'GR0', 'MJ_1', 'MJ_S', 'MS1', 'HOSHINO'],
+    desc: '都電沿いの道から首都高下、グリーン大通り、明治通りを巡る中速コース',
+  },
 ];
+for (const c of COURSES) c.area ||= 'west';
 
-// 順走/逆走を含めた6レイアウト
+// 順走/逆走を含めたレイアウト（西6・東6）
 export const LAYOUTS = COURSES.flatMap((c) => [
-  { key: `${c.id}_f`, course: c, reverse: false, name: `${c.name}（順走）` },
-  { key: `${c.id}_r`, course: c, reverse: true, name: `${c.name}（逆走）` },
+  { key: `${c.id}_f`, course: c, area: c.area, reverse: false, name: `${c.name}（順走）` },
+  { key: `${c.id}_r`, course: c, area: c.area, reverse: true, name: `${c.name}（逆走）` },
 ]);
 
 export function roadWidthBetween(a, b) {
@@ -134,12 +214,34 @@ export function roadWidthBetween(a, b) {
   return 10;
 }
 
-// 主人公の初期位置（GS前）
-export const START_SPOT = { node: 'E_EN', heading: Math.PI };
+// 主人公の初期位置（GS前の文化通り、北向き）
+export const START_SPOT = { node: 'GS_E', heading: Math.PI };
+
+// エリア定義
+export const AREAS = {
+  west: {
+    id: 'west', name: '西池袋', roads: WEST_ROADS, pois: WEST_POIS,
+    start: { node: 'GS_E', heading: Math.PI, back: 16 },
+    gates: [
+      { node: 'K5', from: 'K4', to: 'east', label: '東池袋エリア', arrive: { node: 'GATE_K', toward: 'V0' } },
+      { node: 'EDIT_OUT', from: 'EDIT', to: 'east', label: '東池袋エリア', arrive: { node: 'MJ_S', toward: 'MJ_1' } },
+    ],
+  },
+  east: {
+    id: 'east', name: '東池袋', roads: EAST_ROADS, pois: EAST_POIS,
+    start: { node: 'EG_E', heading: 0, back: 0, toward: 'KG1' },
+    gates: [
+      { node: 'GK_OUT', from: 'GATE_K', to: 'west', label: '西池袋エリア', arrive: { node: 'K4', toward: 'K3' } },
+      { node: 'MJ_OUT', from: 'MJ_S', to: 'west', label: '西池袋エリア', arrive: { node: 'EDIT', toward: 'S441' } },
+    ],
+  },
+};
+export const ALL_ROADS = [...WEST_ROADS, ...EAST_ROADS];
+export function areaOfLayout(L) { return L.area || L.course?.area || 'west'; }
 
 // 街の道路で a-b を結ぶもの
 export function townRoadBetween(a, b) {
-  for (const r of ROADS) {
+  for (const r of ALL_ROADS) {
     for (let i = 0; i < r.nodes.length - 1; i++) {
       if ((r.nodes[i] === a && r.nodes[i + 1] === b) || (r.nodes[i] === b && r.nodes[i + 1] === a)) return r;
     }
@@ -175,4 +277,35 @@ export function roadPolyline(r) {
   const last = P[P.length - 1];
   out.push({ x: last.x, z: last.z });
   return out;
+}
+
+// ノードaからノードbへ向く方位（heading）
+export function headingTo(a, b) {
+  const A = NODES[a], B = NODES[b];
+  return Math.atan2(B.x - A.x, B.z - A.z);
+}
+
+// 道路上の左側車線に置く位置 { x, z, h }
+export function laneSpot(node, toward, back = 0, heading = null) {
+  const n = NODES[node];
+  const h = heading != null ? heading : headingTo(node, toward);
+  const f0 = Math.sin(h), f1 = Math.cos(h);
+  const r = toward ? townRoadBetween(node, toward) : null;
+  const o = r ? laneOffset(r) : 0;
+  // 左 = (cos h, -sin h)
+  return { x: n.x - f0 * back + Math.cos(h) * o, z: n.z - f1 * back - Math.sin(h) * o, h };
+}
+
+// エリアの開始位置
+export function areaStart(area) {
+  const st = AREAS[area].start;
+  if (st.toward) return { ...laneSpot(st.node, st.toward, st.back || 0), area };
+  const n = NODES[st.node];
+  const f0 = Math.sin(st.heading), f1 = Math.cos(st.heading);
+  return { x: n.x - f0 * (st.back || 0) - 2.5 * Math.cos(st.heading), z: n.z - f1 * (st.back || 0) + 2.5 * Math.sin(st.heading), h: st.heading, area };
+}
+
+// ゲートを抜けた先の到着位置
+export function arriveSpot(gate) {
+  return { ...laneSpot(gate.arrive.node, gate.arrive.toward, -6), area: gate.to };
 }
