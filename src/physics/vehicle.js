@@ -4,6 +4,11 @@
 
 const G = 9.81;
 
+// トラクションコントロールの段階配分：許容スリップ＝ピークスリップ比×1.1×10^((10-L)/9)
+// （L10≒ピーク付近、L1≒ピークの約11倍＝かなり空転を許す）
+const TCS_MIN_SLIP = 1.1, TCS_RANGE = 10;
+const TCS_CUT_RATE = 9, TCS_RELEASE_RATE = 2.5; // 絞る速さ／戻す速さ[1/s]
+
 // true/false（旧設定）または 0〜10 の数値をレベルに変換
 function levelOf(v, def) {
   if (v === true) return 10;
@@ -217,8 +222,14 @@ export class Vehicle {
     if (rpm >= s.limiter) { thr = 0; this.limiterHit = 0.08; }
     if (this.limiterHit > 0) { this.limiterHit -= dt; thr = 0; }
     // TCS
-    // レベルが高いほど早く（小さいスリップで）介入し、強く絞る。10で従来のON相当
-    if (this.tcsLevel > 0 && this.slipLong > s.peakRatio * (2.2 - 0.09 * this.tcsLevel)) thr *= 1 - 0.07 * this.tcsLevel;
+    // トラクションコントロール：レベルごとの「許容スリップ」を超えないようスロットルを自動で絞る（フィードバック制御）。
+    // 低い段階ほど大きな空転を許し、10で空転をほぼ抑える。車の馬力に関係なく段階ごとの効きが揃う。
+    if (this.tcsLevel > 0) {
+      const target = s.peakRatio * TCS_MIN_SLIP * Math.pow(TCS_RANGE, (10 - this.tcsLevel) / 9);
+      const over = Math.min(2, (this.slipLong - target) / target);
+      this.tcsCut = Math.max(0, Math.min(0.95, (this.tcsCut || 0) + dt * (over > 0 ? TCS_CUT_RATE * over : -TCS_RELEASE_RATE)));
+      thr *= 1 - this.tcsCut;
+    } else this.tcsCut = 0;
     const Te = s.fullTorque(rpm, this.boost) * thr;
     const Tf = (s.maxTorque * (0.03 + 0.12 * (rpm / s.redline))) * (1 - thr);
     let Teng = Te - Tf;
