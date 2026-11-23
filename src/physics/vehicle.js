@@ -3,6 +3,14 @@
 // yawRate w: 右旋回(上から見て時計回り)を正。dh/dt = -w
 
 const G = 9.81;
+
+// true/false（旧設定）または 0〜10 の数値をレベルに変換
+function levelOf(v, def) {
+  if (v === true) return 10;
+  if (v === false) return 0;
+  if (typeof v === 'number') return Math.max(0, Math.min(10, Math.round(v)));
+  return def;
+}
 const RHO = 1.2;
 const TIRE_B = 2.08, TIRE_C = 1.4; // s=1でピーク、滑走域でピークの約80%
 
@@ -25,8 +33,9 @@ export class Vehicle {
     this.slip = 0; this.slipLong = 0;
     this.input = { throttle: 0, brake: 0, steer: 0 };
     this.auto = !!opts.auto; // オートマ
-    this.abs = opts.abs !== false;
-    this.tcs = !!opts.tcs;
+    // ABS・トラクションコントロールの効き（0=OFF、1〜10。10が最も強い）
+    this.absLevel = levelOf(opts.abs, 10);
+    this.tcsLevel = levelOf(opts.tcs, 0);
     this.limiterHit = 0;
     this.wheelLoads = [0, 0, 0, 0];
     this.wheelSlip = [0, 0, 0, 0];
@@ -208,7 +217,8 @@ export class Vehicle {
     if (rpm >= s.limiter) { thr = 0; this.limiterHit = 0.08; }
     if (this.limiterHit > 0) { this.limiterHit -= dt; thr = 0; }
     // TCS
-    if (this.tcs && this.slipLong > s.peakRatio * 1.3) thr *= 0.3;
+    // レベルが高いほど早く（小さいスリップで）介入し、強く絞る。10で従来のON相当
+    if (this.tcsLevel > 0 && this.slipLong > s.peakRatio * (2.2 - 0.09 * this.tcsLevel)) thr *= 1 - 0.07 * this.tcsLevel;
     const Te = s.fullTorque(rpm, this.boost) * thr;
     const Tf = (s.maxTorque * (0.03 + 0.12 * (rpm / s.redline))) * (1 - thr);
     let Teng = Te - Tf;
@@ -274,12 +284,13 @@ export class Vehicle {
     this.slipLong = slipLong;
 
     // ---- ABS ----
-    if (this.abs && brake > 0) {
+    if (this.absLevel > 0 && brake > 0) {
       const lockF = this.wF * R - this.vu;
       const lockR = this.wR * R - this.vu;
-      const lim = -kp * 1.1 * Math.max(Math.abs(this.vu), 4);
-      if (lockF < lim) bF *= 0.35;
-      if (lockR < lim) bR *= 0.35;
+      const lim = -kp * (2.0 - 0.09 * this.absLevel) * Math.max(Math.abs(this.vu), 4);
+      const keep = 1 - 0.065 * this.absLevel;
+      if (lockF < lim) bF *= keep;
+      if (lockR < lim) bR *= keep;
     }
 
     // ---- 車輪回転（陰解法） ----

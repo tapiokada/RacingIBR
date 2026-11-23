@@ -17,7 +17,7 @@ const SETTINGS_KEY = 'ibr.settings.v1';
 
 export const DEFAULT_SETTINGS = {
   keys: Object.fromEntries(ACTIONS.map((a) => [a.id, a.def])),
-  bgm: 0.6, se: 0.7, transmission: 'AT', abs: true, tcs: true, mirror: true,
+  bgm: 0.6, se: 0.7, transmission: 'AT', absLevel: 10, tcsLevel: 10, mirror: true,
   defaultsRev: 2,
   brightness: 1.0,
 };
@@ -29,6 +29,10 @@ export function loadSettings() {
       const s = JSON.parse(raw);
       // v0.1.1でデフォルトをAT・トラコンONに変更（旧設定にも反映）
       if (!s.defaultsRev || s.defaultsRev < 2) { s.transmission = 'AT'; s.tcs = true; s.defaultsRev = 2; }
+      // ABS/トラコンのON/OFF（旧）を0〜10のレベルへ
+      if (s.absLevel == null) s.absLevel = s.abs === false ? 0 : 10;
+      if (s.tcsLevel == null) s.tcsLevel = s.tcs === false ? 0 : 10;
+      delete s.abs; delete s.tcs;
       const keys = { ...DEFAULT_SETTINGS.keys, ...(s.keys || {}) };
       // 追加アクションのデフォルトキーが既存の割当と重複したら未割当にする
       for (const a of ACTIONS) if (!(s.keys || {})[a.id] && Object.entries(keys).some(([id, c]) => id !== a.id && c === keys[a.id])) keys[a.id] = '';

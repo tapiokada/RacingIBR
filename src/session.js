@@ -24,7 +24,7 @@ export class DriveSession {
   addCar({ carId, equipped, color, isPlayer = false, name = '', ai = null }) {
     const spec = buildSpec(carId, equipped);
     const s = this.game.settings;
-    const car = new Vehicle(spec, { auto: isPlayer ? s.transmission === 'AT' : true, abs: isPlayer ? s.abs : true, tcs: isPlayer ? s.tcs : false });
+    const car = new Vehicle(spec, { auto: isPlayer ? s.transmission === 'AT' : true, abs: isPlayer ? s.absLevel : 10, tcs: isPlayer ? s.tcsLevel : 0 });
     const model = buildCarModel(CARS[carId], color, { aero: equipped.aero, wing: equipped.aero === 'aero_wing' || equipped.aero === 'aero_full' ? 'gt' : undefined });
     this.game.world.scene.add(model);
     if (isPlayer) addHeadlights(model);

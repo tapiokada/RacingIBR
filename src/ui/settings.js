@@ -38,8 +38,25 @@ export function openSettings(game, onClose) {
     };
     list.appendChild(el('div', { class: 'key-sep' }, 'ドライビング'));
     opt('トランスミッション', () => (s.transmission === 'MT' ? 'MT（マニュアル）' : 'AT（オートマ）'), () => { s.transmission = s.transmission === 'MT' ? 'AT' : 'MT'; });
-    opt('ABS', () => (s.abs ? 'ON' : 'OFF'), () => { s.abs = !s.abs; });
-    opt('トラクションコントロール', () => (s.tcs ? 'ON' : 'OFF'), () => { s.tcs = !s.tcs; });
+    // 0（OFF）〜10 の段階設定。←→（または◀▶）で変更
+    const level = (label, key, note) => {
+      const val = el('span', { class: 'lv-val' });
+      const bar = el('span', { class: 'lv-bar' });
+      const show = () => {
+        val.textContent = s[key] === 0 ? 'OFF' : `${s[key]} / 10`;
+        bar.innerHTML = '';
+        for (let i = 1; i <= 10; i++) bar.appendChild(el('i', { class: i <= s[key] ? 'on' : '' }));
+      };
+      const set = (v) => { s[key] = Math.max(0, Math.min(10, v)); show(); saveSettings(s); };
+      const minus = el('button', { class: 'arrow', onclick: () => set(s[key] - 1) }, '◀');
+      const plus = el('button', { class: 'arrow', onclick: () => set(s[key] + 1) }, '▶');
+      const row = el('div', { class: 'key-row' }, el('span', { class: 'key-name' }, label, el('small', { class: 'lv-note' }, note)), el('span', { class: 'lv' }, minus, bar, val, plus));
+      rows.push({ row, act: () => set(s[key] >= 10 ? 0 : s[key] + 1), left: () => set(s[key] - 1), right: () => set(s[key] + 1) });
+      list.appendChild(row);
+      show();
+    };
+    level('ABS', 'absLevel', '0=OFF・数値が大きいほど早く強く効く');
+    level('トラクションコントロール', 'tcsLevel', '0=OFF・数値が大きいほど早く強く効く');
     list.appendChild(el('div', { class: 'key-sep' }, '画面'));
     {
       const lbl = el('span', { class: 'key-val' }, `${Math.round(s.brightness * 100)}%`);
