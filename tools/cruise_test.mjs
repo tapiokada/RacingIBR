@@ -40,7 +40,7 @@ for (let t = 0; t < T; t += 1 / 60) {
   }
   for (const o of list) {
     o.slow = o.car.speed < 0.5 ? o.slow + 1 : 0;
-    if (o.slow > o.maxSlow) { o.maxSlow = o.slow; if (o.slow > 360) o.stuckAt = `${o.ai.a}>${o.ai.b}>${o.ai.c}`; }
+    if (o.slow > o.maxSlow) { o.maxSlow = o.slow; if (o.slow > 360) o.stuckAt = `${o.ai.a}>${o.ai.b}>${o.ai.c}@(${o.car.x.toFixed(0)},${o.car.z.toFixed(0)},h${o.car.h.toFixed(2)})`; }
   }
 }
 const stuck = list.filter((o) => o.maxSlow > 360);

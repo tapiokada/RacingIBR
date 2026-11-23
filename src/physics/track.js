@@ -138,6 +138,18 @@ export function townCornerPads(area = 'west') {
       pads.push({ x: b.x, z: b.z, r: r.width / 2 + 2.8 });
     }
   }
+  // 狭い道が分離帯のある広い道に接続する交差点は、角を丸く広げる（右左折できるように）
+  const inc = {};
+  for (const r of ROADS) for (const id of r.nodes) (inc[id] ||= []).push(r);
+  for (const [id, rs] of Object.entries(inc)) {
+    if (rs.length < 2) continue;
+    const narrow = rs.some((r) => r.width < 12 && !r.gate && r.ai !== false);
+    const wide = rs.filter((r) => r.width >= 14 && r.median > 0); // 分離帯のある広い道（走行車線が角に寄る）
+    if (!narrow || !wide.length) continue;
+    const wideW = Math.max(...wide.map((r) => r.width));
+    const n = NODES[id];
+    pads.push({ x: n.x, z: n.z, r: Math.min(14, wideW / 2 + 3) });
+  }
   return pads;
 }
 

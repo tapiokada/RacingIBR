@@ -59,12 +59,22 @@ const N = {
   SB1: [35.721, 139.72938], SB2: [35.72056, 139.7272], J4: [35.71959, 139.72503],
   // 首都高5号の下の道（都道435号）
   T435_1: [35.72021, 139.72394], HELLO: [35.72201, 139.72313], T435_2: [35.72392, 139.72252],
-  J5: [35.72602, 139.71908], J6: [35.72736, 139.71686], S60E: [35.729, 139.71684], N1: [35.73129, 139.7168],
+  J5: [35.72602, 139.71908], J6: [35.72736, 139.71686], S60E: [35.73037, 139.71682], N1: [35.73129, 139.7168],
   // 明治通り（池袋駅東口）
   MJ_OUT: [35.726, 139.7124], MJ_S: [35.72653, 139.7123], MJ_1: [35.7286, 139.71186], GR0: [35.7296, 139.71222],
   MJ_2: [35.73036, 139.71258], MJ_3: [35.73153, 139.71252], MJ_4: [35.7329, 139.71339],
   // サンシャイン60通り
-  S60M: [35.72985, 139.7145],
+  // サンシャイン60通り（東口→ENEへ折れて首都高下の道を越え、サンシャインシティ西側へ）
+  S60P2: [35.73009, 139.7141], S60P3: [35.72999, 139.71472], S60M: [35.72987, 139.71538], S60B: [35.73013, 139.71624],
+  // 東口ストリートコース（添付画像：東池袋1丁目の路地）
+  MJX: [35.73163, 139.71325], CK0: [35.73203, 139.7141], CK1: [35.73175, 139.71421],
+  CK4: [35.73167, 139.71474], CK5: [35.73236, 139.7161], CK6: [35.7307, 139.71612], CK7: [35.73069, 139.71535],
+  // サンシャインシティ外周（添付画像：東池袋駅〜コミティア〜東池袋4丁目）
+  GB1: [35.7265, 139.7183], SC_O: [35.72769, 139.71842], SC_P: [35.72794, 139.71865], SC_A: [35.72837, 139.71899],
+  SC_B: [35.7293, 139.71722], SC_C: [35.72982, 139.71766], SC_W: [35.7304, 139.71762], SC_D: [35.73051, 139.71761],
+  SC_E: [35.7307, 139.7183], SC_F: [35.73007, 139.7195], SC_G: [35.72963, 139.72032], SC_H: [35.73048, 139.72104],
+  SC_I: [35.73095, 139.72148], SC_K: [35.73022, 139.72274], SC_L: [35.72801, 139.72075], // SC_I・SC_K は春日通り上
+  SC_M: [35.72726, 139.72013],
   // 都電沿いの道（南池袋）
   MS1: [35.7255, 139.71382], HOSHINO: [35.72461, 139.71535], MS2: [35.7243, 139.71812], MS3: [35.72361, 139.72139],
   // 東池袋の施設
@@ -80,7 +90,7 @@ export const LANDMARKS = {
   // --- 東池袋 ---
   seibu: [35.7283, 139.7106, 35.7306, 139.7115], // 西部デパート（池袋駅東口の駅ビル・架空名）
   parco: [35.7307, 139.7106, 35.7316, 139.7115], // パルクス（東口北側の商業ビル・架空名）
-  sunshine: [35.7283, 139.7178, 35.7304, 139.7212], // サンライズシティ（サンシャインシティ風・架空名）
+  // サンライズシティ（サンシャインシティ風・架空名）は外周道路の内側に配置（eastSide.js）
   eplaza: [35.72975, 139.7115, 35.73045, 139.7121], // 東口駅前（ビルを建てない）
 };
 
@@ -126,14 +136,18 @@ export const WEST_ROADS = [
 ];
 
 export const EAST_ROADS = [
-  { name: '春日通り', lanes: 2, laneW: 3.25, median: 1.5, shoulder: 0.5, nodes: ['GATE_K', 'V0', 'J1', 'KG1', 'EG_E', 'KG2', 'J2'] },
+  { name: '春日通り', lanes: 2, laneW: 3.25, median: 1.5, shoulder: 0.5, nodes: ['GATE_K', 'V0', 'J1', 'KG1', 'SC_I', 'EG_E', 'SC_K', 'KG2', 'J2'] },
   { name: '明治通り', lanes: 2, laneW: 3.0, median: 0, shoulder: 1.0, smooth: true, nodes: ['MJ_S', 'MJ_1', 'GR0', 'MJ_2', 'MJ_3', 'MJ_4', 'V0'] },
   { name: '首都高下の道（都道435号）', lanes: 2, laneW: 3.25, median: 3.0, shoulder: 0.5, highway: true, nodes: ['J4', 'T435_1', 'HELLO', 'T435_2', 'J5'] },
   { name: '首都高下の道（北）', lanes: 2, laneW: 3.25, median: 3.0, shoulder: 0.5, nodes: ['J6', 'S60E', 'N1', 'J1'] },
   { name: '不忍通り', lanes: 2, laneW: 3.0, median: 0, shoulder: 0.5, smooth: true, nodes: ['J3', 'SB1', 'SB2', 'J4'] },
   { name: '大塚の通り', lanes: 1, laneW: 3.25, median: 0, shoulder: 1.5, nodes: ['J2', 'SN1', 'ES_E', 'J3'] },
-  { name: 'グリーン大通り', lanes: 2, laneW: 3.25, median: 4.0, shoulder: 0.5, green: true, nodes: ['GR0', 'J6', 'J5'] },
-  { name: 'サンシャイン60通り', lanes: 1, laneW: 3.0, median: 0, shoulder: 1.5, neon: true, nodes: ['MJ_2', 'S60M', 'S60E'] },
+  { name: 'グリーン大通り', lanes: 2, laneW: 3.25, median: 4.0, shoulder: 0.5, green: true, nodes: ['GR0', 'J6', 'GB1', 'J5'] },
+  { name: 'サンシャイン60通り', lanes: 1, laneW: 3.0, median: 0, shoulder: 1.5, neon: true, nodes: ['MJ_2', 'S60P2', 'S60P3', 'S60M', 'S60B', 'S60E', 'SC_W'] },
+  { name: '特別区道41-50', lanes: 1, laneW: 3.0, median: 0, shoulder: 1.0, nodes: ['MJ_3', 'MJX', 'CK0', 'CK1', 'S60P2'] },
+  { name: '東池袋一丁目の路地', lanes: 1, laneW: 3.0, median: 0, shoulder: 1.0, nodes: ['S60P3', 'CK4', 'CK5', 'CK6', 'CK7', 'S60M'] },
+  { name: 'サンシャインシティ外周', lanes: 1, laneW: 3.25, median: 0, shoulder: 1.5, nodes: ['GB1', 'SC_O', 'SC_P', 'SC_A', 'SC_B', 'SC_C', 'SC_W', 'SC_D', 'SC_E', 'SC_F', 'SC_G', 'SC_H', 'SC_I'] },
+  { name: 'サンシャインシティ外周（東）', lanes: 1, laneW: 3.25, median: 0, shoulder: 1.5, nodes: ['SC_K', 'SC_L', 'SC_M', 'J5'] },
   { name: '都電沿いの道（南池袋）', lanes: 1, laneW: 3.0, median: 0, shoulder: 1.6, smooth: true, nodes: ['MJ_S', 'MS1', 'HOSHINO', 'MS2', 'MS3', 'T435_2'] },
   { name: 'サービスステーション入口', lanes: 0, laneW: 8.0, median: 0, shoulder: 0.5, ai: false, nodes: ['EG_E', 'EG_P'] },
   { name: 'ショップ駐車場', lanes: 0, laneW: 8.0, median: 0, shoulder: 0.5, ai: false, nodes: ['ES_E', 'ES_P'] },
@@ -183,18 +197,28 @@ export const COURSES = [
   // ===== 東池袋 =====
   {
     id: 'higashi', area: 'east', name: '東池袋ロングコース', laps: 1, radius: 18,
-    nodes: ['KG2', 'J2', 'SN1', 'ES_E', 'J3', 'SB1', 'SB2', 'J4', 'T435_1', 'HELLO', 'T435_2', 'J5', 'J6', 'S60E', 'N1', 'J1', 'KG1', 'EG_E'],
+    nodes: ['KG2', 'J2', 'SN1', 'ES_E', 'J3', 'SB1', 'SB2', 'J4', 'T435_1', 'HELLO', 'T435_2', 'J5', 'GB1', 'J6', 'S60E', 'N1', 'J1', 'KG1', 'SC_I', 'EG_E', 'SC_K'],
     desc: '春日通り・大塚・不忍通り・首都高下を巡る東池袋の高速ロングコース',
   },
   {
     id: 'sunshine', area: 'east', name: 'サンシャインサーキット', laps: 2, radius: 9,
-    nodes: ['S60M', 'S60E', 'J6', 'GR0', 'MJ_2'],
+    nodes: ['S60B', 'S60E', 'J6', 'GR0', 'MJ_2', 'S60P2', 'S60P3', 'S60M'],
     desc: 'サンシャイン60通り・首都高下・グリーン大通り・東口の明治通りを回るショートコース',
   },
   {
     id: 'minami', area: 'east', name: '南池袋ループ', laps: 2, radius: 12,
-    nodes: ['MS2', 'MS3', 'T435_2', 'J5', 'J6', 'GR0', 'MJ_1', 'MJ_S', 'MS1', 'HOSHINO'],
+    nodes: ['MS2', 'MS3', 'T435_2', 'J5', 'GB1', 'J6', 'GR0', 'MJ_1', 'MJ_S', 'MS1', 'HOSHINO'],
     desc: '都電沿いの道から首都高下、グリーン大通り、明治通りを巡る中速コース',
+  },
+  {
+    id: 'higashiguchi', area: 'east', name: '東口ストリートコース', laps: 1, radius: 7,
+    nodes: ['CK1', 'S60P2', 'S60P3', 'CK4', 'CK5', 'CK6', 'CK7', 'S60M', 'S60B', 'S60E', 'J6', 'GR0', 'MJ_2', 'MJ_3', 'MJX', 'CK0'],
+    desc: '東池袋一丁目の路地とサンシャイン60通り・首都高下・グリーン大通りを巡るテクニカルコース',
+  },
+  {
+    id: 'scround', area: 'east', name: 'サンシャインシティ外周', laps: 2, radius: 10,
+    nodes: ['SC_L', 'SC_M', 'J5', 'GB1', 'SC_O', 'SC_P', 'SC_A', 'SC_B', 'SC_C', 'SC_W', 'SC_D', 'SC_E', 'SC_F', 'SC_G', 'SC_H', 'SC_I', 'EG_E', 'SC_K'],
+    desc: '東池袋駅からサンシャインシティをぐるりと一周する中速コース',
   },
 ];
 for (const c of COURSES) c.area ||= 'west';

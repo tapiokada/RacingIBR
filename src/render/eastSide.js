@@ -8,6 +8,15 @@ import { rect, tex, signTex, plane } from './westExit.js';
 
 const S = MAP_SCALE;
 
+function inPoly(poly, x, z) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j];
+    if ((a.z > z) !== (b.z > z) && x < ((b.x - a.x) * (z - a.z)) / (b.z - a.z) + a.x) inside = !inside;
+  }
+  return inside;
+}
+
 function facadeTex(base, band, lit = 0.55, vertical = false) {
   return tex(256, 512, (g, W, H) => {
     g.fillStyle = base; g.fillRect(0, 0, W, H);
@@ -71,7 +80,7 @@ export class EastSide {
   }
 
   excludes(x, z, pad = 3) {
-    return this.exclude.some((r) => x > r.x0 - pad && x < r.x1 + pad && z > r.z0 - pad && z < r.z1 + pad);
+    return this.exclude.some((r) => (r.poly ? inPoly(r.poly, x, z) : x > r.x0 - pad && x < r.x1 + pad && z > r.z0 - pad && z < r.z1 + pad));
   }
 
   // 道路にもコースにも被らない箱か
@@ -165,35 +174,53 @@ export class EastSide {
     }
   }
 
-  // ---- サンライズシティ（サンシャインシティ風） ----
+  // ---- サンライズシティ（サンシャインシティ風）：外周道路の内側に配置 ----
   buildSunshineCity() {
-    const R = rect(LANDMARKS.sunshine);
-    this.exclude.push(R);
+    const loop = ['GB1', 'SC_O', 'SC_P', 'SC_A', 'SC_B', 'SC_C', 'SC_W', 'SC_D', 'SC_E', 'SC_F', 'SC_G', 'SC_H', 'SC_I', 'EG_E', 'SC_K', 'SC_L', 'SC_M', 'J5'].map((id) => NODES[id]);
+    this.exclude.push({ poly: loop });
     const tower = buildSunshineTower();
     this.g.add(tower);
     this.blinkers = tower.userData.blinkers;
-    // 低層の商業棟（アルパ風）
+    // 外周の南西辺に沿った向き
+    const A = NODES.SC_A, B = NODES.SC_B;
+    const rot = Math.atan2(-(B.z - A.z), B.x - A.x); // ローカルxを南西辺に平行に
+    let cx = 0, cz = 0;
+    for (const p of loop) { cx += p.x; cz += p.z; }
+    cx /= loop.length; cz /= loop.length;
+    // 低層の商業棟（アルパ風）：収まる最大サイズ
     const pod = facadeTex('#8c8f96', '#3a3d44', 0.7);
-    pod.repeat.set(R.w / 20, 0.4);
-    this.addBox(R.cx, R.cz, R.w * 0.95, R.d * 0.9, 14, new THREE.MeshLambertMaterial({ map: pod, emissive: 0xffffff, emissiveMap: pod, emissiveIntensity: 0.2 }));
-    // ホテル棟（サンシャインシティプリンス風）
+    for (let k = 1; k >= 0.3; k -= 0.05) {
+      const w = 150 * k, d = 75 * k;
+      if (!this.boxOk(cx, cz, w, d, rot, 2)) continue;
+      pod.repeat.set(w / 20, 0.4);
+      this.addBox(cx, cz, w, d, 14, new THREE.MeshLambertMaterial({ map: pod, emissive: 0xffffff, emissiveMap: pod, emissiveIntensity: 0.2 }), rot);
+      // 入口の看板（南西面）
+      const sg = plane(Math.min(24, w * 0.4), 3, signTex('SUNRISE CITY', { bg: '#0f2440', fg: '#ffd36b', glow: '#ffd36b' }));
+      const nx = Math.sin(rot), nz = Math.cos(rot); // ローカル+z
+      sg.position.set(cx + nx * (d / 2 + 0.3), 10, cz + nz * (d / 2 + 0.3));
+      sg.rotation.y = rot;
+      this.g.add(sg);
+      break;
+    }
+    // ホテル棟（プリンスホテル風）と中層棟（ワールドインポートマート風）＋屋上の水族館ドーム
+    const place = (cands, w, d, h, mat) => {
+      for (const [la, lo] of cands) {
+        const c = geo(la, lo);
+        if (this.boxOk(c.x, c.z, w, d, rot, 2)) { this.addBox(c.x, c.z, w, d, h, mat, rot); return c; }
+      }
+      return null;
+    };
     const ht = facadeTex('#b9b4a8', '#575247', 0.5, true);
     ht.repeat.set(1, 1.5);
-    const hc = geo(35.72905, 139.72045);
-    this.addBox(hc.x, hc.z, 34, 20, 140 * S, new THREE.MeshLambertMaterial({ map: ht, emissive: 0xffffff, emissiveMap: ht, emissiveIntensity: 0.2 }), 0.5);
-    // ワールドインポートマート風の中層棟
+    place([[35.72905, 139.72045], [35.7289, 139.7200], [35.7292, 139.7198]], 34, 20, 140 * S, new THREE.MeshLambertMaterial({ map: ht, emissive: 0xffffff, emissiveMap: ht, emissiveIntensity: 0.2 }));
     const wt = facadeTex('#7f8a96', '#404750', 0.6);
     wt.repeat.set(3, 1);
-    const wc = geo(35.7302, 139.7202);
-    this.addBox(wc.x, wc.z, 42, 30, 60 * S, new THREE.MeshLambertMaterial({ map: wt, emissive: 0xffffff, emissiveMap: wt, emissiveIntensity: 0.2 }));
-    // 水族館（屋上の青いドーム）
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(9, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x7fd3ff, emissive: 0x1a6aa0, emissiveIntensity: 0.6, transparent: true, opacity: 0.8 }));
-    dome.position.set(wc.x, 60 * S, wc.z);
-    this.g.add(dome);
-    // 入口の看板（首都高下の道に面する西側）
-    const sg = plane(20, 3, signTex('SUNRISE CITY', { bg: '#0f2440', fg: '#ffd36b', glow: '#ffd36b' }));
-    sg.position.set(R.x0 - 0.3, 16, R.cz); sg.rotation.y = -Math.PI / 2;
-    this.g.add(sg);
+    const wc = place([[35.7298, 139.72035], [35.7296, 139.7202], [35.7294, 139.7188]], 40, 28, 60 * S, new THREE.MeshLambertMaterial({ map: wt, emissive: 0xffffff, emissiveMap: wt, emissiveIntensity: 0.2 }));
+    if (wc) {
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(9, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x7fd3ff, emissive: 0x1a6aa0, emissiveIntensity: 0.6, transparent: true, opacity: 0.8 }));
+      dome.position.set(wc.x, 60 * S, wc.z);
+      this.g.add(dome);
+    }
   }
 
   // ---- サンシャイン60通り：映画館・ゲームセンター・飲食店のネオン ----
@@ -214,7 +241,7 @@ export class EastSide {
           const off = r.width / 2 + 3.4 + 5;
           const cx = a.x + ux * d + rx * off * sd, cz = a.z + uz * d + rz * off * sd;
           const h = 9 + ((n * 37) % 16);
-          if (!this.boxOk(cx, cz, 10, 8, rot, 0.5)) continue;
+          if (!this.boxOk(cx, cz, 10.6, 8, rot, 1.5)) continue;
           const col = new THREE.Color().setHSL((n * 0.17) % 1, 0.18, 0.22 + ((n * 5) % 4) * 0.03);
           this.addBox(cx, cz, 10, 8, h, new THREE.MeshLambertMaterial({ color: col }), rot);
           this.exclude.push({ x0: cx - 7, x1: cx + 7, z0: cz - 7, z1: cz + 7 });

@@ -310,7 +310,7 @@ export class CruiseAI {
       if (this.reverseT <= 0) car.gear = 1;
       return;
     }
-    if (vt > 3 && car.speed < 0.8) { this.stuck += dt; if (this.stuck > 2.5) { this.stuck = 0; this.reverseT = 1.5; } } else this.stuck = 0;
+    if (vt > 1.5 && car.speed < 0.8) { this.stuck += dt; if (this.stuck > 2.5) { this.stuck = 0; this.reverseT = 1.5; } } else this.stuck = 0;
     if (car.gear < 1) car.gear = 1;
     car.input = { throttle, brake, steer };
   }
