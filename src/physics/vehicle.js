@@ -88,7 +88,8 @@ export class Vehicle {
       wh.camber = F ? sp.camberF : sp.camberR;
       // トー：+イン。左輪(+)は右へ、右輪は左へ向く
       wh.toe = -wh.side * (F ? sp.toeF : sp.toeR) * deg;
-      wh.longMul = 1 - 0.004 * wh.camber * wh.camber;
+      // 縦方向の摩擦係数は横より大きい（摩擦楕円）× キャンバーによる縦グリップ低下
+      wh.longMul = (s.muX || 1) * (1 - 0.004 * wh.camber * wh.camber);
     }
   }
 

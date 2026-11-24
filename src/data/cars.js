@@ -132,7 +132,7 @@ const CHASSIS = {
   'WRX-IMP': { liftF: 0.07, liftR: 0.04, yawK: 0.98, rideH: 145, center: { split: 0.41, pre: 120, acc: 0.45, visc: 0, capK: 0 } },
   'EVO-IX': { liftF: 0.06, liftR: 0.02, yawK: 0.98, rideH: 145, center: { split: 0.5, pre: 80, acc: 0.6, visc: 0, capK: 0 } },
   // ATTESA E-TS：基本はFR、後輪が空転すると多板クラッチで前輪へ最大約50%まで伝える
-  'R34-GTR': { liftF: 0.02, liftR: 0.0, yawK: 1.02, rideH: 135, center: { split: 0.0, pre: 0, acc: 0, visc: 450, capK: 0.5 } },
+  'R34-GTR': { liftF: 0.02, liftR: 0.0, yawK: 1.02, rideH: 135, center: { split: 0.0, pre: 0, acc: 0, visc: 1200, capK: 0.5 } },
 };
 for (const [id, c] of Object.entries(CHASSIS)) Object.assign(CARS[id], c);
 

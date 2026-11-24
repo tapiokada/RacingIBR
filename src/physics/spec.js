@@ -61,10 +61,11 @@ export function buildSpec(carId, equipped, setup = null) {
     tireRadius: car.tireRadius,
     drive: car.drive, awdFront: car.awdFront || 0,
     gears, reverse: car.reverse, final, shiftTime: tm.shift,
-    idle: eng.idle, redline, limiter, engineInertia: eng.inertia,
+    // エンジン回転系の慣性（クランク＋フライホイール＋クラッチ）。実機相当に補正
+    idle: eng.idle, redline, limiter, engineInertia: eng.inertia * 0.75,
     cylinders: eng.cylinders,
     loud: muf.loud,
-    mu: tire.mu * sus.grip, peakAngle: tire.peakAngle, peakRatio: tire.peakRatio,
+    mu: tire.mu * sus.grip, muX: tire.muX || 1.12, // 縦（駆動・制動）の摩擦係数は横の約1.12倍（摩擦楕円） peakAngle: tire.peakAngle, peakRatio: tire.peakRatio,
     loadTau: sus.tau, rollFront: car.rollFront + sus.rollFront,
     length: car.length, width: car.width, height: car.height,
     brakeTorque: car.brakeTorque * brk.torque, brakeBias: car.brakeBias,
