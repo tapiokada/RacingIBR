@@ -6,6 +6,8 @@
 //  SWIFT-S："2020 Suzuki Swift Sport (ZC33S)" by DisneyCars（Sketchfab, CC BY 4.0）
 //  S2K-AP："Honda S2000 Ultimate Edition (AP2)" by Mona x Supercars（Sketchfab, CC BY 4.0）
 //  BRZ-ZD："2023 Subaru BRZ" by Nazh Design（Sketchfab, CC BY 4.0）
+//  EVO-IX："2006 Mitsubishi Lancer Evolution IX MR" by OUTPISTON（Sketchfab, CC BY-NC-SA 4.0 — 非営利・継承）
+//  R34-GTR："2002_nissan_skyline_r34_gt-r" by 007（Sketchfab, CC BY 4.0）
 //  WRX-IMP："2012 Varis Subaru Impreza WRX STI GRB Ver." by Ddiaz Design（Sketchfab, CC BY-NC-SA 4.0 — 非営利・継承）
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -18,6 +20,8 @@ import SUPRA from '../../assets/models/supra.glb';
 import SWIFT from '../../assets/models/swift.glb';
 import S2K from '../../assets/models/s2k.glb';
 import BRZ from '../../assets/models/brz.glb';
+import EVO from '../../assets/models/evo.glb';
+import R34 from '../../assets/models/r34.glb';
 
 // paint: 塗装色を置き換えるマテリアル名、head/tail: ヘッドライト・テールランプのマテリアル名
 // driverX: 運転席の左右位置（+が左）、belt/wsBase: カメラ位置の基準（cameras.js）
@@ -49,6 +53,14 @@ export const GLB_CARS = {
   'BRZ-ZD': {
     data: BRZ, paint: /^Paint$/, head: /(?!)/, tail: /(?!)/, driverX: 0.36, belt: 0.74, wsBase: 0.72, wingY: 0.8,
     credit: 'BRZ-ZDの3Dモデル："2023 Subaru BRZ" by Nazh Design (Sketchfab) — CC BY 4.0',
+  },
+  'EVO-IX': {
+    data: EVO, paint: /^mM_CarPaint(Normal)?_Max/, head: /^mM_LightGlassNormal_Clear_Low1$/, tail: /^mM_LightGlass(Normal)?_Red_Low1$/, driverX: 0.37, belt: 0.72, wsBase: 0.78, wingY: 1.0,
+    credit: 'EVO-IXの3Dモデル："2006 Mitsubishi Lancer Evolution IX MR" by OUTPISTON (Sketchfab) — CC BY-NC-SA 4.0（非営利・継承）',
+  },
+  'R34-GTR': {
+    data: R34, paint: /PaintTNR_Material1$/, head: /(?!)/, tail: /^red_glass$/, driverX: -0.37, belt: 0.68, wsBase: 0.78, wingY: 0.95,
+    credit: 'R34-GTRの3Dモデル："2002_nissan_skyline_r34_gt-r" by 007 (Sketchfab) — CC BY 4.0',
   },
   'WRX-IMP': {
     data: WRX, paint: /^wrxM_CarPaint(Normal)?_Max1$/, head: /^wrxM_LightGlassNormal_Clear_Low1$/, tail: /^wrxM_LightGlass_Red_Low1$|^varisM_Light_Taillight/, driverX: 0.37, belt: 0.72, wsBase: 0.78, wingY: 0.95,

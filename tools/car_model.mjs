@@ -3,7 +3,7 @@
 // - 4輪を車体から分離（回転・操舵用に車輪中心を原点としたノード wheel_FL/FR/RL/RR）
 // - 透過（transmission）ガラスは半透明に置き換え（描画負荷対策）
 // - テクスチャを1024px WebPに縮小、メッシュをmeshopt圧縮
-// usage: node tools/car_model.mjs <gr86|z32|wrx|nd|supra|swift|s2k|brz> <in.glb> <out.glb>
+// usage: node tools/car_model.mjs <gr86|z32|wrx|nd|supra|swift|s2k|brz|evo|r34> <in.glb> <out.glb>
 import { NodeIO, getBounds } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTMeshoptCompression } from '@gltf-transform/extensions';
 import { dedup, prune, weld, textureCompress, meshopt, reorder, simplify } from '@gltf-transform/functions';
@@ -69,6 +69,16 @@ const CONFIGS = {
     paint: (c) => c[2] > 0.45 && c[2] > c[0] * 2 && c[2] > c[1] * 1.6, simplify: 0.3,
     // 窓：ベルトラインより上の黒い面（不透明の黒で、運転席から外が見えないため半透明ガラスに）
     glass: (c, p) => c[0] < 0.03 && c[1] < 0.03 && c[2] < 0.03 && p[1] > 0.0315,
+  },
+  // "2006 Mitsubishi Lancer Evolution IX MR" by OUTPISTON (CC BY-NC-SA 4.0)：Y-up・前が+z・左が+x、縮尺1/100程度。車輪は名前付きノード
+  evo: {
+    world: true, map: (x, y, z) => [x, y, z], wb: 2.625,
+    wheelNodes: ['3DWheel Front L_6', '3DWheel Front R_93', '3DWheel Rear L_180', '3DWheel Rear R_267'],
+  },
+  // "2002_nissan_skyline_r34_gt-r" by 007 (CC BY 4.0)：同上
+  r34: {
+    world: true, map: (x, y, z) => [x, y, z], wb: 2.665,
+    wheelNodes: ['Wheel_104', 'wheel_290', 'wheel_525', 'wheel_764'],
   },
 };
 const C = CONFIGS[model];
