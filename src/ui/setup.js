@@ -6,11 +6,13 @@ import { PART_BY_ID } from '../data/parts.js';
 import { buildSpec } from '../physics/spec.js';
 import { defaultSetup, rideRange, aeroRange, autoGears, gearSpeeds } from '../physics/setup.js';
 import { powerGraph, gearChart } from './graph.js';
+import { keyLabel } from '../input.js';
 
 const AX = { F: '前', R: '後' };
 
 // opts: { carId, equipped, setup, onChange(setup), onClose() }
 export function openSetup(game, opts) {
+  const keyName = (a) => keyLabel(game.settings.keys[a]);
   const { carId, equipped } = opts;
   const car = CARS[carId];
   const def = defaultSetup(carId);
@@ -69,8 +71,17 @@ export function openSetup(game, opts) {
       list.appendChild(row);
       show();
     };
+    // ドライバーアシスト・操作（どの車でも設定可能）
+    sep('ドライバーアシスト・操作');
+    const gset = game.settings;
+    if (S.tcsLevel == null) S.tcsLevel = gset.tcsLevel;
+    if (S.absLevel == null) S.absLevel = gset.absLevel;
+    num('tcsLevel', 'トラクションコントロール', 0, 10, 1, 0, '', '0=OFF・数値が大きいほど早く強く効く（空転を抑える）');
+    num('absLevel', 'ABS', 0, 10, 1, 0, '', '0=OFF・数値が大きいほど早く強く効く（ロックを防ぐ）');
+    num('partialThrottle', 'パーシャルアクセル開度', 10, 90, 5, 0, ' %', `${keyName('partialThrottle')}キーで一定の開度で踏む`);
+    num('partialBrake', 'パーシャルブレーキ開度', 10, 90, 5, 0, ' %', `${keyName('partialBrake')}キーで一定の強さで踏む`);
     if (!sus && !brk && !tm && !aR) {
-      list.appendChild(el('div', { class: 'hint' }, '調整できるパーツが装着されていません。★5のフルカスタマイズ車高調・ブレーキキット・ミッション、または調整式エアロ（GTウイング／フルエアロ）を装着すると、ここで足回り・駆動系を調整できます。'));
+      list.appendChild(el('div', { class: 'hint' }, '足回り・駆動系の調整できるパーツが装着されていません。★5のフルカスタマイズ車高調・ブレーキキット・ミッション、または調整式エアロ（GTウイング／フルエアロ）を装着すると、ここで足回り・駆動系を調整できます。'));
     }
     if (sus) {
       sep('サスペンション（フルカスタマイズ車高調）');

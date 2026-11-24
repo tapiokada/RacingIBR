@@ -48,6 +48,7 @@ export class Vehicle {
     // ABS・トラクションコントロールの効き（0=OFF、1〜10。10が最も強い）
     this.absLevel = levelOf(opts.abs, 10);
     this.tcsLevel = levelOf(opts.tcs, 0);
+    this.spinAssist = !!opts.spinAssist; // スピン防止アシスト
     this.limiterHit = 0;
     this.wheelLoads = [0, 0, 0, 0];
     this.wheelSlip = [0, 0, 0, 0];
@@ -317,6 +318,23 @@ export class Vehicle {
       this.tcsCut = Math.max(0, Math.min(0.95, (this.tcsCut || 0) + dt * (over > 0 ? TCS_CUT_RATE * over : -TCS_RELEASE_RATE)));
       thr *= 1 - this.tcsCut;
     } else this.tcsCut = 0;
+    // スピン防止アシスト（初心者用）：アクセルON＋ハンドル操作中、駆動輪とリアタイヤが限界（摩擦円のピーク）を
+    // 超えないよう、また車体がオーバーステアに入らないようにアクセル開度を自動で調整する。
+    // 曲がりながら、タイヤが出せる最大の駆動力で加速できる開度に保つ。
+    if (this.spinAssist && throttle > 0.05 && speed > 2.5) {
+      const steering = Math.abs(this.input.steer) > 0.05;
+      const ws = this.wheelSlip;
+      const drv = s.drive === 'FF' ? [0, 1] : s.drive === 'FR' ? [2, 3] : [0, 1, 2, 3];
+      let sD = 0; for (const i of drv) if (this.wheelLoads[i] > 0) sD = Math.max(sD, ws[i]);
+      const sR = Math.max(ws[2], ws[3]);
+      const b = Math.atan2(this.vv, Math.max(Math.abs(this.vu), 3));
+      const os = -b * Math.sign(this.w || 1); // オーバーステア側の車体スリップ角[rad]
+      const over = Math.max((sD - 1.0) / 1.0, (sR - 1.05) / 1.05, (os - 0.06) / 0.06);
+      if (steering || os > 0.04) {
+        this.assistCut = Math.max(0, Math.min(0.97, (this.assistCut || 0) + dt * (over > 0 ? 12 * Math.min(2, over) : -3)));
+      } else this.assistCut = Math.max(0, (this.assistCut || 0) - dt * 3);
+      thr *= 1 - this.assistCut;
+    } else this.assistCut = 0;
     const Te = s.fullTorque(rpm, this.boost) * thr;
     const Tf = (s.maxTorque * (0.03 + 0.12 * (rpm / s.redline))) * (1 - thr);
     let Teng = Te - Tf;

@@ -79,6 +79,12 @@ export class Hud {
       c.font = '12px sans-serif'; c.fillStyle = '#9ab'; c.textAlign = 'left';
       c.fillText(`BOOST ${car.boost.toFixed(2)}bar`, cx - 110, cy - 2);
     }
+    // 作動中のアシスト
+    const tags = [];
+    if ((car.tcsCut || 0) > 0.05) tags.push(['TCS', '#ffb020']);
+    if ((car.assistCut || 0) > 0.05) tags.push(['ASSIST', '#33e1ff']);
+    c.font = 'bold 11px sans-serif'; c.textAlign = 'left';
+    tags.forEach(([t, col], i) => { c.fillStyle = col; c.fillText(t, cx - 110 + i * 46, cy - 64); });
   }
 
   // ミニマップ

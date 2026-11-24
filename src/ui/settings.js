@@ -55,8 +55,8 @@ export function openSettings(game, onClose) {
       list.appendChild(row);
       show();
     };
-    level('ABS', 'absLevel', '0=OFF・数値が大きいほど早く強く効く');
-    level('トラクションコントロール', 'tcsLevel', '0=OFF・数値が大きいほど早く強く効く');
+    opt('スピン防止アシスト（初心者用）', () => (s.spinAssist ? 'ON' : 'OFF'), () => { s.spinAssist = !s.spinAssist; });
+    list.appendChild(el('div', { class: 'hint' }, 'ON：アクセル＋ハンドル操作中、タイヤの限界を超えない最適なアクセル開度に自動で調整し、スピンせずに曲がりながら加速します。※ABS・トラクションコントロール・パーシャルアクセル/ブレーキの開度は、ポーズメニューの「セッティング」で車ごとに設定します。'));
     list.appendChild(el('div', { class: 'key-sep' }, '画面'));
     {
       const lbl = el('span', { class: 'key-val' }, `${Math.round(s.brightness * 100)}%`);

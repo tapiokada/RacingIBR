@@ -2,6 +2,8 @@
 export const ACTIONS = [
   { id: 'throttle', name: 'アクセル', def: 'KeyF' },
   { id: 'brake', name: 'ブレーキ', def: 'KeyS' },
+  { id: 'partialThrottle', name: 'パーシャルアクセル', def: 'KeyG' },
+  { id: 'partialBrake', name: 'パーシャルブレーキ', def: 'KeyB' },
   { id: 'shiftUp', name: 'シフトアップ', def: 'KeyE' },
   { id: 'shiftDown', name: 'シフトダウン', def: 'KeyD' },
   { id: 'left', name: '左ハンドル', def: 'KeyJ' },
@@ -17,7 +19,7 @@ const SETTINGS_KEY = 'ibr.settings.v1';
 
 export const DEFAULT_SETTINGS = {
   keys: Object.fromEntries(ACTIONS.map((a) => [a.id, a.def])),
-  bgm: 0.6, se: 0.7, transmission: 'AT', absLevel: 10, tcsLevel: 10, mirror: true,
+  bgm: 0.6, se: 0.7, transmission: 'AT', absLevel: 10, tcsLevel: 10, spinAssist: false, mirror: true,
   defaultsRev: 2,
   brightness: 1.0,
 };

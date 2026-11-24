@@ -80,6 +80,8 @@ export function defaultSetup(carId) {
     gears: [...tm], final: car.final,
     awdSplit: car.center ? Math.round(car.center.split * 100) : null,
     dfF: null, dfR: null,
+    // ドライバーアシスト・操作（車ごと）
+    tcsLevel: null, absLevel: null, partialThrottle: 50, partialBrake: 40,
   };
 }
 
