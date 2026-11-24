@@ -3,7 +3,7 @@ import { CARS } from '../src/data/cars.js';
 import { buildSpec, stockEquip } from '../src/physics/spec.js';
 import { Vehicle } from '../src/physics/vehicle.js';
 const dt = 1 / 500;
-const REAL = { '86-GR': 6.3, 'BRZ-ZD': 6.3, 'RS-RS': 7.5, 'SWIFT-S': 8.1, '80-Supra': 5.1, 'S2K-AP': 6.0, 'WRX-IMP': 4.9, 'EVO-IX': 5.0, 'Z-32': 5.8, 'R34-GTR': 4.9 };
+const REAL = { '86-GR': 6.3, 'BRZ-ZD': 6.3, 'RS-RS': 7.5, 'SWIFT-S': 8.1, '80-Supra': 5.1, 'S2K-AP': 6.0, 'WRX-IMP': 5.0, 'EVO-IX': 5.0, 'Z-32': 5.8, 'R34-GTR': 4.9 };
 for (const id of (process.env.CARS ? process.env.CARS.split(',') : Object.keys(CARS))) {
   const s = buildSpec(id, stockEquip(id));
   const v = new Vehicle(s, { auto: true, tcs: +(process.env.TCS || 0) });

@@ -68,7 +68,7 @@ npx esbuild --servedir=. --serve=8080   # http://localhost:8080
 | 86-GR | 290〜390万円 | 2021〜2024 |
 | BRZ-ZD | 280〜380万円 | 2021〜2024 |
 | Z-32 | 180〜480万円 | 1989〜2000 |
-| WRX-IMP | 280〜580万円 | 2005〜2007 |
+| WRX-IMP | 190〜460万円 | 2007〜2014 |
 | S2K-AP | 420〜780万円 | 2005〜2009 |
 | EVO-IX | 400〜850万円 | 2005〜2006 |
 | 80-Supra | 850〜1600万円 | 1997〜2002 |
@@ -84,7 +84,7 @@ npx esbuild --servedir=. --serve=8080   # http://localhost:8080
 | 車名 | 参考車種 | 出力 / トルク | 重量 | 駆動 |
 |---|---|---|---|---|
 | 86-GR（主人公） | トヨタ GR86 RZ（ZN8 6MT） | 235PS/7000rpm・250N·m/3700rpm | 1270kg | FR |
-| WRX-IMP | スバル インプレッサ WRX STI（GDB F型） | 280PS/6400rpm・422N·m/4400rpm | 1430kg | AWD |
+| WRX-IMP | スバル インプレッサ WRX STI（GRB型 6MT） | 308PS/6400rpm・422N·m/4400rpm | 1480kg | AWD |
 | RS-RS | マツダ ロードスター RS（ND5RC 2018〜） | 132PS/7000rpm・152N·m/4500rpm | 1020kg | FR |
 | SWIFT-S | スズキ スイフトスポーツ（ZC33S 6MT） | 140PS/5500rpm・230N·m/2500-3500rpm | 970kg | FF |
 | 80-Supra | トヨタ スープラ RZ（JZA80 6MT） | 280PS/5600rpm・451N·m/3600rpm | 1510kg | FR |
@@ -235,7 +235,7 @@ tools/                 物理・AI・ブラウザのテストスクリプト、�
 
 - **86-GR の3Dモデル**："Toyota GR86 (ZN8)" by Mona x Supercars（https://sketchfab.com/3d-models/toyota-gr86-zn8-4919d14eba9640599e838230e8e5ed74）、ライセンス CC BY 4.0（http://creativecommons.org/licenses/by/4.0/）。ゲーム用に縮尺・向きの変換、4輪の分離（回転・操舵用）、テクスチャの縮小（WebP 1024px）、メッシュ圧縮（meshopt）を行っています（`tools/car_model.mjs gr86` → `assets/models/gr86.glb`）。ボディ色は車ごとの塗装色に置き換え。このモデルは左ハンドルのため、86-GRの運転席視点は左側の席になります。
 - **Z-32 の3Dモデル**："Nissan Fairlady 300ZX (Z32) 1989" by Lexyc16（https://sketchfab.com/3d-models/nissan-fairlady-300zx-z32-1989-8c04336a4ed84f6f836760db8256f9f0）、ライセンス **CC BY-NC 4.0**（http://creativecommons.org/licenses/by-nc/4.0/）＝**非営利利用のみ**。このモデルを含む配布物を有償にしたり商用で使ったりはできません。ゲーム用に縮尺・向きの変換、4輪の分離、透過ガラスの半透明化、テクスチャ縮小、メッシュ圧縮を行っています（`tools/car_model.mjs z32` → `assets/models/z32.glb`）。右ハンドル。
-- **WRX-IMP の3Dモデル**："2012 Varis Subaru Impreza WRX STI GRB Ver." by Ddiaz Design（https://sketchfab.com/3d-models/2012-varis-subaru-impreza-wrx-sti-grb-ver-4cebf7bb114b4b1eb6cea80bb29a5568）、ライセンス **CC BY-NC-SA 4.0**（http://creativecommons.org/licenses/by-nc-sa/4.0/）＝**非営利利用のみ・改変物は同じライセンスで公開**。変換後の `assets/models/wrx.glb` も CC BY-NC-SA 4.0 です。ゲーム用に縮尺（ホイールベースをゲームのWRX-IMP＝2540mmに合わせて約3%縮小）・ノード変換の焼き込み・4輪の分離・テクスチャ縮小・メッシュ圧縮を行っています（`tools/car_model.mjs wrx`）。GRB型（ハッチバック）にVarisのワイドボディキット・カーボンボンネット・ウイングが付いた外観で、ゲームの車両データ（GDB型F型セダンの諸元）とは型式が異なります。左ハンドル。
+- **WRX-IMP の3Dモデル**："2012 Varis Subaru Impreza WRX STI GRB Ver." by Ddiaz Design（https://sketchfab.com/3d-models/2012-varis-subaru-impreza-wrx-sti-grb-ver-4cebf7bb114b4b1eb6cea80bb29a5568）、ライセンス **CC BY-NC-SA 4.0**（http://creativecommons.org/licenses/by-nc-sa/4.0/）＝**非営利利用のみ・改変物は同じライセンスで公開**。変換後の `assets/models/wrx.glb` も CC BY-NC-SA 4.0 です。ゲーム用に縮尺（ホイールベース2625mm）・ノード変換の焼き込み・4輪の分離・テクスチャ縮小・メッシュ圧縮を行っています（`tools/car_model.mjs wrx`）。GRB型（ハッチバック）にVarisのワイドボディキット・カーボンボンネット・ウイングが付いた外観。左ハンドル。車両データもGRB型の諸元。
 
 
 榛名山の道路・標高データは、国土地理院のベクトルタイル（道路中心線）および基盤地図情報 数値標高モデル（5mメッシュ）を加工して作成しました（国土地理院コンテンツ利用規約に基づく）。

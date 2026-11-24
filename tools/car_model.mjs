@@ -33,7 +33,7 @@ const CONFIGS = {
   // "2012 Varis Subaru Impreza WRX STI GRB Ver." by Ddiaz Design (CC BY-NC-SA 4.0)
   // ノード階層に変換行列があるのでワールド座標で処理（Y-up・前が+z・左が+x）。車輪は名前の付いたノードごと分離
   wrx: {
-    world: true, map: (x, y, z) => [x, y, z], wb: 2.54,
+    world: true, map: (x, y, z) => [x, y, z], wb: 2.625,
     wheelNodes: ['3DWheel Front L', '3DWheel Front R', '3DWheel Rear L', '3DWheel Rear R'],
   },
 };
