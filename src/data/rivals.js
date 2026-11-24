@@ -177,5 +177,7 @@ for (const r of HARUNA_RIVALS) r.area = 'haruna';
 for (const r of RIVALS) r.area = 'west';
 for (const r of EAST_RIVALS) r.area = 'east';
 export const ALL_RIVALS = [...RIVALS, ...EAST_RIVALS, ...HARUNA_RIVALS];
+// 賞金は実勢の中古車価格に合わせて2倍に
+for (const r of ALL_RIVALS) r.reward *= 2;
 
 export const RIVAL_BY_ID = Object.fromEntries(ALL_RIVALS.map((r) => [r.id, r]));

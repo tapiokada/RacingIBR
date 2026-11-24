@@ -79,6 +79,7 @@ export class BattleMode {
     const gap = this.tp.dist - this.tr.dist;
     if (this.R.ai) this.R.ai.boost = gap > 80 ? 1.03 : gap < -100 ? 0.985 : 1.0;
     s.update(dt);
+    { const c = activeCar(g.story); c.km = (c.km || 0) + this.P.car.speed * dt / 1000; }
     this.tp.update(this.P.car, this.raceT);
     this.tr.update(this.R.car, this.raceT);
     if (g.input.hit('view')) this.hud.setView(VIEW_NAMES[g.rig.cycle(['chase', 'cockpit', 'hood'])]);

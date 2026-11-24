@@ -3,11 +3,12 @@ import { el, panel } from './ui.js';
 import { CATEGORIES, PARTS, PART_BY_ID, CATEGORY_NAME, RANK_STARS } from '../data/parts.js';
 import { buildSpec } from '../physics/spec.js';
 import { freeCount, addPart, activeCar, fmtMoney } from '../save.js';
-import { CARS, CAR_IDS, CAR_PRICES, CAR_COLORS } from '../data/cars.js';
+import { CARS } from '../data/cars.js';
+import { dealerStock, dealerBuy } from '../data/dealer.js';
 import { powerGraph } from './graph.js';
 
 export function sellPrice(p) {
-  return p.price ? Math.round(p.price * 0.5) : p.rank * 45000;
+  return p.price ? Math.round(p.price * 0.5) : p.rank * 90000;
 }
 
 export function specSummary(spec) {
@@ -25,6 +26,7 @@ export function specSummary(spec) {
 
 export function openShop(game, state, area, onClose) {
   if (typeof area === 'function') { onClose = area; area = null; }
+  const shopId = area || 'west';
   const wrap = el('div', { class: 'screen shop' });
   let tab = 'equip';
   let index = 0;
@@ -94,30 +96,39 @@ export function openShop(game, state, area, onClose) {
         list.appendChild(row);
       }
     } else if (tab === 'car') {
-      // 中古車店：純正状態の車を購入してガレージへ（乗り換えはポーズメニューのガレージで）
-      for (const id of CAR_IDS) {
-        const c = CARS[id], price = CAR_PRICES[id];
-        const have = state.garage.filter((g) => g.carId === id).length;
-        const can = state.money >= price;
+      // 中古車店：入店時期（バトル2回ごと）で在庫・色・走行距離が入れ替わる。スペシャルカーは別枠
+      const stock = dealerStock(shopId, state);
+      const swatch = (c) => { const i = el('i', { class: 'swatch' }); i.style.background = `#${c.toString(16).padStart(6, '0')}`; return i; };
+      const row = (L) => {
+        const c = CARS[L.carId];
+        const can = state.money >= L.price && L.left > 0;
         const buy = () => {
-          if (state.money < price) { game.audio.beep(220, 0.12, 0.1); return; }
-          state.money -= price;
-          const stock = { ...c.stock };
-          for (const pid of Object.values(stock)) if (pid) addPart(state, pid);
-          state.garage.push({ carId: id, color: CAR_COLORS[id] ?? 0xcccccc, equipped: stock, setup: null });
+          if (L.left <= 0 || state.money < L.price) { game.audio.beep(220, 0.12, 0.1); return; }
+          state.money -= L.price;
+          for (const pid of Object.values(L.equipped)) if (pid) addPart(state, pid);
+          state.garage.push({ carId: L.carId, color: L.color, colorName: L.colorName, year: L.year, km: L.km, equipped: { ...L.equipped }, setup: null });
+          dealerBuy(state, L);
           game.audio.beep(1200, 0.08, 0.12);
           build();
         };
-        const sp = buildSpec(id, c.stock);
-        const row = el('div', { class: 'part-row' + (can ? '' : ' dim') },
-          el('span', { class: 'cat' }, `${c.drive}・${c.mass}kg`),
-          el('span', { class: 'pname' }, c.name, el('small', {}, `　${c.ref}　${sp.maxPowerPS.toFixed(0)}PS／前後${Math.round(c.frontWeight * 100)}:${Math.round(100 - c.frontWeight * 100)}／WB ${c.wheelbase}m／Cd ${c.cd}`)),
-          el('span', { class: 'cnt' }, have ? `所有 ${have}台` : ''),
-          el('button', { class: 'buy', onclick: buy }, fmtMoney(price)));
-        rows.push({ row, act: buy });
-        list.appendChild(row);
+        const sp = buildSpec(L.carId, L.equipped);
+        const extra = L.special ? `　★${L.special}：${L.extras.map((pid) => PART_BY_ID[pid].name).join('・')}（パーツ定価 ${fmtMoney(L.partsValue)}相当）` : '';
+        const r = el('div', { class: 'part-row car-row' + (can ? '' : ' dim') + (L.special ? ' special' : '') },
+          el('span', { class: 'cat' }, swatch(L.color), ` ${L.colorName}`),
+          el('span', { class: 'pname' }, `${c.name}　${L.year}年式　${L.km.toLocaleString('ja-JP')}km`, el('small', {}, `　${c.ref}　${sp.maxPowerPS.toFixed(0)}PS・${c.drive}・${sp.mass.toFixed(0)}kg${extra}`)),
+          el('span', { class: 'cnt' }, L.left > 0 ? `在庫 ${L.left}台` : 'SOLD OUT'),
+          el('button', { class: 'buy', onclick: buy }, fmtMoney(L.price)));
+        rows.push({ row: r, act: buy });
+        return r;
+      };
+      list.appendChild(el('div', { class: 'key-sep' }, `入荷 第${stock.period + 1}期（バトル2回ごとに入れ替え）`));
+      if (stock.special) {
+        list.appendChild(el('div', { class: 'key-sep special-sep' }, 'SPECIAL CAR — チューニングパーツ付きの特選車'));
+        list.appendChild(row(stock.special));
       }
-      list.appendChild(el('div', { class: 'hint' }, '購入した車は純正パーツ付きでガレージに入ります。乗り換えはポーズメニューの「ガレージ」から。'));
+      list.appendChild(el('div', { class: 'key-sep' }, '在庫車（純正）'));
+      for (const L of stock.cars) list.appendChild(row(L));
+      list.appendChild(el('div', { class: 'hint' }, '価格は実際の中古車相場（年式・走行距離で変動）を参考にしています。購入した車はパーツ付きでガレージに入り、乗り換えはポーズメニューの「ガレージ」から。'));
     } else {
       const sellable = PARTS.filter((p) => freeCount(state, p.id) > 0);
       if (!sellable.length) list.appendChild(el('div', { class: 'hint' }, '売却できる（未装着の）パーツはありません'));

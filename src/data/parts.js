@@ -146,6 +146,9 @@ export const PARTS = [
   P({ id: 'aero_full', cat: 'aero', name: 'フルエアロキット', rank: 4, price: null, weight: 8, desc: '前後バランスの取れたダウンフォース。前後とも調整可', clF: 0.2, clR: 0.34, cd: 0.02, adjustable: true }),
 ];
 
+// 価格は実勢の中古車価格に合わせて2倍に
+for (const p of PARTS) if (p.price) p.price *= 2;
+
 export const PART_BY_ID = Object.fromEntries(PARTS.map((p) => [p.id, p]));
 
 export function partsInCategory(cat) {

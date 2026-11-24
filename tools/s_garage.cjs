@@ -2,7 +2,7 @@
 module.exports = async (pg, OUT) => {
   await pg.evaluate(() => {
     const { game } = window.__dbg; const { TownMode, newGameState } = window.__dbgModes;
-    const st = newGameState(); st.money = 5000000; game.story = st;
+    const st = newGameState(); st.money = 30000000; st.wins = 4; game.story = st;
     game.setMode(new TownMode(game, { area: 'west' }));
   });
   await pg.waitForTimeout(1200);
@@ -12,7 +12,9 @@ module.exports = async (pg, OUT) => {
   for (let i = 0; i < 3; i++) await pg.keyboard.press('Tab');
   await pg.waitForTimeout(200);
   await pg.screenshot({ path: OUT + '/g0_dealer.png' });
-  await pg.evaluate(() => { const rows = [...document.querySelectorAll('.part-row')]; rows.find((r) => r.textContent.includes('R34-GTR')).querySelector('.buy').click(); rows.find((r) => r.textContent.includes('RS-RS')).querySelector('.buy').click(); });
+  await pg.evaluate(() => { const rows = [...document.querySelectorAll('.car-row')]; rows[0].querySelector('.buy').click(); });
+  await pg.evaluate(() => { const rows = [...document.querySelectorAll('.car-row')]; rows[rows.length - 1].querySelector('.buy').click(); });
+  await pg.screenshot({ path: OUT + '/g0b_dealer_after.png' });
   await pg.keyboard.press('Escape'); await pg.waitForTimeout(1200);
   console.log('garage', await pg.evaluate(() => window.__dbg.game.story.garage.map((c) => c.carId).join(',') + ' money ' + window.__dbg.game.story.money));
   // ポーズ→ガレージ

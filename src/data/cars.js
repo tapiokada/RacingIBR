@@ -138,11 +138,6 @@ for (const [id, c] of Object.entries(CHASSIS)) Object.assign(CARS[id], c);
 
 export const CAR_IDS = Object.keys(CARS);
 
-// 中古車店の価格（純正状態）
-export const CAR_PRICES = {
-  'SWIFT-S': 600000, 'RS-RS': 850000, '86-GR': 1000000, 'BRZ-ZD': 1000000, 'Z-32': 1150000,
-  'S2K-AP': 1450000, 'WRX-IMP': 1550000, 'EVO-IX': 1700000, '80-Supra': 1850000, 'R34-GTR': 2600000,
-};
 export const CAR_COLORS = {
   '86-GR': 0xd9dde3, 'BRZ-ZD': 0x1e4fa8, 'RS-RS': 0xb3121b, 'S2K-AP': 0xe8e4d8, 'SWIFT-S': 0xf2c40f,
   '80-Supra': 0xd8d8d8, 'Z-32': 0x9a1b1f, 'WRX-IMP': 0x1d3f9a, 'EVO-IX': 0xeaeaea, 'R34-GTR': 0x3a4f9e,

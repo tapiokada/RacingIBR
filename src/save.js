@@ -11,10 +11,10 @@ export function newGameState() {
   for (const id of Object.values(stock)) if (id) owned[id] = (owned[id] || 0) + 1;
   return {
     version: 1,
-    money: 300000,
+    money: 600000,
     wins: 0, losses: 0,
     owned,
-    garage: [{ carId: PLAYER.car, color: PLAYER.color, equipped: stock }],
+    garage: [{ carId: PLAYER.car, color: PLAYER.color, colorName: 'クリスタルホワイト', year: 2022, km: 12400, equipped: stock }],
     active: 0,
     defeated: {},
     area: 'west', // 現在のエリア

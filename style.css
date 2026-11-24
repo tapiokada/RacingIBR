@@ -191,3 +191,7 @@ input[type=range] { width: 200px; accent-color: var(--pink); }
 .garage-spec .stat b { text-align: right; margin-left: 8px; }
 .garage-parts { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 11px; color: var(--dim); margin-top: 6px; }
 .garage-view { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); font-size: 20px; font-weight: 700; color: var(--yellow); text-shadow: 0 1px 4px #000; }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1px solid rgba(255,255,255,.4); vertical-align: -1px; }
+.shop .part-row.car-row { grid-template-columns: 150px 1fr 80px 150px; }
+.part-row.special { background: rgba(255,210,63,.08); border-left-color: var(--yellow); }
+.special-sep { color: var(--yellow); }

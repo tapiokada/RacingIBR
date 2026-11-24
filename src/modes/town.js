@@ -115,6 +115,7 @@ export class TownMode {
     const inp = g.input;
     if (this.paused) return;
     st.playtime += dt;
+    { const c = activeCar(st); c.km = (c.km || 0) + (s.player ? s.player.car.speed * dt / 1000 : 0); } // 走行距離計
     if (inp.hitCode('Escape') && !this.dialog) { this.pause(); return; }
     s.update(dt);
     const P = s.player;
