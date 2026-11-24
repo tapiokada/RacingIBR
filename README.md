@@ -222,8 +222,8 @@ src/main.js, game.js   起動・ループ・モード切替
 src/data/              車両・パーツ・ライバル・マップ
 src/physics/           車両運動 / 道路・コース形状 / 峠道（touge.js）/ スペック計算 / セッティング（setup.js）
 src/ai.js              レースAI（レーシングライン＋速度プロファイル）/ 街流しAI
-src/render/            シーン・車モデル（86-GR・Z-32は実車GLBモデル glbCars.js、他車は手続き生成）・カメラ
-assets/models/         86-GR・Z-32の3Dモデル（変換済みGLB。esbuildでバンドルに埋め込み、file://でも動作）
+src/render/            シーン・車モデル（86-GR・Z-32・WRX-IMPは実車GLBモデル glbCars.js、他車は手続き生成）・カメラ
+assets/models/         86-GR・Z-32・WRX-IMPの3Dモデル（変換済みGLB。esbuildでバンドルに埋め込み、file://でも動作）
 src/modes/             タイトル / 街 / バトル / Practice / リプレイ / ガレージ（garage.js）
 src/ui/                HUD / ショップ / 設定 / セッティング（setup.js）/ パワー・トルク曲線（graph.js）/ メニュー
 tools/                 物理・AI・ブラウザのテストスクリプト、榛名山データ生成（haruna_data.py）
@@ -235,6 +235,7 @@ tools/                 物理・AI・ブラウザのテストスクリプト、�
 
 - **86-GR の3Dモデル**："Toyota GR86 (ZN8)" by Mona x Supercars（https://sketchfab.com/3d-models/toyota-gr86-zn8-4919d14eba9640599e838230e8e5ed74）、ライセンス CC BY 4.0（http://creativecommons.org/licenses/by/4.0/）。ゲーム用に縮尺・向きの変換、4輪の分離（回転・操舵用）、テクスチャの縮小（WebP 1024px）、メッシュ圧縮（meshopt）を行っています（`tools/car_model.mjs gr86` → `assets/models/gr86.glb`）。ボディ色は車ごとの塗装色に置き換え。このモデルは左ハンドルのため、86-GRの運転席視点は左側の席になります。
 - **Z-32 の3Dモデル**："Nissan Fairlady 300ZX (Z32) 1989" by Lexyc16（https://sketchfab.com/3d-models/nissan-fairlady-300zx-z32-1989-8c04336a4ed84f6f836760db8256f9f0）、ライセンス **CC BY-NC 4.0**（http://creativecommons.org/licenses/by-nc/4.0/）＝**非営利利用のみ**。このモデルを含む配布物を有償にしたり商用で使ったりはできません。ゲーム用に縮尺・向きの変換、4輪の分離、透過ガラスの半透明化、テクスチャ縮小、メッシュ圧縮を行っています（`tools/car_model.mjs z32` → `assets/models/z32.glb`）。右ハンドル。
+- **WRX-IMP の3Dモデル**："2012 Varis Subaru Impreza WRX STI GRB Ver." by Ddiaz Design（https://sketchfab.com/3d-models/2012-varis-subaru-impreza-wrx-sti-grb-ver-4cebf7bb114b4b1eb6cea80bb29a5568）、ライセンス **CC BY-NC-SA 4.0**（http://creativecommons.org/licenses/by-nc-sa/4.0/）＝**非営利利用のみ・改変物は同じライセンスで公開**。変換後の `assets/models/wrx.glb` も CC BY-NC-SA 4.0 です。ゲーム用に縮尺（ホイールベースをゲームのWRX-IMP＝2540mmに合わせて約3%縮小）・ノード変換の焼き込み・4輪の分離・テクスチャ縮小・メッシュ圧縮を行っています（`tools/car_model.mjs wrx`）。GRB型（ハッチバック）にVarisのワイドボディキット・カーボンボンネット・ウイングが付いた外観で、ゲームの車両データ（GDB型F型セダンの諸元）とは型式が異なります。左ハンドル。
 
 
 榛名山の道路・標高データは、国土地理院のベクトルタイル（道路中心線）および基盤地図情報 数値標高モデル（5mメッシュ）を加工して作成しました（国土地理院コンテンツ利用規約に基づく）。
