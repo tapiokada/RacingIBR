@@ -222,7 +222,7 @@ src/main.js, game.js   起動・ループ・モード切替
 src/data/              車両・パーツ・ライバル・マップ
 src/physics/           車両運動 / 道路・コース形状 / 峠道（touge.js）/ スペック計算 / セッティング（setup.js）
 src/ai.js              レースAI（レーシングライン＋速度プロファイル）/ 街流しAI
-src/render/            シーン・車モデル（86-GR・Z-32・WRX-IMP・RS-RS・80-Supra・SWIFT-Sは実車GLBモデル glbCars.js、他車は手続き生成）・カメラ
+src/render/            シーン・車モデル（実車GLBモデル glbCars.js。モデルのない車種は手続き生成）・カメラ
 assets/models/         実車の3Dモデル（変換済みGLB。esbuildでバンドルに埋め込み、file://でも動作）
 src/modes/             タイトル / 街 / バトル / Practice / リプレイ / ガレージ（garage.js）
 src/ui/                HUD / ショップ / 設定 / セッティング（setup.js）/ パワー・トルク曲線（graph.js）/ メニュー
@@ -238,6 +238,8 @@ tools/                 物理・AI・ブラウザのテストスクリプト、�
 - **RS-RS の3Dモデル**："2016 Mazda MX-5 Miata" by Galaxy Car Showroom（https://sketchfab.com/3d-models/2016-mazda-mx-5-miata-922ff6fec90340ed8cf5aabe38dd1ad2）、ライセンス CC BY 4.0（http://creativecommons.org/licenses/by/4.0/）。ゲーム用に向きの変換（ホイールベース2310mm）、4輪の分離（車輪の部品名が重複しているので位置で分離）、テクスチャ縮小、メッシュ圧縮を行っています（`tools/car_model.mjs nd`）。ソフトトップを閉じた状態。左ハンドル。
 - **80-Supra の3Dモデル**："Toyota Supra MK4 | supra 1997 | Free Download" by Pooya_dh（https://sketchfab.com/3d-models/toyota-supra-mk4-supra-1997-free-download-18e530a1f4e04b4bbc5f51a09e2f95e2）、ライセンス **CC BY-NC 4.0**（http://creativecommons.org/licenses/by-nc/4.0/）＝**非営利利用のみ**。ゲーム用に縮尺（ホイールベース2550mm）、4輪の分離（前後の車輪が1部品なので位置で分離、ブレーキキャリパーは車体側）、テクスチャ縮小、メッシュ圧縮を行っています（`tools/car_model.mjs supra`）。左ハンドル。
 - **SWIFT-S の3Dモデル**："2020 Suzuki Swift Sport (ZC33S)" by DisneyCars（https://sketchfab.com/3d-models/2020-suzuki-swift-sport-zc33s-00a05ca44b4345acbc0540e1e9517db9）、ライセンス CC BY 4.0（http://creativecommons.org/licenses/by/4.0/）。ゲーム用に縮尺（ホイールベース2450mm）・原点の補正・4輪の分離・テクスチャ縮小・メッシュ圧縮を行っています（`tools/car_model.mjs swift`）。左ハンドル。
+- **S2K-AP の3Dモデル**："Honda S2000 Ultimate Edition (AP2)" by Mona x Supercars（https://sketchfab.com/3d-models/honda-s2000-ultimate-edition-ap2-f489944f34754ee0b37b53edcc7bfb5a）、CC BY 4.0。ハードトップ装着。ゲーム用に向きの変換（ホイールベース2400mm）・位置による4輪の分離・テクスチャ縮小・メッシュ圧縮（`tools/car_model.mjs s2k`）。左ハンドル。
+- **BRZ-ZD の3Dモデル**："2023 Subaru BRZ" by Nazh Design（https://sketchfab.com/3d-models/2023-subaru-brz-829ed5c8149e42819b26d71d69bf6e41）、CC BY 4.0。頂点カラーのみのモデルのため、青系の頂点カラーの面を塗装マテリアルに、ベルトラインより上の黒い面を半透明ガラスに分け、約42万ポリゴンを間引いて軽量化しています（`tools/car_model.mjs brz`）。室内は白一色。左ハンドル。
 - **WRX-IMP の3Dモデル**："2012 Varis Subaru Impreza WRX STI GRB Ver." by Ddiaz Design（https://sketchfab.com/3d-models/2012-varis-subaru-impreza-wrx-sti-grb-ver-4cebf7bb114b4b1eb6cea80bb29a5568）、ライセンス **CC BY-NC-SA 4.0**（http://creativecommons.org/licenses/by-nc-sa/4.0/）＝**非営利利用のみ・改変物は同じライセンスで公開**。変換後の `assets/models/wrx.glb` も CC BY-NC-SA 4.0 です。ゲーム用に縮尺（ホイールベース2625mm）・ノード変換の焼き込み・4輪の分離・テクスチャ縮小・メッシュ圧縮を行っています（`tools/car_model.mjs wrx`）。GRB型（ハッチバック）にVarisのワイドボディキット・カーボンボンネット・ウイングが付いた外観。左ハンドル。車両データもGRB型の諸元。
 
 

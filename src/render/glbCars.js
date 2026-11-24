@@ -4,6 +4,8 @@
 //  RS-RS ："2016 Mazda MX-5 Miata" by Galaxy Car Showroom（Sketchfab, CC BY 4.0）
 //  80-Supra："Toyota Supra MK4 | supra 1997" by Pooya_dh（Sketchfab, CC BY-NC 4.0 — 非営利のみ）
 //  SWIFT-S："2020 Suzuki Swift Sport (ZC33S)" by DisneyCars（Sketchfab, CC BY 4.0）
+//  S2K-AP："Honda S2000 Ultimate Edition (AP2)" by Mona x Supercars（Sketchfab, CC BY 4.0）
+//  BRZ-ZD："2023 Subaru BRZ" by Nazh Design（Sketchfab, CC BY 4.0）
 //  WRX-IMP："2012 Varis Subaru Impreza WRX STI GRB Ver." by Ddiaz Design（Sketchfab, CC BY-NC-SA 4.0 — 非営利・継承）
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -14,6 +16,8 @@ import WRX from '../../assets/models/wrx.glb';
 import ND from '../../assets/models/nd.glb';
 import SUPRA from '../../assets/models/supra.glb';
 import SWIFT from '../../assets/models/swift.glb';
+import S2K from '../../assets/models/s2k.glb';
+import BRZ from '../../assets/models/brz.glb';
 
 // paint: 塗装色を置き換えるマテリアル名、head/tail: ヘッドライト・テールランプのマテリアル名
 // driverX: 運転席の左右位置（+が左）、belt/wsBase: カメラ位置の基準（cameras.js）
@@ -37,6 +41,14 @@ export const GLB_CARS = {
   'SWIFT-S': {
     data: SWIFT, paint: /^New_Material$/, head: /^Puncheffnuminnernalphaalphaita/, tail: /(?!)/, driverX: 0.36, belt: 0.78, wsBase: 0.98, wingY: 1.0,
     credit: 'SWIFT-Sの3Dモデル："2020 Suzuki Swift Sport (ZC33S)" by DisneyCars (Sketchfab) — CC BY 4.0',
+  },
+  'S2K-AP': {
+    data: S2K, paint: /ext_chicane_silver/, head: /(?!)/, tail: /(?!)/, driverX: 0.37, belt: 0.6, wsBase: 0.62, wingY: 0.82,
+    credit: 'S2K-APの3Dモデル："Honda S2000 Ultimate Edition (AP2)" by Mona x Supercars (Sketchfab) — CC BY 4.0',
+  },
+  'BRZ-ZD': {
+    data: BRZ, paint: /^Paint$/, head: /(?!)/, tail: /(?!)/, driverX: 0.36, belt: 0.74, wsBase: 0.72, wingY: 0.8,
+    credit: 'BRZ-ZDの3Dモデル："2023 Subaru BRZ" by Nazh Design (Sketchfab) — CC BY 4.0',
   },
   'WRX-IMP': {
     data: WRX, paint: /^wrxM_CarPaint(Normal)?_Max1$/, head: /^wrxM_LightGlassNormal_Clear_Low1$/, tail: /^wrxM_LightGlass_Red_Low1$|^varisM_Light_Taillight/, driverX: 0.37, belt: 0.72, wsBase: 0.78, wingY: 0.95,

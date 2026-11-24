@@ -3,11 +3,11 @@
 // - 4輪を車体から分離（回転・操舵用に車輪中心を原点としたノード wheel_FL/FR/RL/RR）
 // - 透過（transmission）ガラスは半透明に置き換え（描画負荷対策）
 // - テクスチャを1024px WebPに縮小、メッシュをmeshopt圧縮
-// usage: node tools/car_model.mjs <gr86|z32|wrx|nd|supra|swift> <in.glb> <out.glb>
+// usage: node tools/car_model.mjs <gr86|z32|wrx|nd|supra|swift|s2k|brz> <in.glb> <out.glb>
 import { NodeIO, getBounds } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTMeshoptCompression } from '@gltf-transform/extensions';
-import { dedup, prune, weld, textureCompress, meshopt, reorder } from '@gltf-transform/functions';
-import { MeshoptEncoder, MeshoptDecoder } from 'meshoptimizer';
+import { dedup, prune, weld, textureCompress, meshopt, reorder, simplify } from '@gltf-transform/functions';
+import { MeshoptEncoder, MeshoptDecoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
 
 const [model, inp, out] = process.argv.slice(2);
@@ -53,6 +53,22 @@ const CONFIGS = {
     world: true, map: (x, y, z) => [x, y, z], wb: 2.45, cut: 1.2, inner: 2.45, centerX: true,
     wheels: [{ name: 'wheel_FL', p: [479.43, 110.50, -60.82] }, { name: 'wheel_FR', p: [473.64, 110.50, -60.82] }, { name: 'wheel_RL', p: [479.445, 110.50, -70.253] }, { name: 'wheel_RR', p: [473.618, 110.50, -70.253] }],
     side: (x, y, z) => x - 476.531, along: (x, y, z) => [z, y], ground: 109.34,
+  },
+  // "Honda S2000 Ultimate Edition (AP2)" by Mona x Supercars (CC BY 4.0)：Y-up・前が−z。車輪ノード名が重複しているので位置で分離
+  s2k: {
+    world: true, map: (x, y, z) => [-x, y, -z], wb: 2.4, cut: 0.33, inner: 0.56,
+    wheels: [{ name: 'wheel_FL', p: [-0.7305, 0.297, -1.258] }, { name: 'wheel_FR', p: [0.7295, 0.297, -1.258] }, { name: 'wheel_RL', p: [-0.7305, 0.297, 1.148] }, { name: 'wheel_RR', p: [0.7295, 0.297, 1.148] }],
+    side: (x, y, z) => x, along: (x, y, z) => [z, y], ground: -0.004,
+  },
+  // "2023 Subaru BRZ" by Nazh Design (CC BY 4.0)：頂点カラーのみ・約42万ポリゴン・縮尺1/25程度。Y-up・前が+z
+  // 塗装（青系の頂点カラー）を別マテリアルに分けて塗り替え可能にし、ポリゴンを間引く
+  brz: {
+    world: true, map: (x, y, z) => [x, y, z], wb: 2.575, cut: 0.0142, inner: 0.0255, centerX: true,
+    wheels: [{ name: 'wheel_FL', p: [0.0780, 0.0128, -0.04201] }, { name: 'wheel_FR', p: [0.0100, 0.0128, -0.04201] }, { name: 'wheel_RL', p: [0.0780, 0.0128, -0.14504] }, { name: 'wheel_RR', p: [0.0100, 0.0128, -0.14504] }],
+    side: (x, y, z) => x - 0.044, along: (x, y, z) => [z, y], ground: 0,
+    paint: (c) => c[2] > 0.45 && c[2] > c[0] * 2 && c[2] > c[1] * 1.6, simplify: 0.3,
+    // 窓：ベルトラインより上の黒い面（不透明の黒で、運転席から外が見えないため半透明ガラスに）
+    glass: (c, p) => c[0] < 0.03 && c[1] < 0.03 && c[2] < 0.03 && p[1] > 0.0315,
   },
 };
 const C = CONFIGS[model];
@@ -114,26 +130,31 @@ const xf = (M, v, dir) => {
   if (dir) { const l = Math.hypot(...r) || 1; return r.map((c) => c / l); }
   return r;
 };
+let paintM = null, glassM = null;
+const glassMat = () => (glassM ||= doc.createMaterial('Glass').setBaseColorFactor([0.02, 0.03, 0.04, 0.35]).setAlphaMode('BLEND').setMetallicFactor(0.2).setRoughnessFactor(0.05).setDoubleSided(true));
+const paintMat = () => (paintM ||= doc.createMaterial('Paint').setBaseColorFactor([0.2, 0.25, 0.75, 1]).setMetallicFactor(0.3).setRoughnessFactor(0.35));
 for (const item of items) {
   const mesh = item.mesh;
   const bodyMesh = doc.createMesh('b_' + mesh.getName());
   for (const prim of mesh.listPrimitives()) {
-    const pos = prim.getAttribute('POSITION'), nor = prim.getAttribute('NORMAL'), uv = prim.getAttribute('TEXCOORD_0');
+    const pos = prim.getAttribute('POSITION'), nor = prim.getAttribute('NORMAL'), uv = prim.getAttribute('TEXCOORD_0'), col = prim.getAttribute('COLOR_0');
     const idx = prim.getIndices();
     const n = idx ? idx.getCount() : pos.getCount();
-    const groups = [[], [], [], [], []]; // 0..3 車輪, 4 車体
+    const groups = [[], [], [], [], [], [], []]; // 0..3 車輪, 4 車体, 5 車体の塗装, 6 窓ガラス（頂点カラーから判定）
     const a = [], b = [], cc = [];
     for (let t = 0; t < n; t += 3) {
       const ids = [0, 1, 2].map((k) => (idx ? idx.getScalar(t + k) : t + k));
       const ws = item.wheel != null ? [item.wheel, item.wheel, item.wheel] : ids.map((i) => { pos.getElement(i, a); return wheelOf(...xf(item.M, a, false)); });
-      const g = ws[0] >= 0 && ws[0] === ws[1] && ws[1] === ws[2] ? ws[0] : 4;
+      let g = ws[0] >= 0 && ws[0] === ws[1] && ws[1] === ws[2] ? ws[0] : 4;
+      if (g === 4 && C.paint && col && ids.every((i) => { col.getElement(i, cc); return C.paint(cc); })) g = 5;
+      if (g === 4 && C.glass && col && ids.every((i) => { col.getElement(i, cc); pos.getElement(i, a); return C.glass(cc, xf(item.M, a, false)); })) g = 6;
       groups[g].push(...ids);
     }
     tris += n / 3;
     groups.forEach((list, g) => {
       if (!list.length) return;
       // 使う頂点だけ取り出して座標変換
-      const remap = new Map(), P = [], N = [], U = [], I = [];
+      const remap = new Map(), P = [], N = [], U = [], I = [], K = [];
       const off = g < 4 ? wheelNodes[g].c : [0, 0, 0];
       for (const i of list) {
         if (!remap.has(i)) {
@@ -141,11 +162,13 @@ for (const item of items) {
           pos.getElement(i, a); const p = tp(...xf(item.M, a, false)); P.push(p[0] - off[0], p[1] - off[1], p[2] - off[2]);
           if (nor) { nor.getElement(i, b); N.push(...tn(...xf(item.M, b, true))); }
           if (uv) { uv.getElement(i, cc); U.push(cc[0], cc[1]); }
+          if (col && g < 5) { col.getElement(i, cc); K.push(cc[0], cc[1], cc[2], cc.length > 3 ? cc[3] : 1); }
         }
         I.push(remap.get(i));
       }
       if (g < 4) wtris += I.length / 3;
-      const np = doc.createPrimitive().setMaterial(prim.getMaterial()).setMode(prim.getMode());
+      const np = doc.createPrimitive().setMaterial(g === 5 ? paintMat() : g === 6 ? glassMat() : prim.getMaterial()).setMode(prim.getMode());
+      if (K.length) np.setAttribute('COLOR_0', doc.createAccessor().setType('VEC4').setArray(new Float32Array(K)).setBuffer(buffer));
       np.setAttribute('POSITION', doc.createAccessor().setType('VEC3').setArray(new Float32Array(P)).setBuffer(buffer));
       if (nor) np.setAttribute('NORMAL', doc.createAccessor().setType('VEC3').setArray(new Float32Array(N)).setBuffer(buffer));
       if (uv) np.setAttribute('TEXCOORD_0', doc.createAccessor().setType('VEC2').setArray(new Float32Array(U)).setBuffer(buffer));
@@ -169,7 +192,9 @@ for (const m of root.listMaterials()) {
   if (tr) { const f = tr.getTransmissionFactor(); m.setExtension('KHR_materials_transmission', null); m.setAlphaMode('BLEND'); const c = m.getBaseColorFactor(); m.setBaseColorFactor([c[0], c[1], c[2], Math.min(c[3], 1 - 0.7 * f)]); }
 }
 await doc.transform(
-  prune(), dedup(), weld(), reorder({ encoder: MeshoptEncoder }),
+  prune(), dedup(), weld(),
+  ...(C.simplify ? [simplify({ simplifier: MeshoptSimplifier, ratio: C.simplify, error: 0.0008 })] : []),
+  reorder({ encoder: MeshoptEncoder }),
   textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [1024, 1024], quality: 82 }),
   meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
 );
