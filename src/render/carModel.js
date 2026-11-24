@@ -225,10 +225,16 @@ export function syncCarModel(model, car, extra = {}) {
   const u = model.userData;
   const off = (car.a - car.b) / 2; // ホイールベース中心はCGより前
   const f0 = Math.sin(car.h), f1 = Math.cos(car.h);
-  model.position.set(car.x + f0 * off, 0, car.z + f1 * off);
+  // 路面の高さ・傾き（坂・片勾配）で車全体を傾け、車体はサスペンションの姿勢分だけ動かす
+  const gp = car.gp || 0, gr = car.gr || 0;
+  model.position.set(car.x + f0 * off, (car.gy || 0) + off * Math.sin(gp), car.z + f1 * off);
+  model.rotation.order = 'YXZ';
   model.rotation.y = car.h;
+  model.rotation.x = -gp;
+  model.rotation.z = gr;
   u.body.rotation.x = car.pitch;
   u.body.rotation.z = -car.roll;
+  u.body.position.y = Math.max(-0.08, Math.min(0.1, car.heave || 0));
   for (const w of u.wheels) {
     w.pivot.rotation.y = w.front ? -car.steer : 0;
     w.spin.rotation.x = w.front ? car.spinF : car.spinR;

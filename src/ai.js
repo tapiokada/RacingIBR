@@ -52,21 +52,37 @@ export class RaceAI {
 
     const Ld = 4 + v * 0.4;
     let ti = pr.i, acc = 0;
-    while (acc < Ld) { acc += path.lseg[ti]; ti = (ti + 1) % n; }
+    const nxt = path.open ? (i) => Math.min(n - 1, i + 1) : (i) => (i + 1) % n;
+    while (acc < Ld && (!path.open || ti < n - 1)) { acc += path.lseg[ti]; ti = nxt(ti); }
     const [rx, rz] = path.normal(ti);
     const lim = Math.max(0, path.hw[ti] - 1.4);
     const extra = clamp(this.offTarget, -lim - path.lineOff[ti], lim - path.lineOff[ti]);
     const tx = path.lx[ti] + rx * extra, tz = path.lz[ti] + rz * extra;
     let steer = steerToward(car, tx, tz);
+    // 小さなコーナーでイン側の縁に寄りすぎたら切り増しを抑える（先読み点への直線がインを削るため）
+    {
+      const k = path.curv[pr.i];
+      const inside = Math.abs(k) > 0.02 ? Math.sign(k) : 0; // +1 = 右コーナー（イン側=右）
+      if (inside !== 0 && Math.sign(steer) === inside) {
+        const room = path.hw[pr.i] - inside * pr.lat - car.spec.car.width / 2;
+        if (room < 1.2) steer *= clamp((room - 0.2) / 1.0, 0, 1);
+      }
+    }
 
     // 速度
     let vt = 1e9;
-    for (let k = 1, d = 0; d < 8; k++) { const j = (pr.i + k) % n; vt = Math.min(vt, this.profile[j]); d += path.lseg[j]; }
+    for (let k = 1, d = 0; d < 8; k++) { const j = path.open ? Math.min(n - 1, pr.i + k) : (pr.i + k) % n; vt = Math.min(vt, this.profile[j]); d += path.lseg[j]; if (path.open && j === n - 1) break; }
     vt *= this.boost;
     const err = vt - v;
     let throttle = clamp(0.35 + err * 0.35, 0, 1);
     let brake = clamp(-err * 0.22 - 0.05, 0, 1);
     if (brake > 0) throttle = 0;
+    // スライド時のカウンターステア（車体スリップ角の方向へ当て舵）とアクセルオフ
+    {
+      const beta = Math.atan2(car.vv, Math.max(Math.abs(car.vu), 3));
+      const k = clamp((Math.abs(beta) - 0.09) / 0.22, 0, 1) * clamp((v - 7) / 5, 0, 1); // 低速の小回りでは効かせない
+      if (k > 0) { steer = steer * (1 - k) + Math.sign(beta) * k; throttle *= 1 - 0.85 * k; }
+    }
     // トラクション
     if (car.slipLong > car.spec.peakRatio * 1.4) throttle *= 0.4;
     if (car.slip > 1.6) throttle *= 0.6;
@@ -81,7 +97,7 @@ export class RaceAI {
       if (this.reverseT <= 0) car.gear = 1;
       return;
     }
-    if (v < 1.5 && this.started) { this.stuck += dt; if (this.stuck > 2.2) { this.stuck = 0; this.reverseT = 1.4; } }
+    if (v < 1.5 && this.started && !(path.open && pr.i > n - 40)) { this.stuck += dt; if (this.stuck > 2.2) { this.stuck = 0; this.reverseT = 1.4; } }
     else this.stuck = 0;
     if (car.gear < 1) car.gear = 1;
     car.input = { throttle, brake, steer };
@@ -264,6 +280,17 @@ export class CruiseAI {
   update(dt, others = []) {
     const car = this.car;
     if (this.paused) { car.input = { throttle: 0, brake: 1, steer: 0 }; return; }
+    // 峠道の行き止まり（道の端）：手前で向きを変える（町のモードでは見えない所で入れ替える）
+    const rd = townRoadBetween(this.a, this.b);
+    if (rd && rd.touge && (this.graph[this.b] || []).length <= 1 && Math.hypot(NODES[this.b].x - car.x, NODES[this.b].z - car.z) < 14) {
+      if (this.onDeadEnd && this.onDeadEnd()) return;
+      const lo = laneOffset(rd) * 2;
+      const h = car.h + Math.PI;
+      car.place(car.x - Math.cos(car.h) * lo, car.z + Math.sin(car.h) * lo, h, 0); // 旧進行方向の右へ（左 = (cos h, -sin h)）
+      const nb = this.a; this.a = this.b; this.b = nb; this.c = this.pick(this.b, this.a);
+      this.build();
+      return;
+    }
     let s = this.project(car.x, car.z);
     if (s >= this.exitS) {
       this.a = this.b; this.b = this.c; this.c = this.pick(this.b, this.a);
@@ -280,6 +307,25 @@ export class CruiseAI {
     const toTurn = this.turnS0 - s;
     let vt = this.cruise;
     if (s < this.exitS) vt = Math.min(vt, toTurn > 0 ? Math.sqrt(vTurn * vTurn + 2 * 2.2 * toTurn) : vTurn);
+    // 峠道：先のノード列の曲がり具合から減速（ノード間隔10mの1本道）
+    const road = townRoadBetween(this.a, this.b);
+    if (road && road.touge) {
+      vt = this.cruise;
+      const ia = road.nodes.indexOf(this.a), ib = road.nodes.indexOf(this.b);
+      const dir = ib > ia ? 1 : -1;
+      const here = s - this.project(NODES[this.b].x, NODES[this.b].z); // b からの距離（負＝手前）
+      for (let k = 0; k < 6; k++) {
+        const i0 = ib + dir * (k - 1), i1 = ib + dir * k, i2 = ib + dir * (k + 1);
+        if (i0 < 0 || i2 < 0 || i0 >= road.nodes.length || i2 >= road.nodes.length) break;
+        const A = NODES[road.nodes[i0]], B = NODES[road.nodes[i1]], C = NODES[road.nodes[i2]];
+        const ux = B.x - A.x, uz = B.z - A.z, vx = C.x - B.x, vz = C.z - B.z;
+        const ang = Math.abs(Math.atan2(ux * vz - uz * vx, ux * vx + uz * vz));
+        const R = Math.hypot(vx, vz) / Math.max(1e-3, ang);
+        const vlim = Math.sqrt(2.6 * R);
+        const dist = Math.max(0, k * 10 - here);
+        vt = Math.min(vt, Math.sqrt(vlim * vlim + 2 * 2.0 * dist));
+      }
+    }
     // 進行方向とパスの向きがずれている間（曲がった直後など）は加速しない
     const p0 = this.pointAt(s), p1 = this.pointAt(s + 3);
     const ang = Math.atan2(p1.x - p0.x, p1.z - p0.z);

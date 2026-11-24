@@ -1,6 +1,7 @@
 // ライバル（街を流している走り屋）
 // tier: 出現に必要な勝利数の目安 / skill: AIの攻め具合(0-1)
 import { CARS } from './cars.js';
+import { defaultSetup } from '../physics/setup.js';
 
 const tune = (carId, over) => ({ ...CARS[carId].stock, ...over });
 
@@ -120,8 +121,61 @@ export const EAST_RIVALS = [
     lines: { meet: 'サンシャインの下で、俺に挑むか。', win: '……西の86が、ここまで来たか。', lose: '東池袋は、まだお前の街じゃない。' },
   },
 ];
+// ===== 榛名山（解放後に出現）：★5フルカスタマイズパーツを組み、峠用にセッティングした走り屋たち =====
+const setupOf = (carId, over) => ({ ...defaultSetup(carId), ...over });
+export const HARUNA_RIVALS = [
+  {
+    id: 'kaede', name: '篠原カエデ', team: '榛名ダウンヒラーズ', car: 'RS-RS', color: 0x2f7d4a, minWins: 10, skill: 0.9, reward: 240000,
+    parts: tune('RS-RS', { tire: 'tire_high', suspension: 'sus_full', brake: 'brk_pad', muffler: 'muf_sport', boreup: 'bore_1' }),
+    setup: setupOf('RS-RS', { freqF: 2.2, freqR: 2.4, arbF: 4, arbR: 6, camberF: 2.8, camberR: 2.0, toeR: 0.15 }),
+    lines: { meet: '峠は軽さと足だよ。ついてこれる？', win: '…下りでこの差。あんた何者？', lose: '榛名の路面は、足が柔らかい方が速いの。' },
+  },
+  {
+    id: 'tetsu', name: '岩城テツ', team: '榛名ダウンヒラーズ', car: '86-GR', color: 0x1a1a1a, minWins: 10, skill: 0.9, reward: 260000,
+    parts: tune('86-GR', { tire: 'tire_high', suspension: 'sus_full', transmission: 'tm_full', brake: 'brk_full', muffler: 'muf_sport' }),
+    setup: setupOf('86-GR', { freqF: 2.5, freqR: 2.7, arbF: 6, arbR: 4, lsdInitR: 12, lsdAccR: 35, lsdDecR: 20, brakeBal: -1, final: 4.3 }),
+    lines: { meet: '同じ86でも、峠の86は別物だぜ。', win: '平地の走り屋に負けるとはな…', lose: '下りのブレーキング、まだまだだな。' },
+  },
+  {
+    id: 'akane', name: '日向アカネ', team: '湯けむりレーシング', car: 'S2K-AP', color: 0xd7d2c4, minWins: 11, skill: 0.91, reward: 300000,
+    parts: tune('S2K-AP', { tire: 'tire_high', suspension: 'sus_full', transmission: 'tm_full', brake: 'brk_pad', muffler: 'muf_straight', aero: 'aero_lip' }),
+    setup: setupOf('S2K-AP', { freqF: 2.8, freqR: 3.0, arbF: 5, arbR: 5, camberF: 3.0, camberR: 2.2, lsdAccR: 30, lsdDecR: 18 }),
+    lines: { meet: '9000回転の歌、伊香保まで聴かせてあげる。', win: '回しきれなかった…悔しい。', lose: 'VTECじゃなくてもいいの。高回転は正義。' },
+  },
+  {
+    id: 'ryuu', name: '榊リュウ', team: '上州ストリート連合', car: 'WRX-IMP', color: 0x1b3b8f, minWins: 12, skill: 0.92, reward: 340000,
+    parts: tune('WRX-IMP', { tire: 'tire_high', suspension: 'sus_full', transmission: 'tm_full', brake: 'brk_full', turbo: 'tb_twin', intercooler: 'ic_front', muffler: 'muf_sport' }),
+    setup: setupOf('WRX-IMP', { freqF: 2.6, freqR: 2.6, arbF: 5, arbR: 5, toeR: 0.3, lsdInitF: 10, lsdAccF: 20, lsdAccR: 40, brakeBal: 1 }),
+    lines: { meet: '上りなら四駆が上。下りでも負ける気はしない。', win: '…ヘアピンの立ち上がりで並ばれるとはな。', lose: '四輪で路面を掴む。それが峠だ。' },
+  },
+  {
+    id: 'mio', name: '雪村ミオ', team: '湖畔の亡霊', car: 'SWIFT-S', color: 0xf4f6f8, minWins: 13, skill: 0.92, reward: 320000,
+    parts: tune('SWIFT-S', { tire: 'tire_s', suspension: 'sus_full', transmission: 'tm_full', brake: 'brk_full', turbo: 'tb_mid', intercooler: 'ic_large', muffler: 'muf_sport' }),
+    setup: setupOf('SWIFT-S', { freqF: 2.9, freqR: 3.1, arbF: 4, arbR: 6, toeR: 0.15, lsdInitF: 15, lsdAccF: 30, lsdDecF: 10 }),
+    lines: { meet: '……霧の夜は、私の時間。', win: '……見えなくなるほど離されたのは、初めて。', lose: '……追いつけなかったでしょう。' },
+  },
+  {
+    id: 'daichi', name: '大門ダイチ', team: '上州ストリート連合', car: '80-Supra', color: 0xc8102e, minWins: 14, skill: 0.92, reward: 380000,
+    parts: tune('80-Supra', { tire: 'tire_s', suspension: 'sus_full', transmission: 'tm_full', brake: 'brk_full', turbo: 'tb_twin', intercooler: 'ic_front', muffler: 'muf_straight', aero: 'aero_wing' }),
+    setup: setupOf('80-Supra', { freqF: 2.7, freqR: 2.9, arbF: 6, arbR: 4, toeR: 0.3, lsdAccR: 40, lsdDecR: 25, brakeBal: -1, dfR: 150 }),
+    lines: { meet: '上りの直線で、全部ねじ伏せる。', win: 'パワーだけじゃ峠は勝てねぇか…', lose: 'これが上州の直6ツインターボだ！' },
+  },
+  {
+    id: 'shin', name: '霧島シン', team: '湖畔の亡霊', car: 'BRZ-ZD', color: 0x2266cc, minWins: 15, skill: 0.94, reward: 420000,
+    parts: tune('BRZ-ZD', { tire: 'tire_s', suspension: 'sus_full', transmission: 'tm_full', brake: 'brk_full', boreup: 'bore_2', muffler: 'muf_straight', aero: 'aero_full' }),
+    setup: setupOf('BRZ-ZD', { freqF: 3.0, freqR: 3.2, arbF: 6, arbR: 4, camberF: 3.2, camberR: 2.4, toeF: 0, toeR: 0.3, lsdInitR: 15, lsdAccR: 38, lsdDecR: 28, brakeBal: -1 }),
+    lines: { meet: '湖畔から伊香保まで。一度も前を譲ったことはない。', win: '初めて、テールランプを見せられた…', lose: '峠は、記憶した者が勝つ。' },
+  },
+  {
+    id: 'kanata', name: '天城カナタ', team: '榛名山の主', car: 'EVO-IX', color: 0xe6e6e6, minWins: 17, skill: 0.97, reward: 700000,
+    parts: tune('EVO-IX', { tire: 'tire_s', suspension: 'sus_full', transmission: 'tm_full', brake: 'brk_full', turbo: 'tb_twin', intercooler: 'ic_front', boreup: 'bore_3', muffler: 'muf_straight', aero: 'aero_full' }),
+    setup: setupOf('EVO-IX', { freqF: 2.9, freqR: 3.0, arbF: 6, arbR: 4, toeR: 0.3, camberF: 3.0, camberR: 2.2, lsdInitF: 12, lsdAccF: 25, lsdDecF: 8, lsdInitR: 15, lsdAccR: 45, lsdDecR: 25, brakeBal: 0 }),
+    lines: { meet: 'この山で、俺の前を走った者はいない。', win: '……いい山を、いい走りで降りたな。', lose: '榛名は、まだお前を認めていない。' },
+  },
+];
+for (const r of HARUNA_RIVALS) r.area = 'haruna';
 for (const r of RIVALS) r.area = 'west';
 for (const r of EAST_RIVALS) r.area = 'east';
-export const ALL_RIVALS = [...RIVALS, ...EAST_RIVALS];
+export const ALL_RIVALS = [...RIVALS, ...EAST_RIVALS, ...HARUNA_RIVALS];
 
 export const RIVAL_BY_ID = Object.fromEntries(ALL_RIVALS.map((r) => [r.id, r]));

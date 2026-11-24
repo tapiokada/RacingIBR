@@ -8,12 +8,12 @@ import { townCorridor, boxClearOfCourse, courseClearance, townCornerPads } from 
 import { buildEdges } from './edges.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
-function rng(seed) {
+export function rng(seed) {
   let s = seed >>> 0;
   return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
 }
 
-function canvasTex(w, h, draw, repeat = true) {
+export function canvasTex(w, h, draw, repeat = true) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h);
@@ -24,7 +24,7 @@ function canvasTex(w, h, draw, repeat = true) {
   return t;
 }
 
-function asphaltTex() {
+export function asphaltTex() {
   return canvasTex(256, 256, (g, w, h) => {
     g.fillStyle = '#4a4d55'; g.fillRect(0, 0, w, h);
     const r = rng(7);
@@ -126,7 +126,7 @@ function buildingMaterial() {
   return mat;
 }
 
-function textSprite(text, color = '#fff', bg = 'rgba(0,0,0,0)', size = 64, glow = '#0ff') {
+export function textSprite(text, color = '#fff', bg = 'rgba(0,0,0,0)', size = 64, glow = '#0ff') {
   const t = canvasTex(1024, 160, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     g.font = `bold ${size}px "Hiragino Sans","Noto Sans JP",sans-serif`;

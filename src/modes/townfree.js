@@ -5,6 +5,8 @@ import { AREAS, areaStart, arriveSpot } from '../data/map.js';
 import { VIEW_NAMES } from '../render/cameras.js';
 import { pauseMenu } from './common.js';
 import { TitleMode } from './title.js';
+import { openSetup } from '../ui/setup.js';
+import { savePracticeSetup } from '../save.js';
 
 export class TownFreeMode {
   constructor(game, opts) { this.game = game; this.opts = opts; }
@@ -17,7 +19,7 @@ export class TownFreeMode {
     g.setArea(area);
     g.world.setCourse(null);
     this.session = new DriveSession(g, { corridor: g.world.corridor });
-    this.P = this.session.addCar({ carId, equipped, color, isPlayer: true });
+    this.P = this.session.addCar({ carId, equipped, setup: this.opts.setup || null, color, isPlayer: true });
     const sp = this.opts.pos || areaStart(area);
     this.P.car.place(sp.x, sp.z, sp.h, 0);
     g.mirrorModel = this.P.model;
@@ -26,7 +28,7 @@ export class TownFreeMode {
     this.hud = new Hud(g.ui);
     this.hud.setMapCourse(null, area);
     this.session.onReset = () => this.hud.flash('RESET', 0.8);
-    this.hud.flash(`${AREAS[area].name}タウン`, 2, 'FREE RUN　全道路を自由に走行できます　Escでメニュー');
+    this.hud.flash(AREAS[area].touge ? AREAS[area].name : `${AREAS[area].name}タウン`, 2, AREAS[area].touge ? 'FREE RUN　県道33号（ゆうすげ入口〜伊香保温泉）を自由に走行　Escでメニュー' : 'FREE RUN　全道路を自由に走行できます　Escでメニュー');
   }
 
   update(dt) {
@@ -45,7 +47,7 @@ export class TownFreeMode {
     this.session.updateAudio(this.P);
     this.hud.update(dt);
     this.hud.drawTach(this.P.car);
-    this.hud.tl.innerHTML = `<div class="who">${AREAS[this.area].name}タウン</div><div class="hint">FREE RUN　R:リセット　Esc:メニュー</div>`;
+    this.hud.tl.innerHTML = `<div class="who">${AREAS[this.area].name}${AREAS[this.area].touge ? '' : 'タウン'}</div><div class="hint">FREE RUN　R:リセット　Esc:メニュー</div>`;
     this.hud.drawMap([{ x: this.P.car.x, z: this.P.car.z, h: this.P.car.h, color: '#33e1ff' }]);
   }
 
@@ -54,10 +56,21 @@ export class TownFreeMode {
     this.paused = true;
     pauseMenu(g, 'PAUSE', [
       { label: '再開', action: () => { this.paused = false; } },
+      { label: 'セッティング', sub: '足回り・ブレーキ・ギア比・LSD・ダウンフォースの調整とパワー/トルク曲線', action: () => this.openSetting() },
       { label: 'スタート地点へ戻る', action: () => g.transition(() => g.setMode(new TownFreeMode(g, { ...this.opts, pos: null }))) },
       ...Object.values(AREAS).filter((a) => a.id !== this.area).map((a) => ({ label: `エリア切り替え：${a.name}へ`, action: () => this.changeArea(a.id, areaStart(a.id)) })),
       { label: 'PRACTICEメニューへ', action: () => g.transition(() => g.setMode(new TitleMode(g, 'practice'))) },
     ], () => { this.paused = false; });
+  }
+
+  openSetting() {
+    const g = this.game;
+    this.paused = true;
+    openSetup(g, {
+      carId: this.opts.carId, equipped: this.opts.equipped, setup: this.opts.setup,
+      onChange: (S) => { this.opts.setup = S; this.session.applySetup(this.P, S); if (this.opts.setupKey) savePracticeSetup(this.opts.setupKey, S); },
+      onClose: () => { g.input.pressed.clear(); this.paused = false; },
+    });
   }
 
   changeArea(to, pos) {

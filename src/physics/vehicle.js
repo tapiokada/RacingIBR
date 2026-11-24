@@ -25,16 +25,23 @@ function tireCurve(s) {
 
 export class Vehicle {
   constructor(spec, opts = {}) {
+    this.om = new Float64Array(4); // 各輪の角速度
+    this.ground = opts.ground || null; // 路面高さ { h(x,z) }（null=平地）
     this.setSpec(spec);
     this.x = 0; this.z = 0; this.h = 0;
     this.vu = 0; this.vv = 0; this.w = 0;
     this.steer = 0;
-    this.wF = 0; this.wR = 0;
     this.rpm = spec.idle; this.gear = 1;
     this.shiftTimer = 0; this.boost = 0;
-    this.axF = 0; this.ayF = 0; this.axAcc = 0; this.ayAcc = 0;
+    this.axF = 0; this.ayF = 0;
     this.spinF = 0; this.spinR = 0;
-    this.pitch = 0; this.roll = 0;
+    // ばね上の運動：上下(y,vy)・ピッチ(th:ノーズアップ正)・ロール(ph:右下がり正)
+    this.y = 0; this.vy = 0; this.th = 0; this.dth = 0; this.ph = 0; this.dph = 0;
+    this.gy = 0; this.gp = 0; this.gr = 0; // 重心直下の路面高さ・路面ピッチ・路面ロール（描画用）
+    this.pitch = 0; this.roll = 0; this.heave = 0; // 路面に対する車体の姿勢（描画用）
+    this.comp = new Float64Array(4); // 各輪のストローク（静止位置からの縮み量）
+    this.yr = new Float64Array(4); this.yrPrev = new Float64Array(4);
+    this.vl = new Float64Array(4);
     this.slip = 0; this.slipLong = 0;
     this.input = { throttle: 0, brake: 0, steer: 0 };
     this.auto = !!opts.auto; // オートマ
@@ -46,6 +53,8 @@ export class Vehicle {
     this.wheelSlip = [0, 0, 0, 0];
     this.reverseHold = 0;
     this.offRoad = 0;
+    this.bottom = 0; // 底打ち
+    this.air = 0; // 全輪接地していない時間
   }
 
   setSpec(s) {
@@ -55,25 +64,87 @@ export class Vehicle {
     this.b = this.L * s.frontWeight; // CG→後軸
     this.a = this.L - this.b; // CG→前軸
     this.Iz = (s.mass * (s.car.length ** 2 + s.car.width ** 2)) / 12 * 0.95;
+    this.Ip = (s.mass * (s.car.length ** 2 + s.car.height ** 2)) / 12 * 0.9; // ピッチ
+    this.Ir = (s.mass * (s.car.width ** 2 + s.car.height ** 2)) / 12 * 0.8; // ロール
     this.Iw = 1.1 * s.car.inertiaK; // 1輪あたり
+    const W = s.mass * G;
+    const sp = s.susp;
+    const deg = Math.PI / 180;
     this.wheels = [
-      { pu: this.a, pv: -s.trackF / 2, front: true },
-      { pu: this.a, pv: s.trackF / 2, front: true },
-      { pu: -this.b, pv: -s.trackR / 2, front: false },
-      { pu: -this.b, pv: s.trackR / 2, front: false },
+      { pu: this.a, pv: -s.trackF / 2, front: true, side: -1 },
+      { pu: this.a, pv: s.trackF / 2, front: true, side: 1 },
+      { pu: -this.b, pv: -s.trackR / 2, front: false, side: -1 },
+      { pu: -this.b, pv: s.trackR / 2, front: false, side: 1 },
     ];
+    for (const wh of this.wheels) {
+      const F = wh.front;
+      wh.fs = (W * (F ? this.b : this.a)) / this.L / 2; // 静止輪荷重
+      wh.k = F ? sp.kF : sp.kR;
+      wh.cc = F ? sp.cCF : sp.cCR; wh.ce = F ? sp.cEF : sp.cER;
+      wh.arb = F ? sp.arbLinF : sp.arbLinR;
+      wh.travel = F ? sp.travelF : sp.travelR;
+      wh.camber = F ? sp.camberF : sp.camberR;
+      // トー：+イン。左輪(+)は右へ、右輪は左へ向く
+      wh.toe = -wh.side * (F ? sp.toeF : sp.toeR) * deg;
+      wh.longMul = 1 - 0.004 * wh.camber * wh.camber;
+    }
+  }
+
+  get wF() { return (this.om[0] + this.om[1]) / 2; }
+  set wF(v) { this.om[0] = this.om[1] = v; }
+  get wR() { return (this.om[2] + this.om[3]) / 2; }
+  set wR(v) { this.om[2] = this.om[3] = v; }
+
+  groundAt(x, z) { return this.ground ? this.ground.h(x, z) : 0; }
+
+  // 4輪位置の路面高さ
+  sampleRoad(out) {
+    const f0 = Math.sin(this.h), f1 = Math.cos(this.h);
+    const r0 = -f1, r1 = f0;
+    for (let i = 0; i < 4; i++) {
+      const wh = this.wheels[i];
+      out[i] = this.groundAt(this.x + f0 * wh.pu + r0 * wh.pv, this.z + f1 * wh.pu + r1 * wh.pv);
+    }
+  }
+
+  // 路面に合わせて車体姿勢を初期化
+  settle() {
+    this.sampleRoad(this.yr);
+    this.yrPrev.set(this.yr);
+    const yr = this.yr;
+    const yF = (yr[0] + yr[1]) / 2, yR = (yr[2] + yr[3]) / 2;
+    this.th = (yF - yR) / this.L;
+    this.ph = -(((yr[1] - yr[0]) / this.spec.trackF + (yr[3] - yr[2]) / this.spec.trackR) / 2);
+    this.y = yF * (this.b / this.L) + yR * (this.a / this.L);
+    this.vy = this.vu * (yF - yR) / this.L; this.dth = 0; this.dph = 0;
+    this.comp.fill(0);
+    this.updateGroundPose();
+  }
+
+  updateGroundPose() {
+    const yr = this.yr;
+    const yF = (yr[0] + yr[1]) / 2, yR = (yr[2] + yr[3]) / 2;
+    this.gp = Math.atan((yF - yR) / this.L);
+    this.gr = -Math.atan(((yr[1] - yr[0]) / this.spec.trackF + (yr[3] - yr[2]) / this.spec.trackR) / 2);
+    this.gy = yF * (this.b / this.L) + yR * (this.a / this.L);
+    const vis = 1.5; // 見た目の強調
+    this.pitch = -(this.th - this.gp) * vis;
+    this.roll = -(this.ph - this.gr) * vis;
+    this.heave = this.y - this.gy;
   }
 
   place(x, z, h, speed = 0) {
     this.x = x; this.z = z; this.h = h;
     this.vu = speed; this.vv = 0; this.w = 0;
     const R = this.spec.tireRadius;
-    this.wF = this.wR = speed / R;
+    this.om.fill(speed / R);
     this.gear = speed > 1 ? this.bestGear(speed) : 1;
     this.rpm = Math.max(this.spec.idle, this.wheelRpm());
     this.shiftTimer = 0;
+    this.axF = this.ayF = 0;
+    this.settle();
+    this.fresh = true; // 次の1ステップは路面速度が不明なのでダンパーを効かせない
   }
-
   get speed() { return Math.hypot(this.vu, this.vv); }
   get kmh() { return this.vu * 3.6; }
   fwd() { return [Math.sin(this.h), Math.cos(this.h)]; }
@@ -171,26 +242,41 @@ export class Vehicle {
     const rate = (target === 0 ? 3.2 : 2.4) * dt;
     this.steer += Math.max(-rate, Math.min(rate, desired - this.steer));
     const delta = this.steer;
-    const cd = Math.cos(delta), sd = Math.sin(delta);
 
-    // ---- 荷重 ----
+    // ---- サスペンション（4輪のばね・ダンパー・スタビ、ばね上の上下/ピッチ/ロール） ----
+    const yr = this.yr, yp = this.yrPrev, comp = this.comp;
+    yp.set(yr);
+    this.sampleRoad(yr);
     const v2 = this.vu * this.vu;
     const q = 0.5 * RHO * v2;
     const dfF = q * s.area * s.clF;
     const dfR = q * s.area * s.clR;
-    const W = this.m * G;
-    const h = s.cgHeight;
-    const longT = (this.m * this.axF * h) / this.L;
-    const latT = this.m * this.ayF * h;
-    const fzF = (W * this.b) / this.L - longT + dfF;
-    const fzR = (W * this.a) / this.L + longT + dfR;
-    const latF = (latT * s.rollFront) / s.trackF;
-    const latR = (latT * (1 - s.rollFront)) / s.trackR;
     const loads = this.wheelLoads;
-    loads[0] = Math.max(0, fzF / 2 + latF); // 左前（右旋回で外輪=左が増加）
-    loads[1] = Math.max(0, fzF / 2 - latF);
-    loads[2] = Math.max(0, fzR / 2 + latR);
-    loads[3] = Math.max(0, fzR / 2 - latR);
+    const W = this.m * G;
+    let sumN = 0;
+    let bump = 0;
+    for (let i = 0; i < 4; i++) {
+      const wh = this.wheels[i];
+      const yb = this.y + wh.pu * this.th - wh.pv * this.ph;
+      const c = yr[i] - yb;
+      const cd = this.fresh ? 0 : (yr[i] - yp[i]) / dt - (this.vy + wh.pu * this.dth - wh.pv * this.dph);
+      comp[i] = c;
+      let F = wh.fs + wh.k * c + (cd > 0 ? wh.cc : wh.ce) * cd;
+      if (c > wh.travel) { // バンプラバー→底打ち
+        const e = c - wh.travel;
+        F += wh.k * 10 * e + wh.cc * 3 * Math.max(0, cd);
+        if (e > 0.012) bump += (e - 0.012) * wh.k * 25;
+      }
+      loads[i] = F;
+    }
+    // スタビライザー
+    const aF = this.wheels[0].arb * (comp[0] - comp[1]);
+    const aR = this.wheels[2].arb * (comp[2] - comp[3]);
+    loads[0] += aF; loads[1] -= aF; loads[2] += aR; loads[3] -= aR;
+    for (let i = 0; i < 4; i++) { if (loads[i] < 0) loads[i] = 0; sumN += loads[i]; }
+    this.bottom = bump;
+    this.fresh = false;
+    this.air = sumN < W * 0.05 ? this.air + dt : 0;
     const fz0 = W / 4;
 
     // ---- エンジン / ドライブトレイン ----
@@ -221,7 +307,6 @@ export class Vehicle {
     let thr = throttle;
     if (rpm >= s.limiter) { thr = 0; this.limiterHit = 0.08; }
     if (this.limiterHit > 0) { this.limiterHit -= dt; thr = 0; }
-    // TCS
     // トラクションコントロール：レベルごとの「許容スリップ」を超えないようスロットルを自動で絞る（フィードバック制御）。
     // 低い段階ほど大きな空転を許し、10で空転をほぼ抑える。車の馬力に関係なく段階ごとの効きが揃う。
     if (this.tcsLevel > 0) {
@@ -241,98 +326,137 @@ export class Vehicle {
     const Ie = s.engineInertia * ratio * ratio * (engaged && !slipping ? 1 : 0);
 
     // 駆動配分
-    let tF = 0, tR = 0, IF = this.Iw * 2, IR = this.Iw * 2;
-    if (s.drive === 'FF') { tF = Tdrive; IF += Ie; }
-    else if (s.drive === 'FR') { tR = Tdrive; IR += Ie; }
-    else { tF = Tdrive * s.awdFront; tR = Tdrive * (1 - s.awdFront); IF += Ie * s.awdFront; IR += Ie * (1 - s.awdFront); }
+    let tF = 0, tR = 0, IeF = 0, IeR = 0;
+    if (s.drive === 'FF') { tF = Tdrive; IeF = Ie; }
+    else if (s.drive === 'FR') { tR = Tdrive; IeR = Ie; }
+    else { tF = Tdrive * s.awdFront; tR = Tdrive * (1 - s.awdFront); IeF = Ie * s.awdFront; IeR = Ie * (1 - s.awdFront); }
 
-    // ブレーキ
-    let bF = s.brakeTorque * brake * s.brakeBias;
-    let bR = s.brakeTorque * brake * (1 - s.brakeBias);
+    // ブレーキ（各輪）
+    const bk = [0, 0, 0, 0];
+    bk[0] = bk[1] = s.brakeTorque * brake * s.brakeBias / 2;
+    bk[2] = bk[3] = s.brakeTorque * brake * (1 - s.brakeBias) / 2;
 
     // ---- タイヤ力 ----
     let Fu = 0, Fv = 0, Tz = 0;
-    let FxF = 0, FxR = 0, kF = 0, kR = 0; // 軸ごとの縦力と縦剛性
-    let slipMax = 0, slipLong = 0;
+    const Fx = [0, 0, 0, 0], ks = [0, 0, 0, 0];
+    let slipMax = 0, slipLong = 0, FuT = 0, FvT = 0;
     const kp = s.peakRatio, ap = s.peakAngle;
+    // 路面に対するロール角（右下がり正）→キャンバー変化
+    const relRollDeg = (this.ph - this.gr) * 57.3;
+    const offMul = this.offRoad ? 0.7 : 1;
     for (let i = 0; i < 4; i++) {
       const wh = this.wheels[i];
       const vuw = this.vu - this.w * wh.pv;
       const vvw = this.vv + this.w * wh.pu;
-      let vl, vt;
-      if (wh.front) { vl = vuw * cd + vvw * sd; vt = -vuw * sd + vvw * cd; }
-      else { vl = vuw; vt = vvw; }
-      const om = wh.front ? this.wF : this.wR;
+      const dl = (wh.front ? delta : 0) + wh.toe;
+      const cdl = Math.cos(dl), sdl = Math.sin(dl);
+      const vl = vuw * cdl + vvw * sdl, vt = -vuw * sdl + vvw * cdl;
+      this.vl[i] = vl;
+      const om = this.om[i];
       const vden = Math.max(Math.abs(vl), 4);
       const kappa = (om * R - vl) / vden;
       const alpha = Math.atan2(vt, Math.max(Math.abs(vl), 1.5));
       const Fz = loads[i];
-      const mu = s.mu * Math.max(0.6, 1 - 0.08 * (Fz / fz0 - 1)) * (this.offRoad ? 0.7 : 1);
+      // キャンバー：ネガティブ量（ロールで外輪は減る）。横グリップは2.5°付近が最大、縦グリップは静的キャンバーで低下
+      const e = wh.camber - wh.side * relRollDeg * 0.35;
+      const latMul = 1 + 0.024 * e - 0.0048 * e * e;
+      const mu = s.mu * Math.max(0.6, 1 - 0.08 * (Fz / fz0 - 1)) * offMul;
       const sx = kappa / kp, sy = alpha / ap;
       const sm = Math.hypot(sx, sy);
-      let Fx = 0, Fy = 0, slope = 0;
-      if (sm > 1e-6) {
-        const Fm = mu * Fz * tireCurve(sm);
-        Fx = (Fm * sx) / sm; Fy = (-Fm * sy) / sm;
-        // 縦剛性（陰解法用）
-        const sx2 = (kappa + 0.01) / kp;
-        const sm2 = Math.hypot(sx2, sy);
-        const Fx2 = (mu * Fz * tireCurve(sm2) * sx2) / sm2;
-        slope = Math.max(0, (Fx2 - Fx) / 0.01);
-      } else {
-        slope = (mu * Fz * TIRE_B * TIRE_C) / kp;
+      let fx = 0, fy = 0, slope = 0;
+      if (Fz > 0) {
+        if (sm > 1e-6) {
+          const Fm = mu * Fz * tireCurve(sm);
+          fx = (Fm * sx) / sm * wh.longMul; fy = (-Fm * sy) / sm * latMul;
+          // 縦剛性（陰解法用）
+          const sx2 = (kappa + 0.01) / kp;
+          const sm2 = Math.hypot(sx2, sy);
+          const Fx2 = (mu * Fz * tireCurve(sm2) * sx2) / sm2 * wh.longMul;
+          slope = Math.max(0, (Fx2 - fx) / 0.01);
+        } else {
+          slope = (mu * Fz * TIRE_B * TIRE_C) / kp * wh.longMul;
+        }
       }
       this.wheelSlip[i] = sm;
-      if (sm > slipMax) slipMax = sm;
-      if (Math.abs(kappa) > slipLong) slipLong = Math.abs(kappa);
-      let fu, fv;
-      if (wh.front) { fu = Fx * cd - Fy * sd; fv = Fx * sd + Fy * cd; FxF += Fx; kF += (slope * R) / vden; }
-      else { fu = Fx; fv = Fy; FxR += Fx; kR += (slope * R) / vden; }
+      if (Fz > 0 && sm > slipMax) slipMax = sm;
+      if (Fz > fz0 * 0.25 && Math.abs(kappa) > slipLong) slipLong = Math.abs(kappa);
+      const fu = fx * cdl - fy * sdl, fv = fx * sdl + fy * cdl;
+      Fx[i] = fx; ks[i] = (slope * R) / vden;
       Fu += fu; Fv += fv;
       Tz += wh.pu * fv - wh.pv * fu;
     }
+    FuT = Fu; FvT = Fv;
     this.slip = slipMax;
     this.slipLong = slipLong;
 
-    // ---- ABS ----
+    // ---- ABS（各輪） ----
     if (this.absLevel > 0 && brake > 0) {
-      const lockF = this.wF * R - this.vu;
-      const lockR = this.wR * R - this.vu;
-      const lim = -kp * (2.0 - 0.09 * this.absLevel) * Math.max(Math.abs(this.vu), 4);
       const keep = 1 - 0.065 * this.absLevel;
-      if (lockF < lim) bF *= keep;
-      if (lockR < lim) bR *= keep;
+      for (let i = 0; i < 4; i++) {
+        const lim = -kp * (2.0 - 0.09 * this.absLevel) * Math.max(Math.abs(this.vl[i]), 4);
+        if (this.om[i] * R - this.vl[i] < lim) bk[i] *= keep;
+      }
     }
 
-    // ---- 車輪回転（陰解法） ----
-    const integrateAxle = (om, T, Fx, kslope, I, Tb) => {
-      let o = om + (dt * (T - R * Fx)) / (I + dt * R * kslope);
-      const dB = (Tb * dt) / (I + dt * R * kslope);
-      if (Math.abs(o) <= dB) o = 0;
-      else o -= Math.sign(o) * dB;
-      return o;
-    };
-    if (s.drive === 'AWD' && engaged && !slipping) {
-      // センターデフ直結扱い
-      const Isum = IF + IR;
-      const o = (this.wF + this.wR) / 2;
-      const nw = integrateAxle(o, Tdrive, FxF + FxR, kF + kR, Isum, bF + bR);
-      this.wF = this.wR = nw;
+    // ---- 車輪回転（陰解法）：各軸を「平均回転」と「左右差（デフ）」に分けて解く ----
+    const om = this.om, Iw = this.Iw;
+    const diffs = [s.diffF, s.diffR];
+    const Ts = [tF, tR], Ies = [IeF, IeR];
+    const mean = [0, 0], dmean = [0, 0];
+    const lockedCenter = s.drive === 'AWD' && engaged && !slipping;
+    for (let ax = 0; ax < 2; ax++) {
+      const l = ax * 2, r = l + 1;
+      const T = Ts[ax];
+      const o = (om[l] + om[r]) / 2;
+      mean[ax] = o;
+      dmean[ax] = (T - R * (Fx[l] + Fx[r])) / (2 * Iw + Ies[ax] + dt * R * (ks[l] + ks[r]));
+    }
+    if (lockedCenter) {
+      // センターデフ直結扱い：前後軸の平均回転を共通化
+      const o = (mean[0] + mean[1]) / 2;
+      const Isum = 4 * Iw + Ie + dt * R * (ks[0] + ks[1] + ks[2] + ks[3]);
+      const d = (Tdrive - R * (Fx[0] + Fx[1] + Fx[2] + Fx[3])) / Isum;
+      mean[0] = mean[1] = o + dt * d;
     } else {
-      this.wF = integrateAxle(this.wF, tF, FxF, kF, IF, bF);
-      this.wR = integrateAxle(this.wR, tR, FxR, kR, IR, bR);
+      mean[0] += dt * dmean[0]; mean[1] += dt * dmean[1];
+    }
+    for (let ax = 0; ax < 2; ax++) {
+      const l = ax * 2, r = l + 1;
+      const T = Ts[ax];
+      const dif = diffs[ax];
+      const D = om[l] - om[r];
+      const den = Iw + dt * R * (ks[l] + ks[r]) / 2;
+      const free = -R * (Fx[l] - Fx[r]);
+      // LSD：差動を止めるのに必要なトルク（上限 = イニシャル + 感度×入力トルク）
+      let Tl = (D * den) / dt + free;
+      const drv = (ax === 0 ? s.drive !== 'FR' : s.drive !== 'FF') && engaged;
+      const bias = drv ? dif.pre + (T >= 0 ? dif.acc : dif.dec) * Math.abs(T) : 0;
+      Tl = Math.max(-bias, Math.min(bias, Tl));
+      const Dn = D + (dt * (free - Tl)) / den;
+      om[l] = mean[ax] + Dn / 2; om[r] = mean[ax] - Dn / 2;
+      // ブレーキ（各輪で回転を0へ）
+      const IeHalf = Ies[ax] / 2;
+      for (const i of [l, r]) {
+        if (bk[i] <= 0) continue;
+        const dB = (bk[i] * dt) / (Iw + IeHalf + dt * R * ks[i]);
+        if (Math.abs(om[i]) <= dB) om[i] = 0; else om[i] -= Math.sign(om[i]) * dB;
+      }
     }
 
-    // ---- 空気抵抗・転がり抵抗 ----
+    // ---- 勾配（垂直抗力の水平成分）・空気抵抗・転がり抵抗 ----
+    const sU = ((yr[0] + yr[1]) / 2 - (yr[2] + yr[3]) / 2) / this.L; // 前上がり正
+    const sV = ((yr[1] - yr[0]) / s.trackF + (yr[3] - yr[2]) / s.trackR) / 2; // 右上がり正
+    Fu -= sumN * sU;
+    Fv -= sumN * sV;
     const dragF = 0.5 * RHO * s.cd * s.area * speed * speed;
     if (speed > 0.01) {
       Fu -= (dragF * this.vu) / speed;
       Fv -= (dragF * this.vv) / speed;
     }
-    const rr = 0.011 * W + (this.offRoad ? 0.08 * W : 0);
+    const rr = 0.011 * sumN + (this.offRoad ? 0.08 * sumN : 0) + bump * 0.5;
     if (Math.abs(this.vu) > 0.05) Fu -= Math.sign(this.vu) * Math.min(rr, Math.abs(this.vu) * this.m / dt * 0.5);
 
-    // ---- 車体運動 ----
+    // ---- 車体運動（平面） ----
     const ax = Fu / this.m, ay = Fv / this.m;
     this.vu += (ax + this.w * this.vv) * dt;
     this.vv += (ay - this.w * this.vu) * dt;
@@ -342,13 +466,32 @@ export class Vehicle {
     if (speed < 1.2 && throttle < 0.05 && (brake > 0.05 || speed < 0.25)) {
       const k = Math.exp(-dt * (brake > 0.05 ? 10 : 4));
       this.vu *= k; this.vv *= k; this.w *= k;
-      if (brake > 0.05) { this.wF *= k; this.wR *= k; }
+      if (brake > 0.05) for (let i = 0; i < 4; i++) om[i] *= k;
     }
     if (speed < 3) this.vv *= Math.exp(-dt * 2); // 低速横すべり抑制
 
-    const tau = s.loadTau;
-    this.axF += (ax - this.axF) * Math.min(1, dt / tau);
-    this.ayF += (ay - this.ayF) * Math.min(1, dt / tau);
+    // ---- ばね上の上下・ピッチ・ロール ----
+    // タイヤ力は接地面（重心より cgHeight 下）に働くのでピッチ・ロールモーメントを生む
+    const hcg = s.cgHeight;
+    let Fy = -W + bump;
+    let Mp = -dfF * this.a + dfR * this.b + FuT * hcg;
+    let Mr = -FvT * hcg;
+    Fy -= dfF + dfR;
+    for (let i = 0; i < 4; i++) {
+      const wh = this.wheels[i];
+      Fy += loads[i];
+      Mp += loads[i] * wh.pu;
+      Mr -= loads[i] * wh.pv;
+    }
+    this.vy += (Fy / this.m) * dt;
+    this.dth += (Mp / this.Ip) * dt;
+    this.dph += (Mr / this.Ir) * dt;
+    this.y += this.vy * dt;
+    this.th += this.dth * dt;
+    this.ph += this.dph * dt;
+
+    this.axF += (ax - this.axF) * Math.min(1, dt / 0.1);
+    this.ayF += (ay - this.ayF) * Math.min(1, dt / 0.1);
 
     const f0 = Math.sin(this.h), f1 = Math.cos(this.h);
     const r0 = -f1, r1 = f0;
@@ -358,9 +501,7 @@ export class Vehicle {
 
     this.spinF += this.wF * dt;
     this.spinR += this.wR * dt;
-    const softness = 0.012 * (s.loadTau / 0.12);
-    this.pitch += (-this.axF * softness * 0.6 - this.pitch) * Math.min(1, dt * 8);
-    this.roll += (this.ayF * softness - this.roll) * Math.min(1, dt * 8);
+    this.updateGroundPose();
   }
 
   // ワールド速度
@@ -398,8 +539,7 @@ export class Vehicle {
     this.setWorldVel(vx, vz);
     // 車輪も追従
     const R = this.spec.tireRadius;
-    this.wF = this.wF * 0.7 + (this.vu / R) * 0.3;
-    if (this.spec.drive !== 'FR') this.wR = this.wR * 0.7 + (this.vu / R) * 0.3;
+    for (const i of this.spec.drive !== 'FR' ? [0, 1, 2, 3] : [0, 1]) this.om[i] = this.om[i] * 0.7 + (this.vu / R) * 0.3;
     return j;
   }
 

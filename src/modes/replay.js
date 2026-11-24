@@ -22,16 +22,17 @@ export class ReplayMode {
     g.world.setCourse(this.path);
     g.rig.setGallerySpots(this.path);
     g.audio.playBgm(null);
-    const spec = buildSpec(replay.carId, replay.equipped);
+    const spec = buildSpec(replay.carId, replay.equipped, replay.setup || null);
     this.model = buildCarModel(CARS[replay.carId], replay.color, { aero: replay.equipped.aero, wing: replay.equipped.aero === 'aero_wing' || replay.equipped.aero === 'aero_full' ? 'gt' : undefined });
     g.world.scene.add(this.model);
     addHeadlights(this.model);
     const L = spec.wheelbase;
     const b = L * spec.frontWeight;
     this.ghost = {
-      spec, a: L - b, b, x: 0, z: 0, h: 0, pitch: 0, roll: 0, steer: 0, spinF: 0, spinR: 0, rpm: 0, vu: 0, vv: 0, gear: 1, boost: 0, slip: 0,
+      spec, a: L - b, b, x: 0, z: 0, h: 0, pitch: 0, roll: 0, gy: 0, gp: 0, gr: 0, heave: 0, steer: 0, spinF: 0, spinR: 0, rpm: 0, vu: 0, vv: 0, gear: 1, boost: 0, slip: 0,
       input: { brake: 0, throttle: 0, steer: 0 },
       get speed() { return Math.abs(this.vu); },
+      groundAt: (x, z) => (g.world.ground ? g.world.ground.h(x, z) : 0),
       right() { return [-Math.cos(this.h), Math.sin(this.h)]; },
     };
     this.engine = g.audio.createEngine(spec);
@@ -63,6 +64,7 @@ export class ReplayMode {
     G.pitch = lerp(3); G.roll = lerp(4); G.steer = lerp(5); G.spinF = lerp(6); G.spinR = lerp(7);
     G.rpm = lerp(8); G.vu = lerp(9); G.gear = d[a + 10]; G.input.brake = d[a + 11]; G.input.throttle = d[a + 12];
     G.boost = lerp(13); G.slip = lerp(14);
+    if (S >= 19) { G.gy = lerp(15); G.gp = lerp(16); G.gr = lerp(17); G.heave = lerp(18); }
   }
 
   update(dt) {

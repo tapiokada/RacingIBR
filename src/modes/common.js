@@ -25,16 +25,19 @@ export class LapTracker {
     this.lat = pr.lat;
     if (this.prevS == null) { this.prevS = pr.s; return null; }
     let ds = pr.s - this.prevS;
-    if (ds < -p.length / 2) ds += p.length;
-    if (ds > p.length / 2) ds -= p.length;
+    if (!p.open) {
+      if (ds < -p.length / 2) ds += p.length;
+      if (ds > p.length / 2) ds -= p.length;
+    }
     this.prevS = pr.s;
     if (Math.abs(ds) > 30) ds = 0; // 異常ジャンプ無視
     this.dist += ds;
     if (!this.started) return null;
     let ev = null;
-    const L = p.length;
+    const L = p.open ? p.raceLen : p.length;
     const lapDist = this.dist - this.lap * L;
-    if (this.sector < 2 && lapDist >= ((this.sector + 1) * L) / 3) {
+    const bounds = p.sectorBounds || [L / 3, (L * 2) / 3];
+    if (this.sector < 2 && lapDist >= bounds[this.sector]) {
       this.curSectors.push(t - this.sectorStart);
       this.sectorStart = t;
       this.sector++;

@@ -5,11 +5,13 @@ import { NODES, townRoadBetween, laneOffset } from '../src/data/map.js';
 import { buildSpec, stockEquip } from '../src/physics/spec.js';
 import { Vehicle, collideCars } from '../src/physics/vehicle.js';
 import { CruiseAI } from '../src/ai.js';
+import { HarunaGround } from '../src/physics/touge.js';
 let seed = +(process.argv[2] || 1);
 Math.random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 const N = +(process.argv[3] || 10), T = +(process.argv[4] || 150);
 const AREA = process.env.AREA || 'west';
 const cor = townCorridor(AREA), G = townGraph(AREA); const dt = 1 / 500;
+const ground = AREA === 'haruna' ? new HarunaGround() : null;
 const edges = []; for (const [a, l] of Object.entries(G)) for (const e of l) if ((G[e.to] || []).length > 1) edges.push([a, e.to]);
 const ids = ['86-GR', 'SWIFT-S', '80-Supra', 'WRX-IMP', 'RS-RS'];
 const list = [];
@@ -24,7 +26,7 @@ for (let k = 0; k < N; k++) {
     if (list.every((o) => Math.hypot(o.car.x - x, o.car.z - z) > 25)) break;
   }
   const id = ids[k % ids.length];
-  const car = new Vehicle(buildSpec(id, stockEquip(id)), { auto: true });
+  const car = new Vehicle(buildSpec(id, stockEquip(id)), { auto: true, ground });
   car.place(x, z, Math.atan2(fx, fz), 9);
   list.push({ car, ai: new CruiseAI(car, G, a, b, 11 + Math.random() * 5, cor), slow: 0, maxSlow: 0, stuckAt: null });
 }

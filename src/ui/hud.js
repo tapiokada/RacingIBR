@@ -100,7 +100,22 @@ export class Hud {
     c.fillStyle = 'rgba(5,10,20,0.6)';
     c.beginPath(); c.roundRect(0, 0, W, H, 14); c.fill();
     c.lineCap = 'round'; c.lineJoin = 'round';
-    if (this.course) {
+    if (this.course && this.course.open) {
+      // 片道の峠コース：道全体を薄く、計測区間を明るく。■スタート ◆ゴール
+      const C = this.course;
+      const seg = (from, to, style, w) => {
+        c.strokeStyle = style; c.lineWidth = w; c.beginPath();
+        let first = true;
+        for (let i = 0; i < C.n; i += 3) { if (C.s[i] < from || C.s[i] > to) continue; const [x, y] = P(C.x[i], C.z[i]); first ? c.moveTo(x, y) : c.lineTo(x, y); first = false; }
+        c.stroke();
+      };
+      seg(0, C.length, 'rgba(140,160,200,0.45)', 3);
+      seg(C.startS, C.finishS, 'rgba(200,220,255,0.95)', 4);
+      const a = C.posAt(C.startS), b = C.posAt(C.finishS);
+      const [sx, sy] = P(a.x, a.z), [fx, fy] = P(b.x, b.z);
+      c.fillStyle = '#fff'; c.fillRect(sx - 4, sy - 4, 8, 8);
+      c.fillStyle = '#ffd23f'; c.beginPath(); c.moveTo(fx, fy - 6); c.lineTo(fx + 6, fy); c.lineTo(fx, fy + 6); c.lineTo(fx - 6, fy); c.closePath(); c.fill();
+    } else if (this.course) {
       c.strokeStyle = 'rgba(200,220,255,0.85)'; c.lineWidth = 4;
       c.beginPath();
       for (let i = 0; i <= this.course.n; i++) { const k = i % this.course.n; const [x, y] = P(this.course.x[k], this.course.z[k]); i ? c.lineTo(x, y) : c.moveTo(x, y); }
@@ -109,6 +124,7 @@ export class Hud {
       c.fillStyle = '#fff'; c.fillRect(sx - 4, sy - 4, 8, 8);
     } else {
       for (const r of this.roads) {
+        if (r.touge) { c.strokeStyle = 'rgba(170,190,230,0.75)'; c.lineWidth = 3; c.beginPath(); r.nodes.forEach((id, i) => { const [x, y] = P(NODES[id].x, NODES[id].z); i ? c.lineTo(x, y) : c.moveTo(x, y); }); c.stroke(); continue; }
         c.strokeStyle = 'rgba(170,190,230,0.75)'; c.lineWidth = Math.max(2, r.width * sc * 0.9);
         c.beginPath();
         r.nodes.forEach((id, i) => { const [x, y] = P(NODES[id].x, NODES[id].z); i ? c.lineTo(x, y) : c.moveTo(x, y); });

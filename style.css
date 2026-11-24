@@ -159,3 +159,18 @@ input[type=range] { width: 200px; accent-color: var(--pink); }
 .lv-bar i.on { background: var(--cyan); box-shadow: 0 0 6px rgba(51,225,255,.6); }
 .lv-val { min-width: 54px; text-align: right; font-weight: 700; color: var(--yellow); font-variant-numeric: tabular-nums; }
 .lv-note { display: block; color: var(--dim); font-size: 11px; }
+
+/* ---------- セッティング ---------- */
+.settings.setup .panel { width: min(1080px, 97vw); }
+.setup-body { display: grid; grid-template-columns: 1fr 410px; gap: 14px; }
+.setup-list { max-height: 62vh; overflow-y: auto; padding-right: 4px; }
+.setup-list .key-row { padding: 5px 10px; }
+.setup-list .key-name { font-size: 14px; }
+.setup-list .lv-note { display: block; color: var(--dim); font-size: 10.5px; margin-top: 2px; max-width: 420px; }
+.setup-list .lv { display: flex; align-items: center; gap: 6px; }
+.setup-list .lv-val { min-width: 92px; text-align: center; font-weight: 700; color: var(--yellow); font-variant-numeric: tabular-nums; }
+.setup-right { display: flex; flex-direction: column; gap: 6px; }
+.setup-info { margin-top: 4px; }
+.pgraph { border-radius: 6px; display: block; }
+.shop-side { display: flex; flex-direction: column; gap: 6px; }
+.shop-body { grid-template-columns: 1fr 340px; }

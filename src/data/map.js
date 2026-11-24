@@ -1,3 +1,4 @@
+import HARUNA_DATA from './haruna.js';
 // 西池袋ミニチュアマップ
 // 添付のGoogleマップ画像（経由地座標・画面上の経路）から主要道路の折れ点を緯度経度で起こしたもの。
 // MAP_SCALE倍に縮小した「ミニチュア版」の街として扱う（道幅・車両は実寸）。
@@ -229,6 +230,21 @@ export const LAYOUTS = COURSES.flatMap((c) => [
   { key: `${c.id}_r`, course: c, area: c.area, reverse: true, name: `${c.name}（逆走）` },
 ]);
 
+// 榛名山の峠コース（3セクター＋フルコース × 下り/上り ＝ 8レイアウト）
+// touge: 道路データ上の距離 from〜to（下り方向）。split は touge.js で確定させる
+export const TOUGE_COURSES = [
+  { id: 'haruna_full', area: 'haruna', name: '榛名山 フルコース', laps: 1, touge: { part: 'full' }, desc: 'ゆうすげ入口〜伊香保温泉石段街。約9km・標高差約440mの峠を一気に駆け抜ける' },
+  { id: 'haruna_s1', area: 'haruna', name: '榛名山 セクター1（高原区間）', laps: 1, touge: { part: 1 }, desc: 'ゆうすげ入口から峠の頂上を越え、高原を下る中高速区間' },
+  { id: 'haruna_s2', area: 'haruna', name: '榛名山 セクター2（中腹ヘアピン区間）', laps: 1, touge: { part: 2 }, desc: 'ヘアピンと複合コーナーが連続する中腹の区間' },
+  { id: 'haruna_s3', area: 'haruna', name: '榛名山 セクター3（伊香保区間）', laps: 1, touge: { part: 3 }, desc: '伊香保温泉街へ向かう下りの区間。終盤は勾配がきつい' },
+];
+export const TOUGE_LAYOUTS = TOUGE_COURSES.flatMap((c) => [
+  { key: `${c.id}_d`, course: c, area: 'haruna', reverse: false, dir: 'down', name: `${c.name}（下り）` },
+  { key: `${c.id}_u`, course: c, area: 'haruna', reverse: true, dir: 'up', name: `${c.name}（上り）` },
+]);
+COURSES.push(...TOUGE_COURSES);
+LAYOUTS.push(...TOUGE_LAYOUTS);
+
 export function roadWidthBetween(a, b) {
   for (const r of RACE_ROADS) {
     for (let i = 0; i < r.nodes.length - 1; i++) {
@@ -260,7 +276,55 @@ export const AREAS = {
     ],
   },
 };
-export const ALL_ROADS = [...WEST_ROADS, ...EAST_ROADS];
+
+// ===== 榛名山（県道33号 渋川松井田線：ゆうすげ入口〜伊香保温泉石段街）=====
+// 座標は実寸（メートル）。標高は src/physics/touge.js の路面データを使う。
+export const HARUNA_UNLOCK_WINS = 10; // 榛名山エリアが解放される勝利数
+const HR_STEP = 5; // データ2m間隔 → ノード10m間隔
+const HR_RAW = HARUNA_DATA.road;
+const HR_IDS = [];
+for (let i = 0; i < HR_RAW.length; i += HR_STEP) {
+  const id = `HR${HR_IDS.length}`;
+  NODES[id] = { x: HR_RAW[i][0], z: HR_RAW[i][1] };
+  HR_IDS.push(id);
+}
+if ((HR_RAW.length - 1) % HR_STEP) { const id = `HR${HR_IDS.length}`; const p = HR_RAW[HR_RAW.length - 1]; NODES[id] = { x: p[0], z: p[1] }; HR_IDS.push(id); }
+// 道路脇の施設（駐車場への引き込み）。side: 下り方向に対して +1=右 / -1=左
+function hrSpur(nodeIdx, side, len, idE, idP) {
+  const a = NODES[HR_IDS[nodeIdx - 1]], b = NODES[HR_IDS[nodeIdx + 1]], c = NODES[HR_IDS[nodeIdx]];
+  const dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz);
+  const rx = -dz / l, rz = dx / l;
+  NODES[idE] = { x: c.x + rx * side * 2, z: c.z + rz * side * 2 };
+  NODES[idP] = { x: c.x + rx * side * (4 + len), z: c.z + rz * side * (4 + len) };
+  return HR_IDS[nodeIdx];
+}
+const HR_GS_ON = hrSpur(6, -1, 16, 'HR_GS_E', 'HR_GS_P');
+const HR_SHOP_ON = hrSpur(HR_IDS.length - 12, 1, 16, 'HR_SH_E', 'HR_SH_P');
+export const HARUNA_ROADS = [
+  { name: '県道33号 渋川松井田線（榛名山）', lanes: 1, laneW: 3.0, median: 0, shoulder: 1.0, smooth: true, touge: true, nodes: HR_IDS },
+  { name: '湖畔サービスステーション入口', lanes: 0, laneW: 8.0, median: 0, shoulder: 0.5, ai: false, nodes: [HR_GS_ON, 'HR_GS_E', 'HR_GS_P'] },
+  { name: '伊香保モータース駐車場', lanes: 0, laneW: 8.0, median: 0, shoulder: 0.5, ai: false, nodes: [HR_SHOP_ON, 'HR_SH_E', 'HR_SH_P'] },
+];
+for (const r of HARUNA_ROADS) {
+  r.width = r.lanes > 0 ? r.lanes * 2 * r.laneW + r.median + r.shoulder * 2 : r.laneW + r.shoulder * 2;
+  if (r.ai === undefined) r.ai = true;
+  r.area = 'haruna';
+}
+export const HARUNA_POIS = [
+  { id: 'gs_h', type: 'gs', name: '榛名湖畔サービスステーション（セーブポイント・架空）', short: 'GS / SAVE', node: 'HR_GS_P', from: 'HR_GS_E', offset: [0, 0] },
+  { id: 'shop_h', type: 'shop', name: '伊香保モータース（チューニングショップ・架空）', short: 'TUNE SHOP', node: 'HR_SH_P', from: 'HR_SH_E', offset: [0, 0] },
+];
+AREAS.haruna = {
+  id: 'haruna', name: '榛名山', roads: HARUNA_ROADS, pois: HARUNA_POIS, touge: true,
+  start: { node: HR_IDS[9], toward: HR_IDS[10], back: 0 },
+  gates: [],
+  unlockWins: HARUNA_UNLOCK_WINS,
+};
+// 道路データ上の距離（下り方向）でのコース区間。区間境界は touge.js で直線的な地点に決める
+const HR_LEN = (() => { let a = 0; for (let i = 1; i < HR_RAW.length; i++) a += Math.hypot(HR_RAW[i][0] - HR_RAW[i - 1][0], HR_RAW[i][1] - HR_RAW[i - 1][1]); return a; })();
+export const HARUNA_LENGTH = HR_LEN;
+
+export const ALL_ROADS = [...WEST_ROADS, ...EAST_ROADS, ...HARUNA_ROADS];
 export function areaOfLayout(L) { return L.area || L.course?.area || 'west'; }
 
 // 街の道路で a-b を結ぶもの

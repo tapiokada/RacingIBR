@@ -4,6 +4,7 @@ import { CATEGORIES, PARTS, PART_BY_ID, CATEGORY_NAME, RANK_STARS } from '../dat
 import { buildSpec } from '../physics/spec.js';
 import { freeCount, addPart, activeCar, fmtMoney } from '../save.js';
 import { CARS } from '../data/cars.js';
+import { powerGraph } from './graph.js';
 
 export function sellPrice(p) {
   return p.price ? Math.round(p.price * 0.5) : p.rank * 45000;
@@ -22,7 +23,8 @@ export function specSummary(spec) {
   ];
 }
 
-export function openShop(game, state, onClose) {
+export function openShop(game, state, area, onClose) {
+  if (typeof area === 'function') { onClose = area; area = null; }
   const wrap = el('div', { class: 'screen shop' });
   let tab = 'equip';
   let index = 0;
@@ -49,7 +51,7 @@ export function openShop(game, state, onClose) {
   const build = () => {
     wrap.innerHTML = '';
     rows = [];
-    const spec = buildSpec(car.carId, car.equipped);
+    const spec = buildSpec(car.carId, car.equipped, car.setup || null);
     const tabs = el('div', { class: 'tabs' },
       ...[['equip', 'パーツ交換'], ['buy', 'パーツ購入'], ['sell', 'パーツ売却']].map(([id, name]) =>
         el('button', { class: 'tab' + (tab === id ? ' on' : ''), onclick: () => { tab = id; index = 0; build(); } }, name)));
@@ -76,7 +78,8 @@ export function openShop(game, state, onClose) {
         list.appendChild(row);
       }
     } else if (tab === 'buy') {
-      for (const p of PARTS.filter((x) => x.price)) {
+      // ★5フルカスタマイズパーツは榛名山のショップだけで扱う
+      for (const p of PARTS.filter((x) => x.price && (!x.custom || area === 'haruna'))) {
         const can = state.money >= p.price;
         const buy = () => {
           if (state.money < p.price) { game.audio.beep(220, 0.12, 0.1); return; }
@@ -113,7 +116,7 @@ export function openShop(game, state, onClose) {
     wrap.appendChild(panel(`TUNE SHOP — ${CARS[car.carId].name}`,
       el('div', { class: 'shop-head' }, el('span', {}, `所持金 ${fmtMoney(state.money)}`), el('span', { class: 'hint' }, 'Tab:タブ切替　↑↓:選択　←→:パーツ変更　Enter:購入/売却　Esc:出る')),
       tabs,
-      el('div', { class: 'shop-body' }, list, statsBox(spec, buildSpec(car.carId, CARS[car.carId].stock))),
+      el('div', { class: 'shop-body' }, list, el('div', { class: 'shop-side' }, statsBox(spec, buildSpec(car.carId, CARS[car.carId].stock)), el('div', { class: 'key-sep' }, 'パワー・トルク曲線（点線：純正）'), powerGraph(spec, buildSpec(car.carId, CARS[car.carId].stock), { w: 330, h: 180 }))),
       close));
     hl();
   };

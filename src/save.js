@@ -54,6 +54,15 @@ export function addPart(state, partId, n = 1) {
 
 export function activeCar(state) { return state.garage[state.active]; }
 
+// ---------------- PRACTICE用のセッティング（車種＋パーツ構成ごと） ----------------
+const PSET_KEY = 'ibr.practiceSetup.v1';
+export function loadPracticeSetup(key) {
+  try { return JSON.parse(localStorage.getItem(PSET_KEY) || '{}')[key] || null; } catch (e) { return null; }
+}
+export function savePracticeSetup(key, setup) {
+  try { const all = JSON.parse(localStorage.getItem(PSET_KEY) || '{}'); all[key] = setup; localStorage.setItem(PSET_KEY, JSON.stringify(all)); } catch (e) { /* */ }
+}
+
 // ---------------- タイムアタック記録 ----------------
 export function loadRecords() {
   try { return JSON.parse(localStorage.getItem(REC_KEY) || '{}'); } catch (e) { return {}; }

@@ -21,18 +21,33 @@ export class DriveSession {
     this.flash = 0;
   }
 
-  addCar({ carId, equipped, color, isPlayer = false, name = '', ai = null }) {
-    const spec = buildSpec(carId, equipped);
+  addCar({ carId, equipped, setup = null, color, isPlayer = false, name = '', ai = null }) {
+    const spec = buildSpec(carId, equipped, setup);
     const s = this.game.settings;
-    const car = new Vehicle(spec, { auto: isPlayer ? s.transmission === 'AT' : true, abs: isPlayer ? s.absLevel : 10, tcs: isPlayer ? s.tcsLevel : 0 });
+    const car = new Vehicle(spec, { auto: isPlayer ? s.transmission === 'AT' : true, abs: isPlayer ? s.absLevel : 10, tcs: isPlayer ? s.tcsLevel : 0, ground: this.game.world.ground || null });
     const model = buildCarModel(CARS[carId], color, { aero: equipped.aero, wing: equipped.aero === 'aero_wing' || equipped.aero === 'aero_full' ? 'gt' : undefined });
     this.game.world.scene.add(model);
     if (isPlayer) addHeadlights(model);
     const engine = this.game.audio.createEngine(spec);
-    const e = { car, model, engine, isPlayer, name, ai, color, carId, equipped, flash: 0 };
+    const e = { car, model, engine, isPlayer, name, ai, color, carId, equipped, setup, flash: 0 };
     this.entries.push(e);
     if (isPlayer) this.player = e;
     return e;
+  }
+
+  // セッティング変更をその場で反映（位置・速度は維持）
+  applySetup(e, setup) {
+    e.setup = setup;
+    const spec = buildSpec(e.carId, e.equipped, setup);
+    const c = e.car;
+    const keep = { x: c.x, z: c.z, h: c.h, vu: c.vu, vv: c.vv, w: c.w, gear: c.gear };
+    c.setSpec(spec);
+    c.place(keep.x, keep.z, keep.h, 0);
+    c.vu = keep.vu; c.vv = keep.vv; c.w = keep.w;
+    c.gear = Math.min(keep.gear, spec.gears.length);
+    c.om.fill(c.vu / spec.tireRadius);
+    this.game.audio.destroyEngine(e.engine);
+    e.engine = this.game.audio.createEngine(spec);
   }
 
   removeCar(e) {
@@ -47,7 +62,7 @@ export class DriveSession {
     if (!p) return;
     const car = p.car;
     const prev = car.input;
-    if (!this.controlsEnabled) { car.input = { throttle: 0, brake: this.frozen ? 1 : 0, steer: 0 }; return; }
+    if (!this.controlsEnabled) { car.input = { throttle: 0, brake: this.frozen ? 1 : this.coastBrake || 0, steer: 0 }; return; }
     const tT = inp.held('throttle') ? 1 : 0;
     const tB = inp.held('brake') ? 1 : 0;
     const steer = (inp.held('right') ? 1 : 0) - (inp.held('left') ? 1 : 0);
@@ -144,7 +159,8 @@ export class DriveSession {
 }
 
 // リプレイ記録
-export const REPLAY_STRIDE = 15;
+// 0:x 1:z 2:h 3:pitch 4:roll 5:steer 6:spinF 7:spinR 8:rpm 9:vu 10:gear 11:brake 12:throttle 13:boost 14:slip 15:路面高さ 16:路面ピッチ 17:路面ロール 18:車体の浮き沈み
+export const REPLAY_STRIDE = 19;
 export class Recorder {
   constructor(rate = 30) { this.rate = rate; this.t = 0; this.buf = []; this.frames = 0; }
   sample(dt, car) {
@@ -152,7 +168,7 @@ export class Recorder {
     while (this.t >= 1 / this.rate) {
       this.t -= 1 / this.rate;
       this.buf.push(car.x, car.z, car.h, car.pitch, car.roll, car.steer, car.spinF, car.spinR, car.rpm, car.vu,
-        car.gear, car.input.brake, car.input.throttle, car.boost, car.slip);
+        car.gear, car.input.brake, car.input.throttle, car.boost, car.slip, car.gy, car.gp, car.gr, car.heave);
       this.frames++;
     }
   }

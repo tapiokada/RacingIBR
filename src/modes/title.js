@@ -1,7 +1,7 @@
 // タイトル画面（メインメニュー）
 import { el, Menu, panel } from '../ui/ui.js';
 import { openSettings } from '../ui/settings.js';
-import { hasSave, loadGame, newGameState, fmtMoney, loadRecords, fmtTime } from '../save.js';
+import { hasSave, loadGame, newGameState, fmtMoney, loadRecords, fmtTime, loadPracticeSetup } from '../save.js';
 import { LAYOUTS, AREAS, areaOfLayout } from '../data/map.js';
 import { TownMode } from './town.js';
 import { PracticeMode } from './practice.js';
@@ -89,6 +89,7 @@ export class TitleMode {
     const town = kind === 'free' ? [
       { label: '西池袋タウン（全道路）', sub: '池袋駅西口・西口公園・西一番街を含む街全体を自由に走行', action: () => this.pickSetup('town', null, 'west') },
       { label: '東池袋タウン（全道路）', sub: '池袋駅東口・サンシャイン60通り・春日通り・首都高下を含む街全体を自由に走行', action: () => this.pickSetup('town', null, 'east') },
+      { label: '榛名山（峠道全線）', sub: 'ゆうすげ入口〜伊香保温泉石段街の約9kmを自由に走行（国土地理院データに基づく実寸・実標高）', action: () => this.pickSetup('town', null, 'haruna') },
     ] : [];
     this.setMenu([
       ...town,
@@ -104,15 +105,20 @@ export class TitleMode {
   pickSetup(kind, L, area = 'west') {
     const save = hasSave() ? loadGame() : null;
     const car = save ? save.garage[save.active] : null;
-    const start = (equipped, color) => {
+    const start = (equipped, color, setupKey, baseSetup = null) => {
       const g = this.game;
+      const setup = loadPracticeSetup(setupKey) || baseSetup;
+      const o = { carId: car && setupKey === 'story' ? car.carId : PLAYER.car, equipped, color, setup, setupKey };
       g.transition(() => g.setMode(kind === 'town'
-        ? new TownFreeMode(g, { carId: PLAYER.car, equipped, color, area })
-        : new PracticeMode(g, { layout: L, kind, carId: PLAYER.car, equipped, color })));
+        ? new TownFreeMode(g, { ...o, area })
+        : new PracticeMode(g, { ...o, layout: L, kind })));
     };
+    // ★5フルカスタマイズパーツを組んだ練習用の86-GR（フリーランのポーズメニューからセッティング可能）
+    const fullEquip = { ...CARS[PLAYER.car].stock, tire: 'tire_high', suspension: 'sus_full', brake: 'brk_full', transmission: 'tm_full', aero: 'aero_wing', muffler: 'muf_sport' };
     this.setMenu([
-      { label: 'ストーリーのマシン', disabled: !car, sub: car ? 'セーブデータのチューニング状態で走行' : 'セーブデータなし', action: () => start(car.equipped, car.color) },
-      { label: 'ノーマル 86-GR', sub: CARS[PLAYER.car].ref + ' 相当', action: () => start({ ...CARS[PLAYER.car].stock }, PLAYER.color) },
+      { label: 'ストーリーのマシン', disabled: !car, sub: car ? 'セーブデータのチューニング状態で走行' : 'セーブデータなし', action: () => start(car.equipped, car.color, 'story', car.setup || null) },
+      { label: 'ノーマル 86-GR', sub: CARS[PLAYER.car].ref + ' 相当', action: () => start({ ...CARS[PLAYER.car].stock }, PLAYER.color, 'stock') },
+      { label: 'フルカスタム 86-GR', sub: '★5フルカスタマイズ車高調・ブレーキ・ミッション＋GTウイング。FREE RUNのポーズメニューでセッティング可能', action: () => start(fullEquip, PLAYER.color, 'full86') },
       { label: '戻る', action: () => this.pickLayout(kind === 'town' ? 'free' : kind) },
     ], () => this.pickLayout(kind === 'town' ? 'free' : kind), `${L ? L.name : AREAS[area].name + 'タウン'} — マシン選択`);
   }

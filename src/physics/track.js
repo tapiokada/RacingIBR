@@ -1,7 +1,23 @@
 // 走行可能領域（道路カプセルの和集合）とコース中心線
 import { NODES, AREAS, roadWidthBetween, roadPolyline, LAYOUTS, areaOfLayout } from '../data/map.js';
 
+import { TougePath, harunaCorridor } from './touge.js';
+
 const roadsOf = (area) => AREAS[area || 'west'].roads;
+// 榛名山の施設への引き込み（峠の本線以外の道路）
+function harunaSpurSegs() {
+  const segs = [];
+  for (const r of AREAS.haruna.roads) {
+    if (r.touge) continue;
+    for (let i = 0; i < r.nodes.length - 1; i++) { const a = NODES[r.nodes[i]], b = NODES[r.nodes[i + 1]]; segs.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, hw: r.width / 2, road: r.name }); }
+  }
+  // 道の両端の転回場
+  const main = AREAS.haruna.roads.find((r) => r.touge);
+  for (const id of [main.nodes[0], main.nodes[main.nodes.length - 1]]) { const n = NODES[id]; segs.push({ ax: n.x, az: n.z, bx: n.x, bz: n.z, hw: 10, road: 'turn' }); }
+  // 駐車場（奥を広く）
+  for (const p of AREAS.haruna.pois) { const n = NODES[p.node]; segs.push({ ax: n.x, az: n.z, bx: n.x, bz: n.z, hw: 9, road: 'lot' }); }
+  return segs;
+}
 
 // ---------------- 走行可能領域 ----------------
 export class Corridor {
@@ -154,6 +170,7 @@ export function townCornerPads(area = 'west') {
 }
 
 export function townCorridor(area = 'west') {
+  if (AREAS[area].touge) return getHarunaCorridor();
   const ROADS = roadsOf(area);
   const segs = [];
   for (const p of townCornerPads(area)) segs.push({ ax: p.x, az: p.z, bx: p.x, bz: p.z, hw: p.r, road: 'corner' });
@@ -432,8 +449,10 @@ export class CoursePath {
 
 // ---------------- コース共通 ----------------
 const pathCache = {};
+let harunaCorr = null;
+export function getHarunaCorridor() { return (harunaCorr ||= harunaCorridor(harunaSpurSegs())); }
 export function getCoursePath(layout) {
-  if (!pathCache[layout.key]) pathCache[layout.key] = new CoursePath(layout);
+  if (!pathCache[layout.key]) pathCache[layout.key] = layout.course.touge ? new TougePath(layout, getHarunaCorridor()) : new CoursePath(layout);
   return pathCache[layout.key];
 }
 

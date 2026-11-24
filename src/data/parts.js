@@ -122,13 +122,15 @@ export const PARTS = [
 
   // ---------------- サスペンション ----------------
   P({ id: 'sus_stock', cat: 'suspension', name: '純正サスペンション', rank: 1, price: 30000, weight: 0, desc: '乗り心地重視', grip: 1.0, cgDrop: 0, tau: 0.12, rollFront: 0 }),
-  P({ id: 'sus_street', cat: 'suspension', name: 'ストリート車高調', rank: 2, price: 150000, weight: -2, desc: '車高-20mm。グリップ+3%、応答向上', grip: 1.03, cgDrop: 0.02, tau: 0.085, rollFront: -0.02 }),
-  P({ id: 'sus_circuit', cat: 'suspension', name: 'サーキット車高調', rank: 4, price: null, weight: -3, desc: '車高-35mm。グリップ+6%、鋭い応答', grip: 1.06, cgDrop: 0.035, tau: 0.06, rollFront: -0.04 }),
+  P({ id: 'sus_street', cat: 'suspension', name: 'ストリート車高調', rank: 2, price: 150000, weight: -2, desc: '車高-20mm。グリップ+3%、応答向上', grip: 1.015, cgDrop: 0.02, tau: 0.085, rollFront: -0.02 }),
+  P({ id: 'sus_circuit', cat: 'suspension', name: 'サーキット車高調', rank: 4, price: null, weight: -3, desc: '車高-35mm。グリップ+6%、鋭い応答', grip: 1.03, cgDrop: 0.035, tau: 0.06, rollFront: -0.04 }),
+  P({ id: 'sus_full', cat: 'suspension', name: 'フルカスタマイズ車高調', rank: 5, price: 680000, weight: -3, desc: '車高・固有振動数・スタビ・減衰・キャンバー・トーを自由に調整（ポーズメニューのセッティング）', grip: 1.03, cgDrop: 0.035, tau: 0.06, rollFront: -0.04, custom: true }),
 
   // ---------------- ブレーキ ----------------
   P({ id: 'brk_stock', cat: 'brake', name: '純正ブレーキ', rank: 1, price: 20000, weight: 0, desc: '制動力100%', torque: 1.0 }),
   P({ id: 'brk_pad', cat: 'brake', name: 'スポーツパッド', rank: 1, price: 50000, weight: 0, desc: '制動力112%', torque: 1.12 }),
   P({ id: 'brk_big', cat: 'brake', name: 'ビッグキャリパーキット', rank: 4, price: null, weight: 3, desc: '制動力128%', torque: 1.28 }),
+  P({ id: 'brk_full', cat: 'brake', name: 'フルカスタマイズブレーキキット', rank: 5, price: 520000, weight: 3, desc: '制動力132%基準。ブレーキバランスとブレーキ力を調整可能', torque: 1.32, custom: true }),
 
   // ---------------- トランスミッション ----------------
   // 各車の純正ギア比を基準に補正する方式（流用可能にするため）
@@ -136,11 +138,12 @@ export const PARTS = [
   P({ id: 'tm_lowfinal', cat: 'transmission', name: 'ローファイナルギア', rank: 2, price: 90000, weight: 0, desc: 'ファイナル×1.12。加速重視', close: 1.0, final: 1.12, shift: 0.18 }),
   P({ id: 'tm_highgear', cat: 'transmission', name: 'ハイギアードファイナル', rank: 2, price: 90000, weight: 0, desc: 'ファイナル×0.90。最高速重視', close: 1.0, final: 0.9, shift: 0.18 }),
   P({ id: 'tm_close', cat: 'transmission', name: 'クロスミッション', rank: 4, price: null, weight: 2, desc: 'ギア間を詰め、シフトも速い', close: 0.78, final: 1.05, shift: 0.11 }),
+  P({ id: 'tm_full', cat: 'transmission', name: 'フルカスタマイズミッション', rank: 5, price: 750000, weight: 2, desc: '全ギア比・ファイナル・LSD（イニシャル/加速/減速）を調整可能。シフトも最速', close: 1.0, final: 1.0, shift: 0.09, custom: true }),
 
   // ---------------- エアロ ----------------
   P({ id: 'aero_lip', cat: 'aero', name: 'フロントリップスポイラー', rank: 1, price: 60000, weight: 2, desc: 'フロントダウンフォース小', clF: 0.10, clR: 0.0, cd: 0.005 }),
-  P({ id: 'aero_wing', cat: 'aero', name: 'GTウイング', rank: 3, price: null, weight: 5, desc: 'リアダウンフォース大。空気抵抗増', clF: 0.0, clR: 0.38, cd: 0.03 }),
-  P({ id: 'aero_full', cat: 'aero', name: 'フルエアロキット', rank: 4, price: null, weight: 8, desc: '前後バランスの取れたダウンフォース', clF: 0.2, clR: 0.34, cd: 0.02 }),
+  P({ id: 'aero_wing', cat: 'aero', name: 'GTウイング', rank: 3, price: null, weight: 5, desc: 'リアダウンフォース大。空気抵抗増。ダウンフォース調整可', clF: 0.0, clR: 0.38, cd: 0.03, adjustable: true }),
+  P({ id: 'aero_full', cat: 'aero', name: 'フルエアロキット', rank: 4, price: null, weight: 8, desc: '前後バランスの取れたダウンフォース。前後とも調整可', clF: 0.2, clR: 0.34, cd: 0.02, adjustable: true }),
 ];
 
 export const PART_BY_ID = Object.fromEntries(PARTS.map((p) => [p.id, p]));

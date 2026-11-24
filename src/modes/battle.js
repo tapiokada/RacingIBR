@@ -9,7 +9,7 @@ import { activeCar, addPart, fmtMoney, fmtTime } from '../save.js';
 import { VIEW_NAMES } from '../render/cameras.js';
 import { LapTracker, Countdown, pauseMenu } from './common.js';
 import { coursePath, TownMode } from './town.js';
-import { areaOfLayout } from '../data/map.js';
+import { areaOfLayout, HARUNA_UNLOCK_WINS } from '../data/map.js';
 
 const SNAP_GAP = 200; // ちぎり判定距離[m]
 
@@ -28,11 +28,12 @@ export class BattleMode {
     g.rig.setGallerySpots(path);
     this.session = new DriveSession(g, { corridor: path.corridor, path });
     const mine = activeCar(g.story);
-    const P = this.session.addCar({ carId: mine.carId, equipped: mine.equipped, color: mine.color, isPlayer: true, name: PLAYER.name });
-    const R = this.session.addCar({ carId: rival.car, equipped: rival.parts, color: rival.color, name: rival.name });
+    const P = this.session.addCar({ carId: mine.carId, equipped: mine.equipped, setup: mine.setup || null, color: mine.color, isPlayer: true, name: PLAYER.name });
+    const R = this.session.addCar({ carId: rival.car, equipped: rival.parts, setup: rival.setup || null, color: rival.color, name: rival.name });
     const hw = path.hw[0];
     const lat = Math.min(2.4, hw - 1.4);
-    const pp = path.posAt(-9, lat), rp = path.posAt(-9, -lat);
+    const s0 = path.open ? path.startS : 0;
+    const pp = path.posAt(s0 - 9, lat), rp = path.posAt(s0 - 9, -lat);
     P.car.place(pp.x, pp.z, pp.h, 0);
     R.car.place(rp.x, rp.z, rp.h, 0);
     R.ai = new RaceAI(R.car, path, rival.skill);
@@ -40,7 +41,7 @@ export class BattleMode {
     this.tp = new LapTracker(path, -9);
     this.tr = new LapTracker(path, -9);
     this.laps = layout.course.laps;
-    this.total = this.laps * path.length;
+    this.total = this.laps * (path.open ? path.raceLen : path.length);
     this.session.frozen = true;
     this.session.controlsEnabled = false;
     g.mirrorModel = P.model;
@@ -57,7 +58,7 @@ export class BattleMode {
     this.state = 'intro';
     this.result = null;
     this.introT = 2.2;
-    this.hud.flash(`VS ${rival.name}`, 2.2, `${layout.name}　${this.laps}LAP`);
+    this.hud.flash(`VS ${rival.name}`, 2.2, path.open ? `${layout.name}　${(path.raceLen / 1000).toFixed(2)}km` : `${layout.name}　${this.laps}LAP`);
     this.countdown = new Countdown(g, this.hud, () => {
       this.state = 'race';
       this.session.frozen = false;
@@ -98,7 +99,7 @@ export class BattleMode {
         this.finishT = 2.5;
         this.session.controlsEnabled = false;
         // ゴール後はAIに任せて減速
-        this.P.car.input = { throttle: 0, brake: 0.3, steer: 0 };
+        this.session.coastBrake = this.path.open ? 0.75 : 0.3;
         this.hud.flash(res.win ? 'YOU WIN!' : 'YOU LOSE…', 2.5, res.how === 'snap' ? (res.win ? 'ライバルを引き離した！' : '引き離された…') : 'FINISH');
         g.audio.beep(res.win ? 1320 : 330, 0.5, 0.3);
       }
@@ -113,7 +114,8 @@ export class BattleMode {
     this.hud.drawTach(this.P.car);
     const lap = Math.min(this.laps, Math.max(1, Math.floor(this.tp.dist / this.path.length) + 1));
     const ahead = gap >= 0;
-    this.hud.tc.innerHTML = `<div class="lap">LAP <b>${lap}</b>/${this.laps}</div><div class="time">${fmtTime(this.raceT)}</div>`;
+    const head = this.path.open ? `残り <b>${(Math.max(0, this.total - this.tp.dist) / 1000).toFixed(2)}</b> km` : `LAP <b>${lap}</b>/${this.laps}`;
+    this.hud.tc.innerHTML = `<div class="lap">${head}</div><div class="time">${fmtTime(this.raceT)}</div>`;
     const pct = Math.max(-1, Math.min(1, gap / SNAP_GAP));
     this.hud.tr.innerHTML = `<div class="pos ${ahead ? 'p1' : 'p2'}">${ahead ? '1st' : '2nd'}</div>
       <div class="gap">${ahead ? '+' : '−'}${Math.abs(gap).toFixed(0)} m</div>
@@ -142,7 +144,11 @@ export class BattleMode {
     const win = this.result.win;
     this.session.controlsEnabled = false;
     this.session.frozen = true;
-    if (win) { st.wins++; st.money += r.reward; st.defeated[r.id] = (st.defeated[r.id] || 0) + 1; }
+    let unlockMsg = '';
+    if (win) {
+      st.wins++; st.money += r.reward; st.defeated[r.id] = (st.defeated[r.id] || 0) + 1;
+      if (st.wins === HARUNA_UNLOCK_WINS) unlockMsg = '榛名山エリアが解放された！（ポーズメニューから移動）';
+    }
     else st.losses++;
     const box = panel(win ? 'BATTLE WIN' : 'BATTLE LOSE',
       el('div', { class: 'enc-head' }, el('span', { class: 'enc-team' }, r.team), el('span', { class: 'enc-name' }, r.name)),
@@ -163,7 +169,7 @@ export class BattleMode {
         action: () => {
           addPart(st, p.id);
           menu.destroy();
-          back(`${p.name} を手に入れた！`);
+          back(unlockMsg || `${p.name} を手に入れた！`);
         },
       })), { className: 'scroll' });
       box.appendChild(menu.root);

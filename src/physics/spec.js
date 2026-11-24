@@ -1,6 +1,7 @@
 // 車両 + 装着パーツ → 物理パラメータ
 import { CARS } from '../data/cars.js';
 import { PART_BY_ID } from '../data/parts.js';
+import { applyChassis } from './setup.js';
 
 const lerpTable = (tbl, x) => {
   if (x <= tbl[0][0]) return tbl[0][1];
@@ -20,7 +21,7 @@ const smooth = (a, b, x) => {
 };
 
 // equipped: { cat: partId | null }
-export function buildSpec(carId, equipped) {
+export function buildSpec(carId, equipped, setup = null) {
   const car = CARS[carId];
   const get = (cat) => (equipped[cat] ? PART_BY_ID[equipped[cat]] : null);
   const eng = get('engine') || PART_BY_ID[car.stock.engine];
@@ -65,6 +66,7 @@ export function buildSpec(carId, equipped) {
     loud: muf.loud,
     mu: tire.mu * sus.grip, peakAngle: tire.peakAngle, peakRatio: tire.peakRatio,
     loadTau: sus.tau, rollFront: car.rollFront + sus.rollFront,
+    length: car.length, width: car.width, height: car.height,
     brakeTorque: car.brakeTorque * brk.torque, brakeBias: car.brakeBias,
     cd: car.cd + (aero?.cd || 0), area: car.area,
     clF: aero?.clF || 0, clR: aero?.clR || 0,
@@ -74,6 +76,8 @@ export function buildSpec(carId, equipped) {
     _bore: bore ? bore.torqueMul : 1,
     _mufLow: muf.low, _mufHigh: muf.high,
   };
+  applyChassis(spec, setup);
+  spec.setup = setup ? { ...setup } : null;
   spec.boostTarget = (rpm) => {
     if (!tb) return 0;
     let b = tb.boost * smooth(tb.spool[0], tb.spool[1], rpm);
@@ -107,7 +111,7 @@ export function ratingOf(s) {
   const power = s.maxPowerPS / (s.mass / 1000); // PS/t
   const grip = s.mu * (1 + (s.clF + s.clR) * 0.15);
   const brake = Math.min(1.3, s.brakeTorque / (s.mass * 3.4));
-  return Math.round(power * 2.2 + grip * 220 + brake * 60 + (s.trans.close < 1 ? 15 : 0));
+  return Math.round(power * 2.2 + grip * 220 + brake * 60 + (s.trans.close < 1 || s.trans.id === 'tm_full' ? 15 : 0) + (s.sus.id === 'sus_full' ? 6 : 0));
 }
 
 export function stockEquip(carId) {

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { DriveSession } from '../session.js';
 import { Hud } from '../ui/hud.js';
 import { el, Menu, panel } from '../ui/ui.js';
-import { NODES, AREAS, LAYOUTS, COURSES, townRoadBetween, laneOffset, areaStart, arriveSpot } from '../data/map.js';
+import { NODES, AREAS, LAYOUTS, COURSES, TOUGE_LAYOUTS, HARUNA_UNLOCK_WINS, townRoadBetween, laneOffset, areaStart, arriveSpot } from '../data/map.js';
 import { ALL_RIVALS } from '../data/rivals.js';
 import { CARS, PLAYER } from '../data/cars.js';
 import { CruiseAI } from '../ai.js';
@@ -11,6 +11,7 @@ import { townGraph, getCoursePath } from '../physics/track.js';
 import { buildSpec } from '../physics/spec.js';
 import { saveGame, activeCar, fmtMoney } from '../save.js';
 import { openShop } from '../ui/shop.js';
+import { openSetup } from '../ui/setup.js';
 import { VIEW_NAMES } from '../render/cameras.js';
 import { BattleMode } from './battle.js';
 import { TitleMode } from './title.js';
@@ -37,7 +38,7 @@ export class TownMode {
     this.graph = townGraph(area);
     this.session = new DriveSession(g, { corridor: g.world.corridor });
     const mine = activeCar(st);
-    const p = this.session.addCar({ carId: mine.carId, equipped: mine.equipped, color: mine.color, isPlayer: true, name: PLAYER.name });
+    const p = this.session.addCar({ carId: mine.carId, equipped: mine.equipped, setup: mine.setup || null, color: mine.color, isPlayer: true, name: PLAYER.name });
     const saved = st.pos && (st.pos.area || 'west') === area ? st.pos : null;
     const pos = this.opts.returnPos || saved || areaStart(area);
     p.car.place(pos.x, pos.z, pos.h, 0);
@@ -86,12 +87,14 @@ export class TownMode {
       if (s.entries.some((e) => Math.hypot(e.car.x - x, e.car.z - z) < 30)) continue;
       const len = Math.hypot(B.x - A.x, B.z - A.z);
       const fx = (B.x - A.x) / len, fz = (B.z - A.z) / len;
-      const e = s.addCar({ carId: r.car, equipped: r.parts, color: r.color, name: r.name });
+      const e = s.addCar({ carId: r.car, equipped: r.parts, setup: r.setup || null, color: r.color, name: r.name });
       const lo = laneOffset(townRoadBetween(a, b));
       e.car.place(x + fz * lo, z - fx * lo, Math.atan2(fx, fz), 9);
       e.ai = new CruiseAI(e.car, this.graph, a, b, 11 + Math.random() * 5, this.game.world.corridor);
       e.rival = r;
-      e.rating = buildSpec(r.car, r.parts).rating;
+      e.rating = buildSpec(r.car, r.parts, r.setup || null).rating;
+      // 峠の端まで来たら（プレイヤーから見えない所で）入れ替える
+      e.ai.onDeadEnd = () => { if (Math.hypot(e.car.x - pc.x, e.car.z - pc.z) > 90 && !this.encounter) { this.removeRival(e); return true; } return false; };
       e.mapColor = '#ff4d6d';
       e.label = el('div', { class: 'rival-tag' }, el('b', {}, r.name), el('span', {}, `${CARS[r.car].name}　戦闘力 ${e.rating}`));
       this.labels.appendChild(e.label);
@@ -209,8 +212,25 @@ export class TownMode {
     }
   }
 
+  // 峠：いる区間と向き（下り/上り）でセクターを決める
+  pickTougeLayout(car, full = false) {
+    const L0 = TOUGE_LAYOUTS[0];
+    const path = coursePath(L0); // 下り向き
+    const pr = path.project(car.x, car.z, -1);
+    const [f0, f1] = car.fwd();
+    const down = f0 * path.tx[pr.i] + f1 * path.tz[pr.i] >= 0;
+    const dir = down ? 'd' : 'u';
+    if (full) return TOUGE_LAYOUTS.find((l) => l.key === `haruna_full_${dir}`);
+    // 進行方向の先にある区間（区間の終わり近くなら次の区間）
+    const split = [coursePath(TOUGE_LAYOUTS.find((l) => l.key === 'haruna_s1_d')).finishS, coursePath(TOUGE_LAYOUTS.find((l) => l.key === 'haruna_s2_d')).finishS];
+    const ahead = pr.s + (down ? 150 : -150);
+    let sec = ahead < split[0] ? 1 : ahead < split[1] ? 2 : 3;
+    return TOUGE_LAYOUTS.find((l) => l.key === `haruna_s${sec}_${dir}`);
+  }
+
   // パッシング位置に最も近いコース（向きで順走/逆走）
   pickLayout(car) {
+    if (AREAS[this.area].touge) return this.pickTougeLayout(car);
     let best = null;
     for (const c of COURSES) {
       if (c.area !== this.area) continue;
@@ -244,12 +264,14 @@ export class TownMode {
         el('div', {}, el('small', {}, 'YOU'), el('b', {}, String(mySpec.rating))),
         el('div', { class: 'vs' }, 'VS'),
         el('div', {}, el('small', {}, 'RIVAL'), el('b', {}, String(e.rating)))),
-      el('div', { class: 'enc-course' }, `COURSE：${layout.name}　${layout.course.laps}周`, el('br'), el('small', {}, layout.course.desc)),
+      el('div', { class: 'enc-course' }, layout.course.touge ? `COURSE：${layout.name}　${(coursePath(layout).raceLen / 1000).toFixed(2)}km` : `COURSE：${layout.name}　${layout.course.laps}周`, el('br'), el('small', {}, layout.course.desc)),
       el('div', { class: 'hint' }, '先にゴールするか、200m以上引き離せば勝利'));
+    const full = layout.course.touge ? this.pickTougeLayout(s.player.car, true) : null;
     const dlg = el('div', { class: 'screen dialog encounter' }, box);
     const close = () => { g.input.pressed.clear(); menu.destroy(); dlg.remove(); this.dialog = null; this.encounter = null; s.controlsEnabled = true; e.ai.paused = false; this.poiCool = 0.5; };
     const menu = new Menu(g, [
-      { label: 'バトル開始', action: () => { close(); this.startBattle(e, layout); } },
+      { label: 'バトル開始', sub: layout.course.touge ? `${layout.name}（スタート地点へ移動）` : '', action: () => { close(); this.startBattle(e, layout); } },
+      ...(full ? [{ label: 'フルコースで勝負', sub: `${full.name}　約${(coursePath(full).raceLen / 1000).toFixed(1)}km`, action: () => { close(); this.startBattle(e, full); } }] : []),
       { label: 'やめておく', action: () => close() },
     ], { onBack: () => close() });
     box.appendChild(menu.root);
@@ -279,7 +301,7 @@ export class TownMode {
     this.session.frozen = true;
     this.dialog = true;
     this.hud.prompt.style.display = 'none';
-    openShop(g, g.story, () => {
+    openShop(g, g.story, this.area, () => {
       // 装着変更を反映して再構築
       const P = this.session.player;
       const pos = { x: P.car.x, z: P.car.z, h: P.car.h, area: this.area };
@@ -321,14 +343,32 @@ export class TownMode {
     const resume = () => { g.input.pressed.clear(); menu.destroy(); dlg.remove(); this.paused = false; };
     const menu = new Menu(g, [
       { label: '再開', action: resume },
-      ...Object.values(AREAS).filter((a) => a.id !== this.area).map((a) => ({
-        label: `エリア切り替え：${a.name}へ`, sub: `${a.name}エリアの開始地点（GS前）へ移動します`,
-        action: () => { menu.destroy(); dlg.remove(); this.paused = false; this.changeArea(a.id, areaStart(a.id)); },
-      })),
+      { label: 'セッティング', sub: '足回り・ブレーキ・ギア比・LSD・ダウンフォースの調整（★5フルカスタマイズパーツ）とパワー/トルク曲線', action: () => { menu.destroy(); dlg.remove(); this.openSetting(); } },
+      ...Object.values(AREAS).filter((a) => a.id !== this.area).map((a) => {
+        const locked = (a.unlockWins || 0) > st.wins;
+        return {
+          label: `エリア切り替え：${a.name}へ`, disabled: locked,
+          sub: locked ? `${a.unlockWins}勝で解放（あと${a.unlockWins - st.wins}勝）` : `${a.name}エリアの開始地点（GS前）へ移動します`,
+          action: () => { menu.destroy(); dlg.remove(); this.paused = false; this.changeArea(a.id, areaStart(a.id)); },
+        };
+      }),
       { label: 'タイトルへ戻る', sub: '未セーブの進行は失われます', action: () => { menu.destroy(); g.transition(() => g.setMode(new TitleMode(g))); } },
     ], { onBack: resume });
     box.appendChild(menu.root);
     g.ui.appendChild(dlg);
+  }
+
+  // セッティング画面（変更はその場で車両に反映し、ガレージの車に保存）
+  openSetting() {
+    const g = this.game;
+    const car = activeCar(g.story);
+    const P = this.session.player;
+    this.paused = true;
+    openSetup(g, {
+      carId: car.carId, equipped: car.equipped, setup: car.setup,
+      onChange: (S) => { car.setup = S; this.session.applySetup(P, S); },
+      onClose: () => { g.input.pressed.clear(); this.paused = false; this.hud.flash('セッティング完了', 1.2); },
+    });
   }
 
   exit() {

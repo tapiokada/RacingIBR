@@ -4,7 +4,7 @@ import { buildSpec, stockEquip } from '../src/physics/spec.js';
 import { Vehicle } from '../src/physics/vehicle.js';
 import { RaceAI } from '../src/ai.js';
 const dt=1/500;
-for (const L of LAYOUTS.filter((l) => !process.env.ONLY || l.key.startsWith(process.env.ONLY))) {
+for (const L of LAYOUTS.filter((l) => !l.course.touge && (!process.env.ONLY || l.key.startsWith(process.env.ONLY)))) {
   const path = new CoursePath(L);
   const row=[L.key.padEnd(11), 'len', path.length.toFixed(0)+'m'];
   for (const id of (process.env.CARS ? process.env.CARS.split(',') : ['86-GR','WRX-IMP','RS-RS'])) {

@@ -25,7 +25,7 @@ export class CameraRig {
       const p = path.posAt(s, 0);
       const hw = path.hw[p.i];
       const q = path.posAt(s, side * (hw + 4));
-      this.gallerySpots.push({ x: q.x, z: q.z, y: 3.5 + Math.random() * 3, s });
+      this.gallerySpots.push({ x: q.x, z: q.z, y: (p.y || 0) + 3.5 + Math.random() * 3, s });
       side = -side;
     }
   }
@@ -74,7 +74,7 @@ export class CameraRig {
       if (best !== this.galleryIdx && bd < cd * 0.75) this.galleryIdx = best;
       const sp = this.gallerySpots[this.galleryIdx];
       cam.position.set(sp.x, sp.y, sp.z);
-      tmp.set(car.x, 0.8, car.z);
+      tmp.set(car.x, (car.gy || 0) + 0.8, car.z);
       cam.lookAt(tmp);
       const dist = Math.hypot(sp.x - car.x, sp.z - car.z);
       cam.fov = Math.max(8, Math.min(60, (2 * Math.atan(7 / Math.max(dist, 1)) * 180) / Math.PI));
@@ -84,8 +84,11 @@ export class CameraRig {
     // chase
     const speed = car.speed;
     const back = 5.8 + Math.min(1.5, speed * 0.02);
-    const tx = car.x - f0 * back, tz = car.z - f1 * back, ty = 2.1;
-    const lx = car.x + f0 * 3, lz = car.z + f1 * 3, ly = 1.0;
+    const gy = car.gy || 0;
+    const tx = car.x - f0 * back, tz = car.z - f1 * back;
+    let ty = gy + 2.1;
+    if (car.groundAt) ty = Math.max(ty, car.groundAt(tx, tz) + 1.7); // 坂道で後方の路面に潜らない
+    const lx = car.x + f0 * 3, lz = car.z + f1 * 3, ly = gy + 1.0 + Math.sin(car.gp || 0) * 3;
     if (!this.init) {
       this.pos.set(tx, ty, tz); this.look.set(lx, ly, lz); this.init = true;
     } else {
