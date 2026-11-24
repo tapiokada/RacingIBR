@@ -37,7 +37,7 @@ export class CameraRig {
     if (!u.anchors) {
       u.anchors = {};
       const mk = (x, y, z, ry) => { const o = new THREE.Object3D(); o.position.set(x, y, z); o.rotation.y = ry; u.body.add(o); return o; };
-      u.anchors.cockpit = mk(-0.37, u.belt + 0.34, u.wsBase - 1.05, Math.PI);
+      u.anchors.cockpit = mk(u.driverX ?? -0.37, u.belt + 0.34, u.wsBase - 1.05, Math.PI);
       u.anchors.hood = mk(0, u.belt + 0.32, u.wsBase + 0.25, Math.PI);
       u.anchors.mirror = mk(0, u.H + 0.25, u.wsBase - 0.9, 0);
     }

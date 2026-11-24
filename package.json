@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "description": "RACING IBR v0.1 — 西池袋ナイトレーサーズ（レーシングRPG）",
   "scripts": {
-    "build": "esbuild src/main.js --bundle --minify --format=iife --target=es2020 --outfile=dist/game.js",
-    "dev": "esbuild src/main.js --bundle --sourcemap --format=iife --target=es2020 --outfile=dist/game.js --watch --servedir=. --serve=8080",
+    "build": "esbuild src/main.js --bundle --minify --format=iife --target=es2020 --loader:.glb=binary --outfile=dist/game.js",
+    "dev": "esbuild src/main.js --bundle --sourcemap --format=iife --target=es2020 --loader:.glb=binary --outfile=dist/game.js --watch --servedir=. --serve=8080",
     "test": "node tools/phys_test.mjs && node tools/ai_test.mjs"
   },
   "repository": {
@@ -19,7 +19,12 @@
   },
   "homepage": "https://github.com/tapiokada/RacingIBR#readme",
   "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
     "esbuild": "^0.28.2",
+    "meshoptimizer": "^1.3.0",
+    "sharp": "^0.35.5",
     "three": "^0.170.0"
   },
   "private": true,

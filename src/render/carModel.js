@@ -1,5 +1,6 @@
 // 手続き生成の車モデル（ローポリ）
 import * as THREE from 'three';
+import { buildGr86Model, gr86Ready } from './gr86.js';
 
 const glassMat = new THREE.MeshStandardMaterial({ color: 0x0b0f16, metalness: 0.6, roughness: 0.15 });
 const tireMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
@@ -28,6 +29,7 @@ function extrudeSide(pts, width, mat, bevel = 0.06) {
 
 // carDef: data/cars.js のエントリ, color: 0xRRGGBB, opts: { aero, wing }
 export function buildCarModel(carDef, color, opts = {}) {
+  if (carDef.id === '86-GR' && gr86Ready()) return buildGr86Model(carDef, color, opts);
   const root = new THREE.Group();
   const body = new THREE.Group(); // ピッチ/ロール用
   root.add(body);
@@ -243,7 +245,7 @@ export function syncCarModel(model, car, extra = {}) {
   const braking = car.input.brake > 0.05 && car.gear !== -1;
   u.tailMat.emissiveIntensity = braking ? 2.6 : 0.7;
   const flash = extra.flash || 0;
-  for (const l of u.lightsFront) l.material.emissiveIntensity = 1.4 + flash * 6;
+  for (const l of u.lightsFront) l.material.emissiveIntensity = (u.glb ? 1.2 : 1.4) + flash * 6;
 }
 
 // ヘッドライト（プレイヤー車のみ。路面と障害物を照らす）
