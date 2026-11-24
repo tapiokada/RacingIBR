@@ -9,7 +9,7 @@ import { TownFreeMode } from './townfree.js';
 import { ReplayMode } from './replay.js';
 import { getReplay } from '../save.js';
 import { CARS, PLAYER, CAR_IDS, CAR_COLORS } from '../data/cars.js';
-import { GR86_CREDIT } from '../render/gr86.js';
+import { GLB_CREDITS } from '../render/glbCars.js';
 
 export class TitleMode {
   constructor(game, sub = null) { this.game = game; this.sub = sub; }
@@ -26,7 +26,7 @@ export class TitleMode {
       el('div', { class: 'logo-sub' }, '西池袋ナイトレーサーズ'),
       el('div', { class: 'logo-ver' }, 'v0.1 — Encounter Battle Build'));
     this.menuWrap = el('div', { class: 'title-menu' });
-    this.root.append(this.logo, this.menuWrap, el('div', { class: 'title-foot' }, '↑↓ 選択　Enter 決定　Esc 戻る　｜　クリック操作も可', el('br'), el('small', {}, GR86_CREDIT + '（ゲーム用に縮尺・向き・車輪分離・圧縮を変更）')));
+    this.root.append(this.logo, this.menuWrap, el('div', { class: 'title-foot' }, '↑↓ 選択　Enter 決定　Esc 戻る　｜　クリック操作も可', el('br'), el('small', {}, GLB_CREDITS.join('　／　') + '（いずれもゲーム用に縮尺・向き・車輪分離・圧縮を変更）')));
     g.ui.appendChild(this.root);
     if (this.sub === 'practice') this.showPractice();
     else this.showMain();

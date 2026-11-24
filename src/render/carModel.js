@@ -1,6 +1,6 @@
 // 手続き生成の車モデル（ローポリ）
 import * as THREE from 'three';
-import { buildGr86Model, gr86Ready } from './gr86.js';
+import { buildGlbCarModel, hasGlbModel } from './glbCars.js';
 
 const glassMat = new THREE.MeshStandardMaterial({ color: 0x0b0f16, metalness: 0.6, roughness: 0.15 });
 const tireMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
@@ -29,7 +29,7 @@ function extrudeSide(pts, width, mat, bevel = 0.06) {
 
 // carDef: data/cars.js のエントリ, color: 0xRRGGBB, opts: { aero, wing }
 export function buildCarModel(carDef, color, opts = {}) {
-  if (carDef.id === '86-GR' && gr86Ready()) return buildGr86Model(carDef, color, opts);
+  if (hasGlbModel(carDef.id)) return buildGlbCarModel(carDef, color, opts);
   const root = new THREE.Group();
   const body = new THREE.Group(); // ピッチ/ロール用
   root.add(body);

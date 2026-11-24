@@ -1,49 +1,63 @@
-// GR86(ZN8) GLB（Sketchfab: Mona x Supercars, CC-BY-4.0）をゲーム用に変換する
+// 車両GLB（Sketchfab）をゲーム用に変換する
 // - 座標変換：Y-up・前方+Z・メートル・原点＝ホイールベース中心の地面
 // - 4輪を車体から分離（回転・操舵用に車輪中心を原点としたノード wheel_FL/FR/RL/RR）
+// - 透過（transmission）ガラスは半透明に置き換え（描画負荷対策）
 // - テクスチャを1024px WebPに縮小、メッシュをmeshopt圧縮
-// usage: node tools/gr86_model.mjs <in.glb> assets/models/gr86.glb
+// usage: node tools/car_model.mjs <gr86|z32> <in.glb> <out.glb>
 import { NodeIO, Document } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTMeshoptCompression } from '@gltf-transform/extensions';
 import { dedup, prune, weld, textureCompress, meshopt, reorder } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptDecoder } from 'meshoptimizer';
 import sharp from 'sharp';
 
-const [inp, out] = process.argv.slice(2);
+const [model, inp, out] = process.argv.slice(2);
+// 元データの軸：fwd=前方の軸と符号、up=上の軸。wheels=車輪中心（元座標）、wb=実車ホイールベース[m]
+// cut=車輪として切り出す半径（前後・上下）、inner=車体外側とみなす左右位置の下限（元座標）
+const CONFIGS = {
+  // "Toyota GR86 (ZN8)" by Mona x Supercars (CC BY 4.0)：x=前後（前が−x）、y=左右、z=上
+  gr86: {
+    map: (x, y, z) => [-y, z, -x], wb: 2.575, ground: 0.04, cut: 1.42, inner: 2.35,
+    wheels: [{ name: 'wheel_FL', p: [-5.16, -3.42, 1.435] }, { name: 'wheel_FR', p: [-5.135, 3.42, 1.435] }, { name: 'wheel_RL', p: [5.25, -3.42, 1.32] }, { name: 'wheel_RR', p: [5.315, 3.42, 1.315] }],
+    side: (x, y, z) => y, along: (x, y, z) => [x, z],
+  },
+  // "Nissan Fairlady 300ZX (Z32) 1989" by Lexyc16 (CC BY-NC 4.0)：x=左右（+が左）、y=前後（前が−y）、z=上
+  z32: {
+    map: (x, y, z) => [x, z, -y], wb: 2.45, ground: 0.0, cut: 0.9, inner: 1.42,
+    wheels: [{ name: 'wheel_FL', p: [1.88, -2.785, 0.815] }, { name: 'wheel_FR', p: [-1.953, -2.785, 0.815] }, { name: 'wheel_RL', p: [1.902, 3.373, 0.815] }, { name: 'wheel_RR', p: [-1.995, 3.373, 0.815] }],
+    side: (x, y, z) => x, along: (x, y, z) => [y, z],
+  },
+};
+const C = CONFIGS[model];
 await MeshoptDecoder.ready; await MeshoptEncoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder });
 const doc = await io.read(inp);
 const root = doc.getRoot();
 
-// 元データ：x=前後（前が−x）、y=左右、z=上。車輪中心（ホイール外面メッシュの外接箱から）
-const WHEELS_RAW = [
-  { name: 'wheel_FL', x: -5.16, y: -3.42, z: 1.435 },
-  { name: 'wheel_FR', x: -5.135, y: 3.42, z: 1.435 },
-  { name: 'wheel_RL', x: 5.25, y: -3.42, z: 1.32 },
-  { name: 'wheel_RR', x: 5.315, y: 3.42, z: 1.315 },
-];
-const wbRaw = (WHEELS_RAW[2].x + WHEELS_RAW[3].x) / 2 - (WHEELS_RAW[0].x + WHEELS_RAW[1].x) / 2;
-const S = 2.575 / wbRaw; // 実車ホイールベース2575mm
-const X0 = ((WHEELS_RAW[2].x + WHEELS_RAW[3].x) / 2 + (WHEELS_RAW[0].x + WHEELS_RAW[1].x) / 2) / 2;
-const Z0 = 0.04; // タイヤ接地面
-// 生座標 → ゲーム座標（x=−y_raw, y=z_raw, z=−x_raw。回転なので鏡像にならない）
-const tp = (x, y, z) => [-S * y, S * (z - Z0), -S * (x - X0)];
-const tn = (x, y, z) => [-y, z, -x];
-// 判定：生座標で車輪中心から半径1.42以内（前後・上下）かつ車体外側（|y|>2.35、同じ側）
+// 生座標 → ゲーム座標（回転のみ。鏡像にならない）。原点＝ホイールベース中心の接地点、実寸に拡大縮小
+const mp = C.map;
+const W = C.wheels.map((w) => ({ ...w, g: mp(...w.p) }));
+const zF = (W[0].g[2] + W[1].g[2]) / 2, zR = (W[2].g[2] + W[3].g[2]) / 2;
+const S = C.wb / Math.abs(zF - zR);
+const Z0 = (zF + zR) / 2, Y0 = C.ground;
+const tp = (x, y, z) => { const g = mp(x, y, z); return [S * g[0], S * (g[1] - Y0), S * (g[2] - Z0)]; };
+const tn = (x, y, z) => mp(x, y, z);
+const WHEELS_RAW = C.wheels.map((w) => ({ name: w.name, x: w.p[0], y: w.p[1], z: w.p[2] }));
+// 判定：車輪中心から半径cut以内（前後・上下）かつ車体外側（同じ側で |左右| > inner）
 const wheelOf = (x, y, z) => {
   for (let k = 0; k < 4; k++) {
-    const w = WHEELS_RAW[k];
-    if (Math.sign(y) !== Math.sign(w.y) || Math.abs(y) < 2.35) continue;
-    if ((x - w.x) ** 2 + (z - w.z) ** 2 < 1.42 * 1.42) return k;
+    const w = C.wheels[k];
+    const sd = C.side(x, y, z), sw = C.side(...w.p);
+    if (Math.sign(sd) !== Math.sign(sw) || Math.abs(sd) < C.inner) continue;
+    const [a1, b1] = C.along(x, y, z), [a2, b2] = C.along(...w.p);
+    if ((a1 - a2) ** 2 + (b1 - b2) ** 2 < C.cut * C.cut) return k;
   }
   return -1;
 };
 
-const out2 = new Document();
 // 新しいドキュメントへ素材をコピーする代わりに、元ドキュメント内で新しいノード構成を作る
 const buffer = root.listBuffers()[0];
-const scene = doc.createScene('gr86');
-const top = doc.createNode('gr86');
+const scene = doc.createScene(model);
+const top = doc.createNode(model);
 scene.addChild(top);
 const wheelNodes = WHEELS_RAW.map((w) => {
   const c = tp(w.x, w.y, w.z);
@@ -101,6 +115,11 @@ root.setDefaultScene(scene);
 for (const nd of root.listNodes()) if (!nd.getMesh() && nd !== top && nd !== bodyNode && !wheelNodes.some((w) => w.node === nd)) nd.dispose();
 for (const m of root.listMeshes()) if (!m.listParents().some((p) => p.propertyType === 'Node')) m.dispose();
 console.log('triangles', tris, 'wheel triangles', wtris, 'scale', S.toFixed(4));
+// 透過（transmission）は描画コストが高いので半透明（BLEND）に置き換える
+for (const m of root.listMaterials()) {
+  const tr = m.getExtension('KHR_materials_transmission');
+  if (tr) { const f = tr.getTransmissionFactor(); m.setExtension('KHR_materials_transmission', null); m.setAlphaMode('BLEND'); const c = m.getBaseColorFactor(); m.setBaseColorFactor([c[0], c[1], c[2], Math.min(c[3], 1 - 0.7 * f)]); }
+}
 await doc.transform(
   prune(), dedup(), weld(), reorder({ encoder: MeshoptEncoder }),
   textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [1024, 1024], quality: 82 }),

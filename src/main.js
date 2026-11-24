@@ -13,9 +13,9 @@ import * as MAP from './data/map.js';
 import { Box3, Matrix4, Vector3 } from 'three';
 import { courseClearance } from './physics/track.js';
 import { stockEquip } from './physics/spec.js';
-import { loadGr86 } from './render/gr86.js';
+import { loadGlbCars } from './render/glbCars.js';
 
 const game = new Game(document.getElementById('app'));
-// 86-GRの3Dモデルを読み込んでから開始（失敗時は簡易モデル）
-loadGr86().then(() => game.setMode(new TitleMode(game)));
+// 実車の3Dモデル（86-GR・Z-32）を読み込んでから開始（失敗時は簡易モデル）
+loadGlbCars().then(() => game.setMode(new TitleMode(game)));
 if (location.search.includes('debug')) { window.__dbg = { game, RaceAI }; window.__dbgMap = MAP; window.__dbgModes = { PracticeMode, TownMode, TownFreeMode, BattleMode, ReplayMode, newGameState, RIVAL_BY_ID }; window.__dbgTHREE = { Box3, Matrix4, Vector3 }; window.__dbgClear = courseClearance; window.__dbgStock = stockEquip; }

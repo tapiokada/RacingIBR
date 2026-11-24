@@ -1,36 +1,51 @@
-// 86-GR の車両モデル：GR86(ZN8) 3Dモデル（"Toyota GR86 (ZN8)" by Mona x Supercars / Sketchfab, CC-BY-4.0）
-// tools/gr86_model.mjs で座標変換・車輪分離・圧縮した assets/models/gr86.glb を使う
+// 実車の3Dモデル（GLB）を使う車両：tools/car_model.mjs で座標変換・車輪分離・圧縮したもの
+//  86-GR："Toyota GR86 (ZN8)" by Mona x Supercars（Sketchfab, CC BY 4.0）
+//  Z-32 ："Nissan Fairlady 300ZX (Z32) 1989" by Lexyc16（Sketchfab, CC BY-NC 4.0 — 非営利のみ）
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
-import GLB from '../../assets/models/gr86.glb';
+import GR86 from '../../assets/models/gr86.glb';
+import Z32 from '../../assets/models/z32.glb';
 
-export const GR86_CREDIT = '86-GRの3Dモデル："Toyota GR86 (ZN8)" by Mona x Supercars (Sketchfab) — CC BY 4.0';
-let template = null;
+// paint: 塗装色を置き換えるマテリアル名、head/tail: ヘッドライト・テールランプのマテリアル名
+// driverX: 運転席の左右位置（+が左）、belt/wsBase: カメラ位置の基準（cameras.js）
+export const GLB_CARS = {
+  '86-GR': {
+    data: GR86, paint: /^Paint1/, head: /^FariFront/, tail: /^Fari005|^Ln4/, driverX: 0.36, belt: 0.74, wsBase: 0.72, wingY: 0.8,
+    credit: '86-GRの3Dモデル："Toyota GR86 (ZN8)" by Mona x Supercars (Sketchfab) — CC BY 4.0',
+  },
+  'Z-32': {
+    data: Z32, paint: /^Material\.001$/, head: /^Material\.010$/, tail: /^Material\.016$/, driverX: -0.36, belt: 0.62, wsBase: 0.62, wingY: 0.82,
+    credit: 'Z-32の3Dモデル："Nissan Fairlady 300ZX (Z32) 1989" by Lexyc16 (Sketchfab) — CC BY-NC 4.0（非営利）',
+  },
+};
+export const GLB_CREDITS = Object.values(GLB_CARS).map((c) => c.credit);
+const templates = {};
 let loading = null;
 
-export function loadGr86() {
-  if (template) return Promise.resolve(template);
+// 全モデルを読み込む（失敗した車種は簡易モデルのまま）
+export function loadGlbCars() {
   if (!loading) {
-    loading = new Promise((resolve) => {
-      const loader = new GLTFLoader();
-      loader.setMeshoptDecoder(MeshoptDecoder);
-      const buf = GLB.buffer.slice(GLB.byteOffset, GLB.byteOffset + GLB.byteLength);
-      loader.parse(buf, '', (gltf) => { template = gltf.scene; resolve(template); }, (e) => { console.error('GR86モデルの読み込みに失敗', e); resolve(null); });
-    });
+    const loader = new GLTFLoader();
+    loader.setMeshoptDecoder(MeshoptDecoder);
+    loading = Promise.all(Object.entries(GLB_CARS).map(([id, c]) => new Promise((resolve) => {
+      const buf = c.data.buffer.slice(c.data.byteOffset, c.data.byteOffset + c.data.byteLength);
+      loader.parse(buf, '', (gltf) => { templates[id] = gltf.scene; resolve(); }, (e) => { console.error(`${id}のモデルの読み込みに失敗`, e); resolve(); });
+    })));
   }
   return loading;
 }
-export const gr86Ready = () => !!template;
+export const hasGlbModel = (id) => !!templates[id];
 
 const blackMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.6 });
 
-// carDef: 86-GR, color: ボディ色, opts: { aero, wing }
-export function buildGr86Model(carDef, color, opts = {}) {
+// carDef: 車種データ, color: ボディ色, opts: { aero, wing }
+export function buildGlbCarModel(carDef, color, opts = {}) {
+  const cfg = GLB_CARS[carDef.id];
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
-  const src = template.clone(true);
+  const src = templates[carDef.id].clone(true);
   const L = carDef.length, W = carDef.width, H = carDef.height;
   const wheels = [];
   const lightsFront = [];
@@ -42,10 +57,10 @@ export function buildGr86Model(carDef, color, opts = {}) {
     if (!matCache.has(m)) {
       const c = m.clone();
       const n = m.name || '';
-      if (/^Paint1/.test(n)) c.color.copy(paint); // ボディ塗装
-      if (/^FariFront/.test(n)) { c.emissive = new THREE.Color(0xfff2cc); c.emissiveIntensity = 1.4; c.emissiveMap = c.map; lightsFront.push({ material: c }); }
+      if (cfg.paint.test(n)) c.color.copy(paint); // ボディ塗装
+      if (cfg.head.test(n)) { c.emissive = new THREE.Color(0xfff2cc); c.emissiveIntensity = 1.4; c.emissiveMap = c.map; lightsFront.push({ material: c }); }
       // テールランプ（レンズ）：ブレーキで明るく
-      if (/^Fari005|^Ln4/.test(n)) { c.emissive = new THREE.Color(0xff1a10); if (c.map) c.emissiveMap = c.map; c.emissiveIntensity = 0.7; tailMats.push(c); }
+      if (cfg.tail.test(n)) { c.emissive = new THREE.Color(0xff1a10); if (c.map) c.emissiveMap = c.map; c.emissiveIntensity = 0.7; tailMats.push(c); }
       matCache.set(m, c);
     }
     return matCache.get(m);
@@ -67,7 +82,7 @@ export function buildGr86Model(carDef, color, opts = {}) {
   // syncCarModel は tailMat.emissiveIntensity を書き換えるので、複数マテリアルへ配る
   const tailMat = { set emissiveIntensity(v) { for (const m of tailMats) m.emissiveIntensity = v; } };
   // エアロパーツ（装着時のみ）
-  const belt = 0.8, hl = L / 2;
+  const belt = cfg.wingY, hl = L / 2;
   const wingType = opts.wing;
   if (wingType === 'gt') {
     const wing = new THREE.Group();
@@ -92,7 +107,6 @@ export function buildGr86Model(carDef, color, opts = {}) {
   const cockpit = new THREE.Group(); cockpit.visible = false; body.add(cockpit);
   const steeringWheel = new THREE.Object3D(); cockpit.add(steeringWheel);
   // カメラ位置の基準（cameras.js：運転席 = (−0.37, belt+0.34, wsBase−1.05)）
-  const wsBase = 0.72;
-  root.userData = { exterior: [], body, wheels, lightsFront, tailMat, cockpit, steeringWheel, paint: null, belt: 0.74, wsBase, H, L, W, glb: true, driverX: 0.36 }; // このモデルは左ハンドル
+  root.userData = { exterior: [], body, wheels, lightsFront, tailMat, cockpit, steeringWheel, paint: null, belt: cfg.belt, wsBase: cfg.wsBase, H, L, W, glb: true, driverX: cfg.driverX };
   return root;
 }
