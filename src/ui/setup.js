@@ -32,30 +32,40 @@ export function openSetup(game, opts) {
 
   const build = () => {
     const keep = index;
+    const prevList = wrap.querySelector('.setup-list');
+    const scroll = prevList ? prevList.scrollTop : 0; // 再描画してもスクロール位置を保つ
     wrap.innerHTML = '';
     rows = [];
     const spec = buildSpec(carId, equipped, S);
     const list = el('div', { class: 'key-list setup-list' });
     const sep = (t) => list.appendChild(el('div', { class: 'key-sep' }, t));
     // 数値行：key, 表示名, min, max, step, 小数桁, 単位
-    const num = (key, name, min, max, step, fmt, unit = '', note = '', onSet = null, get = null, set = null) => {
+    // fineStep：Shift＋←→（またはShift＋クリック）での細かい刻み（表示桁で見える項目だけ）
+    const num = (key, name, min, max, step, fmt, unit = '', note = '', onSet = null, get = null, set = null, fineStep = null) => {
       const gv = get || (() => S[key]);
       const sv = set || ((v) => { S[key] = v; });
       const val = el('span', { class: 'lv-val' });
       const show = () => { val.textContent = `${Number(gv()).toFixed(fmt)}${unit}`; };
-      const put = (v) => {
-        const st = fine ? step / (step >= 1 ? 1 : 10) : step;
-        v = Math.round(v / st) * st;
-        sv(Math.max(min, Math.min(max, +v.toFixed(4))));
+      const st = (sh) => (sh && fineStep ? fineStep : step);
+      const put = (dir, sh) => {
+        const d = st(sh);
+        // 刻みに丸めてから1刻み動かす（丸めで元の値に戻って「押しても変わらない」ことがないように）
+        const cur = Number(gv());
+        let v = Math.round(cur / d) * d;
+        if (Math.abs(v - cur) < d * 0.01 || Math.sign(v - cur) !== dir) v += dir * d;
+        v = Math.max(min, Math.min(max, +v.toFixed(4)));
+        if (Math.abs(v - cur) < 1e-9) { game.audio.beep(220, 0.05, 0.06); return; } // 上限・下限
+        sv(v);
         if (onSet) onSet();
         changed();
         build();
       };
-      const st = () => (fine ? step / (step >= 1 ? 1 : 10) : step);
-      const minus = el('button', { class: 'arrow', onclick: () => put(gv() - st()) }, '◀');
-      const plus = el('button', { class: 'arrow', onclick: () => put(gv() + st()) }, '▶');
+      const minus = el('button', { class: 'arrow', onclick: (e) => put(-1, e.shiftKey) }, '◀');
+      const plus = el('button', { class: 'arrow', onclick: (e) => put(1, e.shiftKey) }, '▶');
       const row = el('div', { class: 'key-row' }, el('span', { class: 'key-name' }, name, note ? el('small', { class: 'lv-note' }, note) : ''), el('span', { class: 'lv' }, minus, val, plus));
-      rows.push({ row, left: () => put(gv() - st()), right: () => put(gv() + st()), act: () => {} });
+      const ri = rows.length;
+      row.addEventListener('pointerdown', () => { index = ri; hl(); });
+      rows.push({ row, left: () => put(-1, fine), right: () => put(1, fine), act: () => {} });
       list.appendChild(row);
       show();
     };
@@ -93,12 +103,12 @@ export function openSetup(game, opts) {
       sep('トランスミッション（フルカスタマイズミッション）');
       const top = gearSpeeds(spec)[spec.gears.length - 1];
       num('_top', 'トップスピード（自動調整）', 150, 400, 5, 0, ' km/h', '設定した最高速に合わせて全ギア比を配分', null,
-        () => Math.round(top / 5) * 5,
-        (v) => { S.gears = autoGears(buildSpec(carId, equipped, S), S, v); });
+        () => (S.topSpeed != null ? S.topSpeed : Math.round(top / 5) * 5),
+        (v) => { S.topSpeed = v; S.gears = autoGears(buildSpec(carId, equipped, S), S, v); });
       for (let i = 0; i < S.gears.length; i++) {
-        num(`g${i}`, `${i + 1}速`, 0.5, 6, 0.01, 3, '', i === 0 ? 'Shiftを押しながら←→で0.001刻み' : '', null, () => S.gears[i], (v) => { S.gears[i] = v; });
+        num(`g${i}`, `${i + 1}速`, 0.5, 6, 0.01, 3, '', i === 0 ? 'Shiftを押しながら←→（またはクリック）で0.001刻み' : '', null, () => S.gears[i], (v) => { S.gears[i] = v; S.topSpeed = null; }, 0.001);
       }
-      num('final', 'ファイナルギア', 2.5, 6.5, 0.01, 3);
+      num('final', 'ファイナルギア', 2.5, 6.5, 0.01, 3, '', '', null, null, (v) => { S.final = v; S.topSpeed = null; }, 0.001);
     }
     if (aR) {
       sep(`エアロ（${aero.name}）`);
@@ -128,10 +138,11 @@ export function openSetup(game, opts) {
       el('div', { class: 'key-sep' }, 'ギア別最高速度'), gearChart(spec, { w: 400, h: 24 + spec.gears.length * 16 }),
       info);
     wrap.appendChild(panel(`SETTING — ${car.name}`,
-      el('div', { class: 'hint' }, '↑↓:項目　←→:変更（Shift+←→で細かく）　Esc:閉じる　※変更はすぐに車両へ反映されます'),
+      el('div', { class: 'hint' }, '↑↓:項目　←→:変更（ギア比はShift+←→で0.001刻み）　Esc:閉じる　※変更はすぐに車両へ反映されます'),
       el('div', { class: 'setup-body' }, list, right),
       el('div', { class: 'row-btns' }, reset, back)));
     index = Math.min(keep, rows.length - 1);
+    list.scrollTop = scroll;
     hl();
   };
 
