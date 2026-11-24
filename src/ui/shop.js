@@ -3,7 +3,7 @@ import { el, panel } from './ui.js';
 import { CATEGORIES, PARTS, PART_BY_ID, CATEGORY_NAME, RANK_STARS } from '../data/parts.js';
 import { buildSpec } from '../physics/spec.js';
 import { freeCount, addPart, activeCar, fmtMoney } from '../save.js';
-import { CARS } from '../data/cars.js';
+import { CARS, CAR_IDS, CAR_PRICES, CAR_COLORS } from '../data/cars.js';
 import { powerGraph } from './graph.js';
 
 export function sellPrice(p) {
@@ -53,7 +53,7 @@ export function openShop(game, state, area, onClose) {
     rows = [];
     const spec = buildSpec(car.carId, car.equipped, car.setup || null);
     const tabs = el('div', { class: 'tabs' },
-      ...[['equip', 'パーツ交換'], ['buy', 'パーツ購入'], ['sell', 'パーツ売却']].map(([id, name]) =>
+      ...[['equip', 'パーツ交換'], ['buy', 'パーツ購入'], ['sell', 'パーツ売却'], ['car', '中古車']].map(([id, name]) =>
         el('button', { class: 'tab' + (tab === id ? ' on' : ''), onclick: () => { tab = id; index = 0; build(); } }, name)));
     const list = el('div', { class: 'part-list' });
     if (tab === 'equip') {
@@ -93,6 +93,31 @@ export function openShop(game, state, area, onClose) {
         rows.push({ row, act: buy });
         list.appendChild(row);
       }
+    } else if (tab === 'car') {
+      // 中古車店：純正状態の車を購入してガレージへ（乗り換えはポーズメニューのガレージで）
+      for (const id of CAR_IDS) {
+        const c = CARS[id], price = CAR_PRICES[id];
+        const have = state.garage.filter((g) => g.carId === id).length;
+        const can = state.money >= price;
+        const buy = () => {
+          if (state.money < price) { game.audio.beep(220, 0.12, 0.1); return; }
+          state.money -= price;
+          const stock = { ...c.stock };
+          for (const pid of Object.values(stock)) if (pid) addPart(state, pid);
+          state.garage.push({ carId: id, color: CAR_COLORS[id] ?? 0xcccccc, equipped: stock, setup: null });
+          game.audio.beep(1200, 0.08, 0.12);
+          build();
+        };
+        const sp = buildSpec(id, c.stock);
+        const row = el('div', { class: 'part-row' + (can ? '' : ' dim') },
+          el('span', { class: 'cat' }, `${c.drive}・${c.mass}kg`),
+          el('span', { class: 'pname' }, c.name, el('small', {}, `　${c.ref}　${sp.maxPowerPS.toFixed(0)}PS／前後${Math.round(c.frontWeight * 100)}:${Math.round(100 - c.frontWeight * 100)}／WB ${c.wheelbase}m／Cd ${c.cd}`)),
+          el('span', { class: 'cnt' }, have ? `所有 ${have}台` : ''),
+          el('button', { class: 'buy', onclick: buy }, fmtMoney(price)));
+        rows.push({ row, act: buy });
+        list.appendChild(row);
+      }
+      list.appendChild(el('div', { class: 'hint' }, '購入した車は純正パーツ付きでガレージに入ります。乗り換えはポーズメニューの「ガレージ」から。'));
     } else {
       const sellable = PARTS.filter((p) => freeCount(state, p.id) > 0);
       if (!sellable.length) list.appendChild(el('div', { class: 'hint' }, '売却できる（未装着の）パーツはありません'));
@@ -125,7 +150,7 @@ export function openShop(game, state, area, onClose) {
 
   const off = game.input.onKey((e) => {
     if (!wrap.isConnected) return;
-    if (e.code === 'Tab') { const order = ['equip', 'buy', 'sell']; tab = order[(order.indexOf(tab) + 1) % 3]; index = 0; build(); }
+    if (e.code === 'Tab') { const order = ['equip', 'buy', 'sell', 'car']; tab = order[(order.indexOf(tab) + 1) % 4]; index = 0; build(); }
     else if (e.code === 'ArrowDown' && rows.length) { index = (index + 1) % rows.length; hl(); rows[index].row.scrollIntoView({ block: 'nearest' }); }
     else if (e.code === 'ArrowUp' && rows.length) { index = (index - 1 + rows.length) % rows.length; hl(); rows[index].row.scrollIntoView({ block: 'nearest' }); }
     else if (e.code === 'ArrowLeft') rows[index]?.left?.();

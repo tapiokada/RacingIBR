@@ -86,6 +86,10 @@ export function openSetup(game, opts) {
         num(`lsdAcc${a}`, '加速感度', 5, 60, 1, 0, '', 'アクセルON時の効き。高いほど立ち上がりで内輪が空転しにくい');
         num(`lsdDec${a}`, '減速感度', 5, 60, 1, 0, '', 'アクセルOFF時の効き。高いほど進入で安定・曲がりにくい');
       }
+      if (drive === 'AWD' && car.center) {
+        sep('センターデフ');
+        num('awdSplit', '前後トルク配分（前）', 0, 60, 1, 0, ' %', `前を増やすと安定・アンダー寄り、減らすとFR的に曲がる（純正 前${Math.round(car.center.split * 100)}%）`);
+      }
       sep('トランスミッション（フルカスタマイズミッション）');
       const top = gearSpeeds(spec)[spec.gears.length - 1];
       num('_top', 'トップスピード（自動調整）', 150, 400, 5, 0, ' km/h', '設定した最高速に合わせて全ギア比を配分', null,

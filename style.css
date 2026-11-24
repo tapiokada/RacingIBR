@@ -174,3 +174,20 @@ input[type=range] { width: 200px; accent-color: var(--pink); }
 .pgraph { border-radius: 6px; display: block; }
 .shop-side { display: flex; flex-direction: column; gap: 6px; }
 .shop-body { grid-template-columns: 1fr 340px; }
+
+/* ---------- ガレージ ---------- */
+.screen.garage { pointer-events: none; display: block; background: none; }
+.screen.garage .panel { min-width: 0; pointer-events: auto; position: absolute; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+.screen.garage .panel.garage-left { left: 12px; width: 280px; }
+.garage-left .panel-title, .garage-right .panel-title { font-size: 18px; }
+.screen.garage .panel.garage-right { right: 12px; width: 360px; padding: 18px 20px; }
+.garage-list { display: flex; flex-direction: column; gap: 4px; }
+.garage-row { padding: 7px 10px; background: rgba(255,255,255,.04); border-left: 3px solid transparent; cursor: pointer; }
+.garage-row.sel { border-left-color: var(--pink); background: rgba(255,45,109,.15); }
+.garage-row b { font-size: 15px; margin-right: 8px; }
+.garage-row small { display: block; color: var(--dim); font-size: 11px; }
+.garage-row .tag { font-size: 11px; color: #000; background: var(--cyan); border-radius: 3px; padding: 1px 6px; }
+.garage-spec .stat { font-size: 12px; }
+.garage-spec .stat b { text-align: right; margin-left: 8px; }
+.garage-parts { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 11px; color: var(--dim); margin-top: 6px; }
+.garage-view { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); font-size: 20px; font-weight: 700; color: var(--yellow); text-shadow: 0 1px 4px #000; }

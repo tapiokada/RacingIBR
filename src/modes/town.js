@@ -12,6 +12,7 @@ import { buildSpec } from '../physics/spec.js';
 import { saveGame, activeCar, fmtMoney } from '../save.js';
 import { openShop } from '../ui/shop.js';
 import { openSetup } from '../ui/setup.js';
+import { GarageMode } from './garage.js';
 import { VIEW_NAMES } from '../render/cameras.js';
 import { BattleMode } from './battle.js';
 import { TitleMode } from './title.js';
@@ -343,6 +344,15 @@ export class TownMode {
     const resume = () => { g.input.pressed.clear(); menu.destroy(); dlg.remove(); this.paused = false; };
     const menu = new Menu(g, [
       { label: '再開', action: resume },
+      {
+        label: 'ガレージ', sub: `所有車${st.garage.length}台：全方位から確認・乗り換え・セッティング（車は各ショップの「中古車」タブで購入）`,
+        action: () => {
+          menu.destroy(); dlg.remove();
+          const P = this.session.player.car;
+          const pos = { x: P.x, z: P.z, h: P.h, area: this.area };
+          g.transition(() => g.setMode(new GarageMode(g, { area: this.area, returnPos: pos, view: g.rig.mode, townMode: TownMode })));
+        },
+      },
       { label: 'セッティング', sub: '足回り・ブレーキ・ギア比・LSD・ダウンフォースの調整（★5フルカスタマイズパーツ）とパワー/トルク曲線', action: () => { menu.destroy(); dlg.remove(); this.openSetting(); } },
       ...Object.values(AREAS).filter((a) => a.id !== this.area).map((a) => {
         const locked = (a.unlockWins || 0) > st.wins;

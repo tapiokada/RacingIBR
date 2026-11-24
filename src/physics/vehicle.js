@@ -63,7 +63,8 @@ export class Vehicle {
     this.L = s.wheelbase;
     this.b = this.L * s.frontWeight; // CG→後軸
     this.a = this.L - this.b; // CG→前軸
-    this.Iz = (s.mass * (s.car.length ** 2 + s.car.width ** 2)) / 12 * 0.95;
+    // ヨー慣性：前後重量配分とホイールベースから（Iz = m·a·b·動的指数）。エンジン位置・重量物の配置で変わる
+    this.Iz = s.mass * this.a * this.b * (s.car.yawK || 0.95) * 1.08;
     this.Ip = (s.mass * (s.car.length ** 2 + s.car.height ** 2)) / 12 * 0.9; // ピッチ
     this.Ir = (s.mass * (s.car.width ** 2 + s.car.height ** 2)) / 12 * 0.8; // ロール
     this.Iw = 1.1 * s.car.inertiaK; // 1輪あたり
@@ -161,7 +162,8 @@ export class Vehicle {
     const d = this.spec.drive;
     if (d === 'FF') return this.wF;
     if (d === 'FR') return this.wR;
-    return (this.wF + this.wR) / 2;
+    const sp = this.spec.center ? this.spec.center.split : 0.5; // センターデフのキャリア回転
+    return this.wF * sp + this.wR * (1 - sp);
   }
 
   wheelRpm(g = this.gear) {
@@ -329,7 +331,11 @@ export class Vehicle {
     let tF = 0, tR = 0, IeF = 0, IeR = 0;
     if (s.drive === 'FF') { tF = Tdrive; IeF = Ie; }
     else if (s.drive === 'FR') { tR = Tdrive; IeR = Ie; }
-    else { tF = Tdrive * s.awdFront; tR = Tdrive * (1 - s.awdFront); IeF = Ie * s.awdFront; IeR = Ie * (1 - s.awdFront); }
+    else {
+      const sp = s.center ? s.center.split : s.awdFront;
+      const ish = Math.max(0.25, Math.min(0.75, sp)); // エンジン慣性の割り当て
+      tF = Tdrive * sp; tR = Tdrive * (1 - sp); IeF = Ie * ish; IeR = Ie * (1 - ish);
+    }
 
     // ブレーキ（各輪）
     const bk = [0, 0, 0, 0];
@@ -403,22 +409,33 @@ export class Vehicle {
     const diffs = [s.diffF, s.diffR];
     const Ts = [tF, tR], Ies = [IeF, IeR];
     const mean = [0, 0], dmean = [0, 0];
-    const lockedCenter = s.drive === 'AWD' && engaged && !slipping;
+    const awdOn = s.drive === 'AWD' && engaged && !slipping;
     for (let ax = 0; ax < 2; ax++) {
       const l = ax * 2, r = l + 1;
-      const T = Ts[ax];
-      const o = (om[l] + om[r]) / 2;
-      mean[ax] = o;
-      dmean[ax] = (T - R * (Fx[l] + Fx[r])) / (2 * Iw + Ies[ax] + dt * R * (ks[l] + ks[r]));
+      mean[ax] = (om[l] + om[r]) / 2;
     }
-    if (lockedCenter) {
-      // センターデフ直結扱い：前後軸の平均回転を共通化
+    const DF = 2 * Iw + Ies[0] + dt * R * (ks[0] + ks[1]), DR = 2 * Iw + Ies[1] + dt * R * (ks[2] + ks[3]);
+    const FF = R * (Fx[0] + Fx[1]), FR = R * (Fx[2] + Fx[3]);
+    if (awdOn && !s.center) {
+      // センターデフ直結（旧来の扱い）
       const o = (mean[0] + mean[1]) / 2;
-      const Isum = 4 * Iw + Ie + dt * R * (ks[0] + ks[1] + ks[2] + ks[3]);
-      const d = (Tdrive - R * (Fx[0] + Fx[1] + Fx[2] + Fx[3])) / Isum;
+      const d = (Tdrive - FF - FR) / (DF + DR);
       mean[0] = mean[1] = o + dt * d;
     } else {
-      mean[0] += dt * dmean[0]; mean[1] += dt * dmean[1];
+      let Tc = 0;
+      if (awdOn) {
+        // センターデフ：前後の回転差を止めるのに必要なトルクを、差動制限の上限までかける（＋で後→前へ移す）
+        const c = s.center;
+        const need = (mean[1] + (dt * (Ts[1] - FR)) / DR - mean[0] - (dt * (Ts[0] - FF)) / DF) / (dt / DF + dt / DR);
+        const dw = Math.abs(mean[1] - mean[0]);
+        let lim = c.pre + c.acc * Math.abs(Tdrive) + c.visc * dw;
+        if (c.capK > 0) lim = Math.min(lim, c.capK * Math.abs(Tdrive) + 30);
+        Tc = Math.max(-lim, Math.min(lim, need));
+        this.centerT = Tc;
+      }
+      Ts[0] += Tc; Ts[1] -= Tc;
+      mean[0] += (dt * (Ts[0] - FF)) / DF;
+      mean[1] += (dt * (Ts[1] - FR)) / DR;
     }
     for (let ax = 0; ax < 2; ax++) {
       const l = ax * 2, r = l + 1;

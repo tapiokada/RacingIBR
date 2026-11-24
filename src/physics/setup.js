@@ -78,6 +78,7 @@ export function defaultSetup(carId) {
     lsdInitF: lv(lsd.front, 10), lsdAccF: Math.max(5, lsd.front?.acc || 15), lsdDecF: Math.max(5, lsd.front?.dec || 5),
     lsdInitR: lv(lsd.rear, 10), lsdAccR: Math.max(5, lsd.rear?.acc || 25), lsdDecR: Math.max(5, lsd.rear?.dec || 15),
     gears: [...tm], final: car.final,
+    awdSplit: car.center ? Math.round(car.center.split * 100) : null,
     dfF: null, dfR: null,
   };
 }
@@ -216,6 +217,7 @@ export function applyChassis(spec, setup) {
     const L = (k, d) => clamp(Math.round(num(S[k], d)), 5, 60);
     if (lsd.front) lsd.front = { init: L('lsdInitF', 10), acc: L('lsdAccF', 15), dec: L('lsdDecF', 5) };
     if (lsd.rear) lsd.rear = { init: L('lsdInitR', 10), acc: L('lsdAccR', 25), dec: L('lsdDecR', 15) };
+    if (spec.center && S.awdSplit != null) spec.center.split = clamp(num(S.awdSplit, 40), 0, 60) / 100;
   }
   spec.lsd = lsd;
   spec.diffF = lsd.front ? toDiff(lsd.front) : { pre: 0, acc: 0, dec: 0 };
@@ -230,14 +232,16 @@ export function applyChassis(spec, setup) {
     const rK = clamp(num(S.dfR, rg.R[2]), rg.R[0], rg.R[1]);
     const clF = kgfToClA(fK) / A, clR = kgfToClA(rK) / A;
     const base = aero.clF + aero.clR;
-    spec.clF = clF; spec.clR = clR;
+    spec.clF = clF - (car.liftF || 0); spec.clR = clR - (car.liftR || 0);
     spec.cd = car.cd + aero.cd * ((clF + clR) / base);
     spec.setupAero = { dfF: fK, dfR: rK };
   }
   // 車高による空力（低いほど床下で少し増える）
   const rideK = 1 + clamp((stockRide - (susp.rideF + susp.rideR) / 2) / 1000, -0.03, 0.06) * 2;
-  spec.clF = spec.clF * rideK + Math.max(0, susp.rake) * 0.6 * (spec.clF + spec.clR > 0 ? 1 : 0.2);
-  spec.clR = spec.clR * rideK;
+  // 車高：低いほど床下の流速が上がり揚力が減る（全体に +）。前下がり（レーキ）はフロントの揚力を減らす
+  const lowK = (rideK - 1) * 0.5;
+  spec.clF += lowK * 0.5 + Math.max(0, susp.rake) * 0.8;
+  spec.clR += lowK * 0.5 - Math.max(0, susp.rake) * 0.3;
   return spec;
 }
 

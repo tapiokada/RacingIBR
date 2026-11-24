@@ -8,7 +8,7 @@ import { PracticeMode } from './practice.js';
 import { TownFreeMode } from './townfree.js';
 import { ReplayMode } from './replay.js';
 import { getReplay } from '../save.js';
-import { CARS, PLAYER } from '../data/cars.js';
+import { CARS, PLAYER, CAR_IDS, CAR_COLORS } from '../data/cars.js';
 
 export class TitleMode {
   constructor(game, sub = null) { this.game = game; this.sub = sub; }
@@ -118,9 +118,22 @@ export class TitleMode {
     this.setMenu([
       { label: 'ストーリーのマシン', disabled: !car, sub: car ? 'セーブデータのチューニング状態で走行' : 'セーブデータなし', action: () => start(car.equipped, car.color, 'story', car.setup || null) },
       { label: 'ノーマル 86-GR', sub: CARS[PLAYER.car].ref + ' 相当', action: () => start({ ...CARS[PLAYER.car].stock }, PLAYER.color, 'stock') },
+      { label: 'ノーマル車（車種を選ぶ）', sub: '全10車種の純正状態から選んで走行', action: () => this.pickStockCar(kind, L, area) },
       { label: 'フルカスタム 86-GR', sub: '★5フルカスタマイズ車高調・ブレーキ・ミッション＋GTウイング。FREE RUNのポーズメニューでセッティング可能', action: () => start(fullEquip, PLAYER.color, 'full86') },
       { label: '戻る', action: () => this.pickLayout(kind === 'town' ? 'free' : kind) },
     ], () => this.pickLayout(kind === 'town' ? 'free' : kind), `${L ? L.name : AREAS[area].name + 'タウン'} — マシン選択`);
+  }
+
+  pickStockCar(kind, L, area) {
+    const go = (id) => {
+      const g = this.game;
+      const o = { carId: id, equipped: { ...CARS[id].stock }, color: CAR_COLORS[id], setup: null, setupKey: null };
+      g.transition(() => g.setMode(kind === 'town' ? new TownFreeMode(g, { ...o, area }) : new PracticeMode(g, { ...o, layout: L, kind })));
+    };
+    this.setMenu([
+      ...CAR_IDS.map((id) => ({ label: CARS[id].name, sub: `${CARS[id].ref}　${CARS[id].drive}・${CARS[id].mass}kg`, action: () => go(id) })),
+      { label: '戻る', action: () => this.pickSetup(kind, L, area) },
+    ], () => this.pickSetup(kind, L, area), '車種選択');
   }
 
   showRecords(L) {

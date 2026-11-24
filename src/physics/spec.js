@@ -69,7 +69,9 @@ export function buildSpec(carId, equipped, setup = null) {
     length: car.length, width: car.width, height: car.height,
     brakeTorque: car.brakeTorque * brk.torque, brakeBias: car.brakeBias,
     cd: car.cd + (aero?.cd || 0), area: car.area,
-    clF: aero?.clF || 0, clR: aero?.clR || 0,
+    // ボディの揚力（＋）とエアロパーツのダウンフォースの合計（ダウンフォース＝＋）
+    clF: (aero?.clF || 0) - (car.liftF || 0), clR: (aero?.clR || 0) - (car.liftR || 0),
+    center: car.center ? { ...car.center } : null,
     steerLock: car.steerLock,
     boostMax: tb ? tb.boost : 0, turboLag: tb ? tb.lag : 0,
     icEff,

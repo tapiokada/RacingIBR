@@ -116,6 +116,36 @@ export const CARS = {
   },
 };
 
+// ---- シャシー・ボディの物理データ（推定値） ----
+// liftF/liftR: ボディの揚力係数（前面投影面積基準・＋が揚力）。ウイングやエアロパーツのダウンフォースはこれに加算される
+// yawK: ヨー慣性の動的指数（Iz = m·a·b·yawK。エンジンが前に寄るほど大きい）
+// rideH: 純正車高[mm]（最低地上高ではなくサスペンション基準）
+// center: AWDのセンターデフ（split: 前輪への基本配分、pre/acc: 差動制限、visc: 回転差に比例する伝達[N·m/(rad/s)]、capK: 伝達上限＝入力トルク×capK）
+const CHASSIS = {
+  '86-GR': { liftF: 0.04, liftR: 0.08, yawK: 0.95, rideH: 130 },
+  'BRZ-ZD': { liftF: 0.04, liftR: 0.07, yawK: 0.95, rideH: 130 },
+  'RS-RS': { liftF: 0.07, liftR: 0.12, yawK: 0.88, rideH: 125 },
+  'S2K-AP': { liftF: 0.06, liftR: 0.1, yawK: 0.88, rideH: 125 },
+  'SWIFT-S': { liftF: 0.06, liftR: 0.11, yawK: 0.92, rideH: 150 },
+  '80-Supra': { liftF: 0.05, liftR: 0.01, yawK: 1.0, rideH: 130 },
+  'Z-32': { liftF: 0.05, liftR: 0.07, yawK: 0.98, rideH: 130 },
+  'WRX-IMP': { liftF: 0.07, liftR: 0.04, yawK: 0.98, rideH: 145, center: { split: 0.41, pre: 120, acc: 0.45, visc: 0, capK: 0 } },
+  'EVO-IX': { liftF: 0.06, liftR: 0.02, yawK: 0.98, rideH: 145, center: { split: 0.5, pre: 80, acc: 0.6, visc: 0, capK: 0 } },
+  // ATTESA E-TS：基本はFR、後輪が空転すると多板クラッチで前輪へ最大約50%まで伝える
+  'R34-GTR': { liftF: 0.02, liftR: 0.0, yawK: 1.02, rideH: 135, center: { split: 0.0, pre: 0, acc: 0, visc: 450, capK: 0.5 } },
+};
+for (const [id, c] of Object.entries(CHASSIS)) Object.assign(CARS[id], c);
+
 export const CAR_IDS = Object.keys(CARS);
+
+// 中古車店の価格（純正状態）
+export const CAR_PRICES = {
+  'SWIFT-S': 600000, 'RS-RS': 850000, '86-GR': 1000000, 'BRZ-ZD': 1000000, 'Z-32': 1150000,
+  'S2K-AP': 1450000, 'WRX-IMP': 1550000, 'EVO-IX': 1700000, '80-Supra': 1850000, 'R34-GTR': 2600000,
+};
+export const CAR_COLORS = {
+  '86-GR': 0xd9dde3, 'BRZ-ZD': 0x1e4fa8, 'RS-RS': 0xb3121b, 'S2K-AP': 0xe8e4d8, 'SWIFT-S': 0xf2c40f,
+  '80-Supra': 0xd8d8d8, 'Z-32': 0x9a1b1f, 'WRX-IMP': 0x1d3f9a, 'EVO-IX': 0xeaeaea, 'R34-GTR': 0x3a4f9e,
+};
 
 export const PLAYER = { name: '黒碕カケル', car: '86-GR', color: 0xd9dde3 };
