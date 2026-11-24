@@ -222,8 +222,8 @@ src/main.js, game.js   起動・ループ・モード切替
 src/data/              車両・パーツ・ライバル・マップ
 src/physics/           車両運動 / 道路・コース形状 / 峠道（touge.js）/ スペック計算 / セッティング（setup.js）
 src/ai.js              レースAI（レーシングライン＋速度プロファイル）/ 街流しAI
-src/render/            シーン・車モデル（86-GR・Z-32・WRX-IMP・RS-RSは実車GLBモデル glbCars.js、他車は手続き生成）・カメラ
-assets/models/         86-GR・Z-32・WRX-IMP・RS-RSの3Dモデル（変換済みGLB。esbuildでバンドルに埋め込み、file://でも動作）
+src/render/            シーン・車モデル（86-GR・Z-32・WRX-IMP・RS-RS・80-Supra・SWIFT-Sは実車GLBモデル glbCars.js、他車は手続き生成）・カメラ
+assets/models/         実車の3Dモデル（変換済みGLB。esbuildでバンドルに埋め込み、file://でも動作）
 src/modes/             タイトル / 街 / バトル / Practice / リプレイ / ガレージ（garage.js）
 src/ui/                HUD / ショップ / 設定 / セッティング（setup.js）/ パワー・トルク曲線（graph.js）/ メニュー
 tools/                 物理・AI・ブラウザのテストスクリプト、車両GLBの変換（car_model.mjs）・調査（glb_inspect.mjs）、榛名山データ生成（haruna_data.py）
@@ -236,6 +236,8 @@ tools/                 物理・AI・ブラウザのテストスクリプト、�
 - **86-GR の3Dモデル**："Toyota GR86 (ZN8)" by Mona x Supercars（https://sketchfab.com/3d-models/toyota-gr86-zn8-4919d14eba9640599e838230e8e5ed74）、ライセンス CC BY 4.0（http://creativecommons.org/licenses/by/4.0/）。ゲーム用に縮尺・向きの変換、4輪の分離（回転・操舵用）、テクスチャの縮小（WebP 1024px）、メッシュ圧縮（meshopt）を行っています（`tools/car_model.mjs gr86` → `assets/models/gr86.glb`）。ボディ色は車ごとの塗装色に置き換え。このモデルは左ハンドルのため、86-GRの運転席視点は左側の席になります。
 - **Z-32 の3Dモデル**："Nissan Fairlady 300ZX (Z32) 1989" by Lexyc16（https://sketchfab.com/3d-models/nissan-fairlady-300zx-z32-1989-8c04336a4ed84f6f836760db8256f9f0）、ライセンス **CC BY-NC 4.0**（http://creativecommons.org/licenses/by-nc/4.0/）＝**非営利利用のみ**。このモデルを含む配布物を有償にしたり商用で使ったりはできません。ゲーム用に縮尺・向きの変換、4輪の分離、透過ガラスの半透明化、テクスチャ縮小、メッシュ圧縮を行っています（`tools/car_model.mjs z32` → `assets/models/z32.glb`）。右ハンドル。
 - **RS-RS の3Dモデル**："2016 Mazda MX-5 Miata" by Galaxy Car Showroom（https://sketchfab.com/3d-models/2016-mazda-mx-5-miata-922ff6fec90340ed8cf5aabe38dd1ad2）、ライセンス CC BY 4.0（http://creativecommons.org/licenses/by/4.0/）。ゲーム用に向きの変換（ホイールベース2310mm）、4輪の分離（車輪の部品名が重複しているので位置で分離）、テクスチャ縮小、メッシュ圧縮を行っています（`tools/car_model.mjs nd`）。ソフトトップを閉じた状態。左ハンドル。
+- **80-Supra の3Dモデル**："Toyota Supra MK4 | supra 1997 | Free Download" by Pooya_dh（https://sketchfab.com/3d-models/toyota-supra-mk4-supra-1997-free-download-18e530a1f4e04b4bbc5f51a09e2f95e2）、ライセンス **CC BY-NC 4.0**（http://creativecommons.org/licenses/by-nc/4.0/）＝**非営利利用のみ**。ゲーム用に縮尺（ホイールベース2550mm）、4輪の分離（前後の車輪が1部品なので位置で分離、ブレーキキャリパーは車体側）、テクスチャ縮小、メッシュ圧縮を行っています（`tools/car_model.mjs supra`）。左ハンドル。
+- **SWIFT-S の3Dモデル**："2020 Suzuki Swift Sport (ZC33S)" by DisneyCars（https://sketchfab.com/3d-models/2020-suzuki-swift-sport-zc33s-00a05ca44b4345acbc0540e1e9517db9）、ライセンス CC BY 4.0（http://creativecommons.org/licenses/by/4.0/）。ゲーム用に縮尺（ホイールベース2450mm）・原点の補正・4輪の分離・テクスチャ縮小・メッシュ圧縮を行っています（`tools/car_model.mjs swift`）。左ハンドル。
 - **WRX-IMP の3Dモデル**："2012 Varis Subaru Impreza WRX STI GRB Ver." by Ddiaz Design（https://sketchfab.com/3d-models/2012-varis-subaru-impreza-wrx-sti-grb-ver-4cebf7bb114b4b1eb6cea80bb29a5568）、ライセンス **CC BY-NC-SA 4.0**（http://creativecommons.org/licenses/by-nc-sa/4.0/）＝**非営利利用のみ・改変物は同じライセンスで公開**。変換後の `assets/models/wrx.glb` も CC BY-NC-SA 4.0 です。ゲーム用に縮尺（ホイールベース2625mm）・ノード変換の焼き込み・4輪の分離・テクスチャ縮小・メッシュ圧縮を行っています（`tools/car_model.mjs wrx`）。GRB型（ハッチバック）にVarisのワイドボディキット・カーボンボンネット・ウイングが付いた外観。左ハンドル。車両データもGRB型の諸元。
 
 

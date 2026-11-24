@@ -2,6 +2,8 @@
 //  86-GR："Toyota GR86 (ZN8)" by Mona x Supercars（Sketchfab, CC BY 4.0）
 //  Z-32 ："Nissan Fairlady 300ZX (Z32) 1989" by Lexyc16（Sketchfab, CC BY-NC 4.0 — 非営利のみ）
 //  RS-RS ："2016 Mazda MX-5 Miata" by Galaxy Car Showroom（Sketchfab, CC BY 4.0）
+//  80-Supra："Toyota Supra MK4 | supra 1997" by Pooya_dh（Sketchfab, CC BY-NC 4.0 — 非営利のみ）
+//  SWIFT-S："2020 Suzuki Swift Sport (ZC33S)" by DisneyCars（Sketchfab, CC BY 4.0）
 //  WRX-IMP："2012 Varis Subaru Impreza WRX STI GRB Ver." by Ddiaz Design（Sketchfab, CC BY-NC-SA 4.0 — 非営利・継承）
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -10,6 +12,8 @@ import GR86 from '../../assets/models/gr86.glb';
 import Z32 from '../../assets/models/z32.glb';
 import WRX from '../../assets/models/wrx.glb';
 import ND from '../../assets/models/nd.glb';
+import SUPRA from '../../assets/models/supra.glb';
+import SWIFT from '../../assets/models/swift.glb';
 
 // paint: 塗装色を置き換えるマテリアル名、head/tail: ヘッドライト・テールランプのマテリアル名
 // driverX: 運転席の左右位置（+が左）、belt/wsBase: カメラ位置の基準（cameras.js）
@@ -25,6 +29,14 @@ export const GLB_CARS = {
   'RS-RS': {
     data: ND, paint: /^M_CarPaintNormal_Max$/, head: /^M_LightGlassNormal_Clear_Low$/, tail: /^M_LightGlassNormal_Red_Low$/, driverX: 0.35, belt: 0.62, wsBase: 0.62, wingY: 0.78,
     credit: 'RS-RSの3Dモデル："2016 Mazda MX-5 Miata" by Galaxy Car Showroom (Sketchfab) — CC BY 4.0',
+  },
+  '80-Supra': {
+    data: SUPRA, paint: /^Paint$/, head: /^Bright_White_Light$/, tail: /^Bright_Red_Light$|^Trunk_Stoplight$/, driverX: 0.36, belt: 0.66, wsBase: 0.7, wingY: 0.85,
+    credit: '80-Supraの3Dモデル："Toyota Supra MK4 | supra 1997" by Pooya_dh (Sketchfab) — CC BY-NC 4.0（非営利）',
+  },
+  'SWIFT-S': {
+    data: SWIFT, paint: /^New_Material$/, head: /^Puncheffnuminnernalphaalphaita/, tail: /(?!)/, driverX: 0.36, belt: 0.78, wsBase: 0.98, wingY: 1.0,
+    credit: 'SWIFT-Sの3Dモデル："2020 Suzuki Swift Sport (ZC33S)" by DisneyCars (Sketchfab) — CC BY 4.0',
   },
   'WRX-IMP': {
     data: WRX, paint: /^wrxM_CarPaint(Normal)?_Max1$/, head: /^wrxM_LightGlassNormal_Clear_Low1$/, tail: /^wrxM_LightGlass_Red_Low1$|^varisM_Light_Taillight/, driverX: 0.37, belt: 0.72, wsBase: 0.78, wingY: 0.95,

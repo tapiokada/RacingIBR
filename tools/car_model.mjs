@@ -3,7 +3,7 @@
 // - 4輪を車体から分離（回転・操舵用に車輪中心を原点としたノード wheel_FL/FR/RL/RR）
 // - 透過（transmission）ガラスは半透明に置き換え（描画負荷対策）
 // - テクスチャを1024px WebPに縮小、メッシュをmeshopt圧縮
-// usage: node tools/car_model.mjs <gr86|z32|wrx|nd> <in.glb> <out.glb>
+// usage: node tools/car_model.mjs <gr86|z32|wrx|nd|supra|swift> <in.glb> <out.glb>
 import { NodeIO, getBounds } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTMeshoptCompression } from '@gltf-transform/extensions';
 import { dedup, prune, weld, textureCompress, meshopt, reorder } from '@gltf-transform/functions';
@@ -42,6 +42,18 @@ const CONFIGS = {
     wheels: [{ name: 'wheel_FL', p: [-0.733, 0.1805, -1.1535] }, { name: 'wheel_FR', p: [0.733, 0.1805, -1.1535] }, { name: 'wheel_RL', p: [-0.733, 0.1805, 1.1535] }, { name: 'wheel_RR', p: [0.733, 0.1805, 1.1535] }],
     side: (x, y, z) => x, along: (x, y, z) => [z, y], ground: -0.14,
   },
+  // "Toyota Supra MK4 | supra 1997" by Pooya_dh (CC BY-NC 4.0)：Y-up・前が+z・左が+x。前後の車輪が1つの部品なので位置で分離、キャリパーは車体側
+  supra: {
+    world: true, map: (x, y, z) => [x, y, z], wb: 2.55, cut: 0.4, inner: 0.72, noWheel: /Caliper/i,
+    wheels: [{ name: 'wheel_FL', p: [0.88, 0.349, 1.5625] }, { name: 'wheel_FR', p: [-0.88, 0.349, 1.5625] }, { name: 'wheel_RL', p: [0.88, 0.349, -1.3605] }, { name: 'wheel_RR', p: [-0.88, 0.349, -1.3605] }],
+    side: (x, y, z) => x, along: (x, y, z) => [z, y], ground: -0.007,
+  },
+  // "2020 Suzuki Swift Sport (ZC33S)" by DisneyCars (CC BY 4.0)：Y-up・前が+z・左が+x、原点がずれているので左右も中央に寄せる
+  swift: {
+    world: true, map: (x, y, z) => [x, y, z], wb: 2.45, cut: 1.2, inner: 2.45, centerX: true,
+    wheels: [{ name: 'wheel_FL', p: [479.43, 110.50, -60.82] }, { name: 'wheel_FR', p: [473.64, 110.50, -60.82] }, { name: 'wheel_RL', p: [479.445, 110.50, -70.253] }, { name: 'wheel_RR', p: [473.618, 110.50, -70.253] }],
+    side: (x, y, z) => x - 476.531, along: (x, y, z) => [z, y], ground: 109.34,
+  },
 };
 const C = CONFIGS[model];
 if (C.world && C.wheelNodes) {
@@ -60,7 +72,8 @@ const W = C.wheels.map((w) => ({ ...w, g: mp(...w.p) }));
 const zF = (W[0].g[2] + W[1].g[2]) / 2, zR = (W[2].g[2] + W[3].g[2]) / 2;
 const S = C.wb / Math.abs(zF - zR);
 const Z0 = (zF + zR) / 2, Y0 = C.ground;
-const tp = (x, y, z) => { const g = mp(x, y, z); return [S * g[0], S * (g[1] - Y0), S * (g[2] - Z0)]; };
+const X0 = C.centerX ? W.reduce((a, w) => a + w.g[0], 0) / 4 : 0; // 左右の中心（原点がずれたモデル用）
+const tp = (x, y, z) => { const g = mp(x, y, z); return [S * (g[0] - X0), S * (g[1] - Y0), S * (g[2] - Z0)]; };
 const tn = (x, y, z) => mp(x, y, z);
 const WHEELS_RAW = C.wheels.map((w) => ({ name: w.name, x: w.p[0], y: w.p[1], z: w.p[2] }));
 // 判定：車輪中心から半径cut以内（前後・上下）かつ車体外側（同じ側で |左右| > inner）
@@ -92,7 +105,7 @@ let tris = 0, wtris = 0;
 // 処理単位：world=true ならメッシュを持つノードごと（ワールド行列と車輪の所属を付ける）、そうでなければメッシュごと
 const isAnc = (anc, n) => { for (let p = n; p; p = p.getParentNode()) if (p === anc) return true; return false; };
 const items = C.world
-  ? root.listNodes().filter((n) => n.getMesh()).map((n) => ({ mesh: n.getMesh(), M: n.getWorldMatrix(), wheel: C.wheelNodes ? C.wheels.findIndex((w) => isAnc(w.node, n)) : null }))
+  ? root.listNodes().filter((n) => n.getMesh()).map((n) => ({ mesh: n.getMesh(), M: n.getWorldMatrix(), wheel: C.wheelNodes ? C.wheels.findIndex((w) => isAnc(w.node, n)) : C.noWheel && C.noWheel.test(n.getName()) ? -1 : null }))
   : root.listMeshes().map((mesh) => ({ mesh, M: null, wheel: null }));
 const xf = (M, v, dir) => {
   if (!M) return v;
