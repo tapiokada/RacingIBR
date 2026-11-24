@@ -3,7 +3,7 @@
 // - 4輪を車体から分離（回転・操舵用に車輪中心を原点としたノード wheel_FL/FR/RL/RR）
 // - 透過（transmission）ガラスは半透明に置き換え（描画負荷対策）
 // - テクスチャを1024px WebPに縮小、メッシュをmeshopt圧縮
-// usage: node tools/car_model.mjs <gr86|z32|wrx> <in.glb> <out.glb>
+// usage: node tools/car_model.mjs <gr86|z32|wrx|nd> <in.glb> <out.glb>
 import { NodeIO, getBounds } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTMeshoptCompression } from '@gltf-transform/extensions';
 import { dedup, prune, weld, textureCompress, meshopt, reorder } from '@gltf-transform/functions';
@@ -36,9 +36,15 @@ const CONFIGS = {
     world: true, map: (x, y, z) => [x, y, z], wb: 2.625,
     wheelNodes: ['3DWheel Front L', '3DWheel Front R', '3DWheel Rear L', '3DWheel Rear R'],
   },
+  // "2016 Mazda MX-5 Miata" by Galaxy Car Showroom (CC BY 4.0)：ワールド座標がY-up・メートル・前が−z。車輪ノード名が重複しているので位置で分離
+  nd: {
+    world: true, map: (x, y, z) => [-x, y, -z], wb: 2.31, cut: 0.345, inner: 0.58,
+    wheels: [{ name: 'wheel_FL', p: [-0.733, 0.1805, -1.1535] }, { name: 'wheel_FR', p: [0.733, 0.1805, -1.1535] }, { name: 'wheel_RL', p: [-0.733, 0.1805, 1.1535] }, { name: 'wheel_RR', p: [0.733, 0.1805, 1.1535] }],
+    side: (x, y, z) => x, along: (x, y, z) => [z, y], ground: -0.14,
+  },
 };
 const C = CONFIGS[model];
-if (C.world) {
+if (C.world && C.wheelNodes) {
   // 車輪ノードの外接箱の中心を車輪中心に、シーン最下点を接地面にする
   C.wheels = C.wheelNodes.map((nm, k) => {
     const nd = root.listNodes().find((n) => n.getName() === nm);
@@ -86,7 +92,7 @@ let tris = 0, wtris = 0;
 // 処理単位：world=true ならメッシュを持つノードごと（ワールド行列と車輪の所属を付ける）、そうでなければメッシュごと
 const isAnc = (anc, n) => { for (let p = n; p; p = p.getParentNode()) if (p === anc) return true; return false; };
 const items = C.world
-  ? root.listNodes().filter((n) => n.getMesh()).map((n) => ({ mesh: n.getMesh(), M: n.getWorldMatrix(), wheel: C.wheels.findIndex((w) => isAnc(w.node, n)) }))
+  ? root.listNodes().filter((n) => n.getMesh()).map((n) => ({ mesh: n.getMesh(), M: n.getWorldMatrix(), wheel: C.wheelNodes ? C.wheels.findIndex((w) => isAnc(w.node, n)) : null }))
   : root.listMeshes().map((mesh) => ({ mesh, M: null, wheel: null }));
 const xf = (M, v, dir) => {
   if (!M) return v;
@@ -106,7 +112,7 @@ for (const item of items) {
     const a = [], b = [], cc = [];
     for (let t = 0; t < n; t += 3) {
       const ids = [0, 1, 2].map((k) => (idx ? idx.getScalar(t + k) : t + k));
-      const ws = item.wheel != null ? [item.wheel, item.wheel, item.wheel] : ids.map((i) => { pos.getElement(i, a); return wheelOf(a[0], a[1], a[2]); });
+      const ws = item.wheel != null ? [item.wheel, item.wheel, item.wheel] : ids.map((i) => { pos.getElement(i, a); return wheelOf(...xf(item.M, a, false)); });
       const g = ws[0] >= 0 && ws[0] === ws[1] && ws[1] === ws[2] ? ws[0] : 4;
       groups[g].push(...ids);
     }

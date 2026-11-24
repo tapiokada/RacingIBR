@@ -1,6 +1,7 @@
 // 実車の3Dモデル（GLB）を使う車両：tools/car_model.mjs で座標変換・車輪分離・圧縮したもの
 //  86-GR："Toyota GR86 (ZN8)" by Mona x Supercars（Sketchfab, CC BY 4.0）
 //  Z-32 ："Nissan Fairlady 300ZX (Z32) 1989" by Lexyc16（Sketchfab, CC BY-NC 4.0 — 非営利のみ）
+//  RS-RS ："2016 Mazda MX-5 Miata" by Galaxy Car Showroom（Sketchfab, CC BY 4.0）
 //  WRX-IMP："2012 Varis Subaru Impreza WRX STI GRB Ver." by Ddiaz Design（Sketchfab, CC BY-NC-SA 4.0 — 非営利・継承）
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -8,6 +9,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import GR86 from '../../assets/models/gr86.glb';
 import Z32 from '../../assets/models/z32.glb';
 import WRX from '../../assets/models/wrx.glb';
+import ND from '../../assets/models/nd.glb';
 
 // paint: 塗装色を置き換えるマテリアル名、head/tail: ヘッドライト・テールランプのマテリアル名
 // driverX: 運転席の左右位置（+が左）、belt/wsBase: カメラ位置の基準（cameras.js）
@@ -19,6 +21,10 @@ export const GLB_CARS = {
   'Z-32': {
     data: Z32, paint: /^Material\.001$/, head: /^Material\.010$/, tail: /^Material\.016$/, driverX: -0.36, belt: 0.62, wsBase: 0.62, wingY: 0.82,
     credit: 'Z-32の3Dモデル："Nissan Fairlady 300ZX (Z32) 1989" by Lexyc16 (Sketchfab) — CC BY-NC 4.0（非営利）',
+  },
+  'RS-RS': {
+    data: ND, paint: /^M_CarPaintNormal_Max$/, head: /^M_LightGlassNormal_Clear_Low$/, tail: /^M_LightGlassNormal_Red_Low$/, driverX: 0.35, belt: 0.62, wsBase: 0.62, wingY: 0.78,
+    credit: 'RS-RSの3Dモデル："2016 Mazda MX-5 Miata" by Galaxy Car Showroom (Sketchfab) — CC BY 4.0',
   },
   'WRX-IMP': {
     data: WRX, paint: /^wrxM_CarPaint(Normal)?_Max1$/, head: /^wrxM_LightGlassNormal_Clear_Low1$/, tail: /^wrxM_LightGlass_Red_Low1$|^varisM_Light_Taillight/, driverX: 0.37, belt: 0.72, wsBase: 0.78, wingY: 0.95,
