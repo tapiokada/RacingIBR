@@ -97,6 +97,7 @@ export class Hud {
     const tags = [];
     if ((car.tcsCut || 0) > 0.05 && car.input.throttle > 0.05) tags.push(['TCS', '#ffb020']);
     if ((car.assistCut || 0) > 0.05) tags.push(['ASSIST', '#33e1ff']);
+    if ((car.input?.handbrake || 0) > 0.3) tags.push(['HAND', '#ff4d6d']);
     c.font = 'bold 11px sans-serif'; c.textAlign = 'left';
     tags.forEach(([t, col], i) => { c.fillStyle = col; c.fillText(t, cx - 110 + i * 46, cy - 64); });
   }

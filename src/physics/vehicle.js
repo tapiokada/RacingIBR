@@ -270,6 +270,7 @@ export class Vehicle {
     const R = s.tireRadius;
     if (this.auto) this.autoShift(dt);
     let { throttle, brake } = this.effectiveInputs();
+    const hb = this.input.handbrake || 0; // ハンドブレーキ（後輪のみ、ABSは効かない）
     if (this.shiftTimer > 0) this.shiftTimer -= dt;
     const shifting = this.shiftTimer > 0;
 
@@ -324,7 +325,8 @@ export class Vehicle {
 
     // ---- エンジン / ドライブトレイン ----
     const ratio = this.ratio();
-    const engaged = ratio !== 0 && !shifting;
+    // ハンドブレーキを引いている間はクラッチを切る（後輪をロックさせてもエンストさせない操作。FFは後輪が駆動輪でないので切らない）
+    const engaged = ratio !== 0 && !shifting && !(hb > 0.5 && s.drive !== 'FF');
     let rpm;
     const wheelRpm = this.wheelRpm();
     let slipping = false;
@@ -467,6 +469,9 @@ export class Vehicle {
         if (this.om[i] * R - this.vl[i] < lim) bk[i] *= keep;
       }
     }
+
+    // ハンドブレーキ：後輪にロックできる強さのブレーキ（ABSの制御外）
+    if (hb > 0) { const T = (s.handbrakeTorque || 1600) * hb; bk[2] += T; bk[3] += T; }
 
     // ---- 車輪回転（陰解法）：各軸を「平均回転」と「左右差（デフ）」に分けて解く ----
     const om = this.om, Iw = this.Iw;

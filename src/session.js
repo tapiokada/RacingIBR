@@ -75,7 +75,7 @@ export class DriveSession {
     const tB = inp.held('brake') ? 1 : inp.held('partialBrake') ? pB : 0;
     const steer = (inp.held('right') ? 1 : 0) - (inp.held('left') ? 1 : 0);
     const ramp = (a, b, r) => a + Math.max(-r * dt, Math.min(r * dt, b - a));
-    car.input = { throttle: ramp(prev.throttle, tT, tT > prev.throttle ? 7 : 12), brake: ramp(prev.brake, tB, 10), steer };
+    car.input = { throttle: ramp(prev.throttle, tT, tT > prev.throttle ? 7 : 12), brake: ramp(prev.brake, tB, 10), steer, handbrake: ramp(prev.handbrake || 0, inp.held('handbrake') ? 1 : 0, 12) };
     if (inp.hit('reset')) {
       // resetRule: 'battle' = 10km/h以下のときだけ、10m後方へ
       if (this.resetRule === 'battle') {

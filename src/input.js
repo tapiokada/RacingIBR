@@ -4,6 +4,7 @@ export const ACTIONS = [
   { id: 'brake', name: 'ブレーキ', def: 'KeyS' },
   { id: 'partialThrottle', name: 'パーシャルアクセル', def: 'KeyG' },
   { id: 'partialBrake', name: 'パーシャルブレーキ', def: 'KeyB' },
+  { id: 'handbrake', name: 'ハンドブレーキ', def: 'KeyN' },
   { id: 'shiftUp', name: 'シフトアップ', def: 'KeyE' },
   { id: 'shiftDown', name: 'シフトダウン', def: 'KeyD' },
   { id: 'left', name: '左ハンドル', def: 'KeyJ' },
