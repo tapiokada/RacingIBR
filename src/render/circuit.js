@@ -1,15 +1,22 @@
-// つくば山麓サーキット（実在の筑波サーキット TC2000 を元にした架空名称）の夕暮れのシーン
+// 実在サーキット（筑波・鈴鹿・富士）を元にした架空名称のサーキットの夕暮れのシーン
 // コース・縁石・ランオフ（芝／グラベル／舗装）・タイヤバリア・ガードレール・ピットウォール、
-// ピットビル・コントロールタワー・グランドスタンド・ブリッジ・コーナー看板など（施設名はすべて架空）
+// ピットビル・コントロールタワー・グランドスタンド・コーナー看板、立体交差の橋（鈴鹿）、
+// 筑波のブリッジ・隣接コース、鈴鹿の観覧車、富士の富士山など（施設名はすべて架空）
 import * as THREE from 'three';
 import { AREAS } from '../data/map.js';
-import { CIRCUIT as C, CircuitGround, circuitCorridor, terrainAt, CORNER_SIGNS, PIT_WALL_RANGE } from '../physics/circuit.js';
+import { CIRCUITS, CircuitGround, circuitCorridor, terrainAt as terrainAtC } from '../physics/circuit.js';
 import { canvasTex, asphaltTex, textSprite, rng } from './world.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
-const N = C.n;
+// 構築中のサーキット（CircuitWorld の構築時に設定）
+let C = null, N = 0, L = 0;
 const W = (i) => ((i % N) + N) % N;
-const L = C.length;
+const terrainAt = (x, z) => terrainAtC(C, x, z);
+const SIGN_TEXT = {
+  tsukuba: ['TSUKUBA SANROKU CIRCUIT', 'つくば山麓サーキット'],
+  suzuka: ['SUZUKA KYURYO CIRCUIT', '鈴鹿丘陵サーキット'],
+  fuji: ['FUJI SANROKU CIRCUIT', '富士山麓サーキット'],
+};
 
 // 中心線から lat（右正）の点
 function pt(i, lat, yOff = 0) {
@@ -78,12 +85,13 @@ export class CircuitWorld {
     this.area = area;
     this.areaDef = AREAS[area];
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x2a2440, 150, 1100);
+    this.scene.fog = new THREE.Fog(0x2a2440, 200, area === 'tsukuba' ? 1100 : 1900);
     const pm = new THREE.PMREMGenerator(renderer);
     this.scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
     this.scene.environmentIntensity = 0.45;
-    this.corridor = circuitCorridor();
-    this.ground = new CircuitGround();
+    C = this.C = CIRCUITS[this.areaDef.circuit]; N = C.n; L = C.length;
+    this.corridor = circuitCorridor(C);
+    this.ground = new CircuitGround(C);
     this.poiMarkers = [];
     this.gateMarkers = [];
     this.courseGroup = null;
@@ -98,9 +106,13 @@ export class CircuitWorld {
     this.buildBarriers();
     this.buildPit();
     this.buildGrandstand();
-    this.buildBridge();
+    this.noTree = [];
+    if (C.id === 'tsukuba') { this.buildBridge(); this.buildOtherCourses(); }
+    this.buildOverpass();
+    this.buildEmbankment();
     this.buildSigns();
-    this.buildOtherCourses();
+    if (C.id === 'suzuka') this.buildFerrisWheel();
+    if (C.id === 'fuji') this.buildMtFuji();
     this.buildTrees();
     this.buildLights();
   }
@@ -114,17 +126,17 @@ export class CircuitWorld {
       g.fillStyle = gr; g.fillRect(0, 0, w, h);
     }, false);
     const dome = new THREE.Mesh(new THREE.SphereGeometry(2500, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2 + 0.05), new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false, depthWrite: false }));
-    dome.position.y = -40;
+    dome.position.y = C.terrain.hmin - 40;
     S.add(dome);
     // 遠くの山並み（筑波山の方角＝北東にシルエット）
     const mtn = canvasTex(1024, 128, (g, w, h) => {
       g.clearRect(0, 0, w, h); g.fillStyle = '#1a1830';
       g.beginPath(); g.moveTo(0, h);
-      for (let x = 0; x <= w; x += 8) { const t = x / w; const y = h - (18 + 70 * Math.exp(-((t - 0.42) ** 2) / 0.004) + 55 * Math.exp(-((t - 0.47) ** 2) / 0.003) + 14 * Math.sin(t * 40)); g.lineTo(x, y); }
+      for (let x = 0; x <= w; x += 8) { const t = x / w; const pk = C.id === 'tsukuba' ? 1 : 0.25; const y = h - (18 + pk * (70 * Math.exp(-((t - 0.42) ** 2) / 0.004) + 55 * Math.exp(-((t - 0.47) ** 2) / 0.003)) + 14 * Math.sin(t * 40) + (C.id === 'tsukuba' ? 0 : 10 * Math.sin(t * 13 + 1))); g.lineTo(x, y); }
       g.lineTo(w, h); g.closePath(); g.fill();
     }, false);
     const ring = new THREE.Mesh(new THREE.CylinderGeometry(2200, 2200, 260, 48, 1, true), new THREE.MeshBasicMaterial({ map: mtn, transparent: true, side: THREE.BackSide, fog: false, depthWrite: false }));
-    ring.position.y = 60; ring.rotation.y = -0.6;
+    ring.position.y = C.terrain.hmin + 40; ring.rotation.y = -0.6;
     S.add(ring);
     S.background = new THREE.Color(0x0c1030);
     S.add(new THREE.HemisphereLight(0x9a90c8, 0x3a3020, 1.15));
@@ -135,19 +147,14 @@ export class CircuitWorld {
 
   // 地面（芝）：コース周辺は路面より少し低く、外は地形
   buildGround() {
-    const x0 = -300, z0 = -280, x1 = 380, z1 = 360, cell = 4;
+    const T = C.terrain;
+    const x0 = T.x0 + 8, z0 = T.z0 + 8, x1 = T.x0 + (T.nx - 2) * T.cell, z1 = T.z0 + (T.nz - 2) * T.cell, cell = C.id === 'tsukuba' ? 4 : 5;
     const nx = Math.round((x1 - x0) / cell) + 1, nz = Math.round((z1 - z0) / cell) + 1;
     const pos = new Float32Array(nx * nz * 3), col = new Float32Array(nx * nz * 3);
     const r = rng(21);
     for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
       const k = j * nx + i, x = x0 + i * cell, z = z0 + j * cell;
-      let y = terrainAt(x, z);
-      const q = this.ground.nearest(x, z);
-      if (q) {
-        const ty = C.y[q.i] - 0.12;
-        const t = Math.max(0, Math.min(1, 1 - (q.d - C.hw[q.i] - 24) / 30));
-        y = y * (1 - t) + ty * t;
-      }
+      const y = this.ground.groundY(x, z);
       pos[k * 3] = x; pos[k * 3 + 1] = y; pos[k * 3 + 2] = z;
       const v = 0.8 + r() * 0.3;
       col[k * 3] = 0.16 * v; col[k * 3 + 1] = 0.24 * v; col[k * 3 + 2] = 0.12 * v;
@@ -166,7 +173,7 @@ export class CircuitWorld {
     this.scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true })));
     // 遠景の田畑
     const far = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshLambertMaterial({ color: 0x1c2a16 }));
-    far.rotation.x = -Math.PI / 2; far.position.y = 18; this.scene.add(far);
+    far.rotation.x = -Math.PI / 2; far.position.y = C.terrain.hmin - 2; this.scene.add(far);
   }
 
   buildTrack() {
@@ -222,7 +229,7 @@ export class CircuitWorld {
   // バリア：コーナー外側（グラベルの奥）はタイヤバリア、その他はガードレール、ホームストレートのイン側はピットウォール
   buildBarriers() {
     const S = this.scene;
-    const pitSide = (i) => inRange(C.s[i], PIT_WALL_RANGE[0], PIT_WALL_RANGE[1]);
+    const pitSide = (i) => inRange(C.s[i], C.pitWall[0], C.pitWall[1]);
     const tyreTex = canvasTex(64, 32, (g, w, h) => { g.fillStyle = '#111'; g.fillRect(0, 0, w, h); for (let k = 0; k < 4; k++) { g.fillStyle = '#2a2a2a'; g.beginPath(); g.arc(8 + k * 16, 16, 7, 0, Math.PI * 2); g.fill(); g.fillStyle = '#0a0a0a'; g.beginPath(); g.arc(8 + k * 16, 16, 3, 0, Math.PI * 2); g.fill(); } });
     const railTex = canvasTex(64, 32, (g, w, h) => { g.fillStyle = '#9aa0a8'; g.fillRect(0, 0, w, h); g.fillStyle = '#c8ccd2'; g.fillRect(0, 6, w, 6); g.fillRect(0, 20, w, 6); g.fillStyle = '#555'; g.fillRect(0, 0, 3, h); });
     const tyreZone = (side) => (i) => {
@@ -252,7 +259,7 @@ export class CircuitWorld {
   buildPit() {
     const S = this.scene;
     const g = new THREE.Group();
-    const s0 = PIT_WALL_RANGE[0] + 25, s1 = PIT_WALL_RANGE[1] - 20; // 0 をまたぐ
+    const s0 = C.pitWall[0] + 25, s1 = C.pitWall[1] - 20; // 0 をまたぐ
     const span = (s1 - s0 + L) % L;
     const pitMask = (i) => inRange(C.s[i], s0, s1);
     const wallLat = (i) => C.hw[i] + C.runR[i] + 0.7;
@@ -283,7 +290,7 @@ export class CircuitWorld {
       g.add(door);
     }
     // ピットビル2階の看板
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(60, 2.4), new THREE.MeshBasicMaterial({ map: textSprite('TSUKUBA SANROKU CIRCUIT', '#fff', 'rgba(20,40,80,0.95)', 92, '#4ad'), side: THREE.DoubleSide }));
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(60, 2.4), new THREE.MeshBasicMaterial({ map: textSprite(SIGN_TEXT[C.id][0], '#fff', 'rgba(20,40,80,0.95)', 92, '#4ad'), side: THREE.DoubleSide }));
     { const i = idxAt(s0 + span * 0.45); const p = pt(i, wallLat(i) + 10.7); sign.position.set(p.x, p.y + 7.6, p.z); sign.rotation.y = Math.atan2(p.tx, p.tz) - Math.PI / 2; g.add(sign); }
     // コントロールタワー（コントロールライン付近）
     {
@@ -297,7 +304,7 @@ export class CircuitWorld {
       const roof = new THREE.Mesh(new THREE.BoxGeometry(18, 0.6, 13.5), new THREE.MeshLambertMaterial({ color: 0x555a63 }));
       roof.position.set(p.x, p.y + 16.3, p.z); roof.rotation.y = rot;
       g.add(tower, glass, roof);
-      const t = new THREE.Mesh(new THREE.PlaneGeometry(14, 2), new THREE.MeshBasicMaterial({ map: textSprite('つくば山麓サーキット', '#fff', 'rgba(170,20,30,0.95)', 90, '#f66'), side: THREE.DoubleSide }));
+      const t = new THREE.Mesh(new THREE.PlaneGeometry(14, 2), new THREE.MeshBasicMaterial({ map: textSprite(SIGN_TEXT[C.id][1], '#fff', 'rgba(170,20,30,0.95)', 90, '#f66'), side: THREE.DoubleSide }));
       const q = pt(i, wallLat(i) + 11 + 2.9);
       t.position.set(q.x, q.y + 10, q.z); t.rotation.y = rot - Math.PI / 2;
       g.add(t);
@@ -322,7 +329,9 @@ export class CircuitWorld {
         g.add(lamp); this.signal.push(lamp);
       }
     }
-    // パドックの建物（インフィールド）
+    S.add(g);
+    if (C.id !== 'tsukuba') return;
+    // パドックの建物（インフィールド・筑波）
     const bm = new THREE.MeshLambertMaterial({ color: 0xbfc4cc });
     const placeBld = (x, z, w, d, h, rot, mat = bm) => {
       const y = terrainAt(x, z);
@@ -341,7 +350,6 @@ export class CircuitWorld {
     placeBld(-105, 140, 14, 22, 7, 0.05);
     placeBld(85, 95, 26, 8, 5, -0.5);
     placeBld(5, 40, 28, 7, 4, 0.45, new THREE.MeshLambertMaterial({ color: 0xd0d4da }));
-    S.add(g);
   }
 
   // グランドスタンド（ホームストレートのアウト側）
@@ -353,7 +361,7 @@ export class CircuitWorld {
     const roofMat = new THREE.MeshLambertMaterial({ color: 0xd0d4da });
     const crowd = new THREE.MeshLambertMaterial({ color: 0x6a5a50 });
     const r = rng(14);
-    for (let s = -70; s <= 90; s += 10) {
+    for (let s = C.stand[0]; s <= C.stand[1]; s += 10) {
       const i = idxAt(s);
       const base = C.hw[i] + C.runL[i] + 3.5;
       const rot = Math.atan2(C.tx[i], C.tz[i]);
@@ -413,7 +421,7 @@ export class CircuitWorld {
     const S = this.scene;
     const g = new THREE.Group();
     const pole = new THREE.MeshLambertMaterial({ color: 0x888888 });
-    for (const c of CORNER_SIGNS) {
+    for (const c of C.signs) {
       const i = idxAt(c.s);
       const side = c.right ? -1 : 1; // コーナーの外側
       const lat = side * (C.hw[i] + (side < 0 ? C.runL[i] : C.runR[i]) + 2.5);
@@ -427,7 +435,7 @@ export class CircuitWorld {
       g.add(b, po);
     }
     // 距離板（1コーナー・第1/第2ヘアピン・最終コーナーの手前）
-    const boards = CORNER_SIGNS.filter((c) => /1コーナー|ヘアピン|最終/.test(c.name));
+    const boards = C.signs.filter((c) => /1コーナー|ヘアピン|最終|シケイン|スプーン/.test(c.name));
     for (const c of boards) {
       for (const d of [150, 100, 50]) {
         const s = c.s - d - (c.name === '1コーナー' ? 0 : 25);
@@ -457,7 +465,7 @@ export class CircuitWorld {
       S.add(mesh);
     };
     ell(118, -118, 96, 128, 20, 0.35, terrainAt(118, -118) + 0.08); // オーバル
-    this.noTree = [{ x: 118, z: -118, r: 140 }, { x: 255, z: 75, r: 115 }, { x: -60, z: 40, r: 70 }, { x: -30, z: -60, r: 50 }, { x: 60, z: 120, r: 45 }];
+    this.noTree.push({ x: 118, z: -118, r: 140 }, { x: 255, z: 75, r: 115 }, { x: -60, z: 40, r: 70 }, { x: -30, z: -60, r: 50 }, { x: 60, z: 120, r: 45 });
     ell(255, 75, 62, 95, 12, 0.2, terrainAt(255, 75) + 0.08); // 1000コース（簡略）
   }
 
@@ -465,14 +473,16 @@ export class CircuitWorld {
     const r = rng(8);
     const trunks = [], crowns = [];
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
-    for (let it = 0; it < 9000 && crowns.length < 2600; it++) {
-      const x = -300 + r() * 680, z = -280 + r() * 640;
-      const nq = this.ground.nearest(x, z);
+    const T = C.terrain, tx0 = T.x0 + 10, tz0 = T.z0 + 10, tw = (T.nx - 3) * T.cell, td = (T.nz - 3) * T.cell;
+    const maxN = C.id === 'tsukuba' ? 2600 : 5000;
+    for (let it = 0; it < 30000 && crowns.length < maxN; it++) {
+      const x = tx0 + r() * tw, z = tz0 + r() * td;
+      const nq = this.ground.nearest(x, z, null);
       if (nq && nq.d < C.hw[nq.i] + Math.max(C.runL[nq.i], C.runR[nq.i]) + 14) continue;
       if (this.noTree.some((a) => Math.hypot(x - a.x, z - a.z) < a.r)) continue;
       // 南東の雑木林は密に、それ以外は疎ら
-      const forest = x > -20 && x < 260 && z > 170 && z < 320;
-      if (!forest && r() < 0.8) continue;
+      if (C.id === 'tsukuba') { const forest = x > -20 && x < 260 && z > 170 && z < 320; if (!forest && r() < 0.8) continue; }
+      else if (nq && nq.d < 60 && r() < 0.7) continue; // コースのすぐ近くは疎らに
       const y = terrainAt(x, z);
       const h = 8 + r() * 10;
       m4.compose(p.set(x, y + h * 0.25, z), q, sc.set(1, h * 0.5, 1)); trunks.push(m4.clone());
@@ -503,6 +513,105 @@ export class CircuitWorld {
       g.add(pole, head);
       if (n++ % 2 === 0) { const L0 = new THREE.PointLight(0xfff0d0, 260, 120, 1.6); L0.position.set(p.x - p.rx * side * 6, p.y + 17, p.z - p.rz * side * 6); g.add(L0); }
     }
+    this.scene.add(g);
+  }
+
+  // 点 i（lat の位置）が、下を通る別の区間の上空にあるか（立体交差の橋の部分）
+  overLower(i, lat = 0) {
+    if (!C.crossings.length) return false;
+    const p = pt(i, lat);
+    for (const cr of C.crossings) {
+      const lo = C.y[cr.i] < C.y[cr.j] ? cr.i : cr.j;
+      if (C.y[i] < C.y[lo] + 3) continue;
+      for (let k = -25; k <= 25; k++) {
+        const j = W(lo + k);
+        const d = Math.hypot(p.x - C.x[j], p.z - C.z[j]);
+        if (d < C.hw[j] + Math.max(C.runL[j], C.runR[j]) + 3) return true;
+      }
+    }
+    return false;
+  }
+
+  // 立体交差：上を通る区間の橋桁（下の道の上だけ）と橋脚
+  buildOverpass() {
+    if (!C.crossings.length) return;
+    const S = this.scene;
+    const mask = (i) => this.overLower(i, 0);
+    const conc = new THREE.MeshLambertMaterial({ color: 0xa8aab0 });
+    const run = (i, side) => C.hw[i] + (side < 0 ? C.runL[i] : C.runR[i]) + 0.6;
+    S.add(band((i) => -run(i, -1), (i) => run(i, 1), -1.3, conc, { mask }));
+    for (const side of [-1, 1]) S.add(wall((i) => side * run(i, side), 2.4, new THREE.MeshLambertMaterial({ color: 0xc4c6cc }), { mask, yBase: -1.3 }));
+    // 看板（架空の広告）
+    for (const cr of C.crossings) {
+      const up = C.y[cr.i] > C.y[cr.j] ? cr.i : cr.j;
+      const p = pt(up, 0);
+      for (const sd of [-1, 1]) {
+        const q = pt(up - sd * 4, 0);
+        const ad = new THREE.Mesh(new THREE.PlaneGeometry((C.hw[up] + 4) * 2, 1.6), new THREE.MeshBasicMaterial({ map: textSprite('RACING IBR', '#fff', 'rgba(20,20,120,0.95)', 96, '#8af'), side: THREE.DoubleSide }));
+        ad.position.set(q.x, p.y - 0.6, q.z); ad.rotation.y = Math.atan2(p.tx, p.tz) + Math.PI / 2;
+        S.add(ad);
+      }
+    }
+  }
+
+  // 盛土の法面：路面（バリアの外）が地面より高い所はコンクリートの擁壁で地面まで
+  buildEmbankment() {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshLambertMaterial({ color: 0x5a5a52, side: THREE.DoubleSide });
+    for (const side of [-1, 1]) {
+      const pos = [], idx = [];
+      let prev = -1;
+      for (let k = 0; k <= N; k++) {
+        const i = W(k);
+        const lat = side * (C.hw[i] + (side < 0 ? C.runL[i] : C.runR[i]) + 1.4);
+        const p = pt(i, lat);
+        const gy = this.ground.groundY(p.x, p.z);
+        if (p.y - gy < 0.6 || this.overLower(i, lat)) { prev = -1; continue; }
+        pos.push(p.x, p.y + 0.05, p.z, p.x, gy - 0.3, p.z);
+        const v = pos.length / 3 - 2;
+        if (prev >= 0) idx.push(prev, v, prev + 1, prev + 1, v, v + 1);
+        prev = v;
+      }
+      if (!idx.length) continue;
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setIndex(idx); geo.computeVertexNormals();
+      g.add(new THREE.Mesh(geo, mat));
+    }
+    this.scene.add(g);
+  }
+
+  // 鈴鹿：遊園地の観覧車（コース北東の丘の上・名称なし）
+  buildFerrisWheel() {
+    const g = new THREE.Group();
+    const x = 620, z = -560, y = terrainAt(x, z);
+    g.position.set(x, y, z); g.rotation.y = 0.6;
+    const R = 25;
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.4, 6, 48), new THREE.MeshBasicMaterial({ color: 0xff9ad0 }));
+    rim.position.y = R + 6; g.add(rim);
+    const spokeM = new THREE.MeshLambertMaterial({ color: 0xdddddd });
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2;
+      const sp = new THREE.Mesh(new THREE.BoxGeometry(0.2, R, 0.2), spokeM);
+      sp.position.set(Math.cos(a) * R / 2, R + 6 + Math.sin(a) * R / 2, 0); sp.rotation.z = a - Math.PI / 2; g.add(sp);
+      const cab = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2, 1.8), new THREE.MeshBasicMaterial({ color: [0xff5a5a, 0xffd25a, 0x5ad2ff, 0x9aff5a][k % 4] }));
+      cab.position.set(Math.cos(a) * R, R + 6 + Math.sin(a) * R - 1.2, 0); g.add(cab);
+    }
+    for (const sd of [-1, 1]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.8, R + 8, 0.8), spokeM); leg.position.set(sd * 8, (R + 6) / 2, 0); leg.rotation.z = sd * 0.28; g.add(leg); }
+    this.scene.add(g);
+    this.noTree.push({ x, z, r: 40 });
+  }
+
+  // 富士：北西の富士山（遠景）
+  buildMtFuji() {
+    const g = new THREE.Group();
+    const d = 2350, a = Math.atan2(-1, -0.9); // 北西
+    const x = Math.cos(a) * d, z = Math.sin(a) * d, H = 760, R = 950, base = C.terrain.hmin - 40;
+    const mtn = new THREE.Mesh(new THREE.ConeGeometry(R, H, 48, 1, true), new THREE.MeshBasicMaterial({ color: 0x2a2c48, fog: false }));
+    mtn.position.set(x, base + H / 2, z); g.add(mtn);
+    const capH = H * 0.3, capR = R * 0.3;
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(capR * 1.01, capH, 48, 1, true), new THREE.MeshBasicMaterial({ color: 0xe8e4f0, fog: false }));
+    cap.position.set(x, base + H - capH / 2 + 0.5, z); g.add(cap);
     this.scene.add(g);
   }
 

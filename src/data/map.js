@@ -248,9 +248,11 @@ LAYOUTS.push(...TOUGE_LAYOUTS);
 // つくば山麓サーキット（実在の筑波サーキット TC2000 を国土地理院データから再現。施設名は架空）
 // 走行は時計回りのみ。セクター境界は src/physics/circuit.js で決める
 export const CIRCUIT_COURSES = [
-  { id: 'tsukuba', area: 'tsukuba', name: 'つくば山麓サーキット 2000コース', laps: 3, circuit: true, desc: '茨城県下妻市の常設サーキット（実在コースの実寸・実標高）。1・2コーナー、S字、2つのヘアピン、長いバックストレートを持つテクニカルコース' },
+  { id: 'tsukuba', area: 'tsukuba', name: 'つくば山麓サーキット 2000コース', laps: 3, circuit: 'tsukuba', fee: 25000, desc: '茨城県下妻市の常設サーキット（実在コースの実寸・実標高）。1・2コーナー、S字、2つのヘアピン、長いバックストレートを持つテクニカルコース' },
+  { id: 'suzuka', area: 'suzuka', name: '鈴鹿丘陵サーキット 国際レーシングコース', laps: 2, circuit: 'suzuka', fee: 50000, desc: '三重県鈴鹿市の国際サーキット（実在コースの実寸・実標高）。立体交差の8の字レイアウト、S字・デグナー・ヘアピン・スプーン・130R・シケイン' },
+  { id: 'fuji', area: 'fuji', name: '富士山麓サーキット レーシングコース', laps: 2, circuit: 'fuji', fee: 45000, desc: '静岡県小山町の国際サーキット（実在コースの実寸・実標高）。約1.5kmのホームストレートと、上りの続くテクニカルな最終セクター' },
 ];
-export const CIRCUIT_LAYOUTS = CIRCUIT_COURSES.map((c) => ({ key: `${c.id}_2000`, course: c, area: c.area, reverse: false, name: c.name }));
+export const CIRCUIT_LAYOUTS = CIRCUIT_COURSES.map((c) => ({ key: c.id === 'tsukuba' ? 'tsukuba_2000' : `${c.id}_gp`, course: c, area: c.area, reverse: false, name: c.name }));
 COURSES.push(...CIRCUIT_COURSES);
 LAYOUTS.push(...CIRCUIT_LAYOUTS);
 
@@ -333,11 +335,10 @@ AREAS.haruna = {
 const HR_LEN = (() => { let a = 0; for (let i = 1; i < HR_RAW.length; i++) a += Math.hypot(HR_RAW[i][0] - HR_RAW[i - 1][0], HR_RAW[i][1] - HR_RAW[i - 1][1]); return a; })();
 export const HARUNA_LENGTH = HR_LEN;
 
-AREAS.tsukuba = {
-  id: 'tsukuba', name: 'つくば山麓サーキット', roads: [], pois: [], circuit: true, hidden: true, // 街のエリア移動には出さない（走行会・PRACTICEから）
-  start: null, gates: [],
-};
-export const CIRCUIT_ENTRY_FEE = 25000; // 走行会の参加費（1枠）
+// サーキット（街のエリア移動には出さない。走行会・PRACTICEから）
+AREAS.tsukuba = { id: 'tsukuba', name: 'つくば山麓サーキット', roads: [], pois: [], circuit: 'tsukuba', hidden: true, start: null, gates: [] };
+AREAS.suzuka = { id: 'suzuka', name: '鈴鹿丘陵サーキット', roads: [], pois: [], circuit: 'suzuka', hidden: true, start: null, gates: [] };
+AREAS.fuji = { id: 'fuji', name: '富士山麓サーキット', roads: [], pois: [], circuit: 'fuji', hidden: true, start: null, gates: [] };
 
 export const ALL_ROADS = [...WEST_ROADS, ...EAST_ROADS, ...HARUNA_ROADS];
 export function areaOfLayout(L) { return L.area || L.course?.area || 'west'; }

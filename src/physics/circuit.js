@@ -1,13 +1,13 @@
-// つくば山麓サーキット 2000コース（実在の筑波サーキット TC2000 の実寸・実標高データを元にした架空名称のサーキット）
-// 中心線・幅員・標高は tools/tsukuba_data.mjs で国土地理院のデータから生成（src/data/tsukuba.js）。
-// 走行方向は時計回り（ホームストレートは北向き）。s=0 がコントロールライン。
+// 実在サーキットを国土地理院のデータから実寸・実標高で再現したコース（施設名はすべて架空）
+//   tsukuba：つくば山麓サーキット 2000コース（筑波サーキット コース2000。tools/tsukuba_data.mjs → src/data/tsukuba.js）
+//   suzuka ：鈴鹿丘陵サーキット 国際レーシングコース（鈴鹿サーキット 国際レーシングコース。立体交差あり）
+//   fuji   ：富士山麓サーキット レーシングコース（富士スピードウェイ レーシングコース）
+//   （鈴鹿・富士は tools/circuit_data.mjs → src/data/suzuka.js / fuji.js）
+// 走行方向は時計回り。s=0 がコントロールライン。
 import TSUKUBA from '../data/tsukuba.js';
+import SUZUKA from '../data/suzuka.js';
+import FUJI from '../data/fuji.js';
 import { Corridor, CoursePath } from './track.js';
-
-const RAW = TSUKUBA.road;
-// ピットウォールの範囲（s：最終コーナー立ち上がり〜1コーナー手前。0をまたぐ）
-const PIT_WALL = [TSUKUBA.length - 150, 120];
-const N = RAW.length;
 
 // 路面の種類と摩擦係数倍率・転がり抵抗（荷重比）
 export const SURF = {
@@ -18,8 +18,11 @@ export const SURF = {
   gravel: { mu: 0.45, rr: 0.22 },
 };
 
-export const CIRCUIT = (() => {
+export function buildCircuit(id, D) {
+  const RAW = D.road, N = RAW.length;
+  const PIT_WALL = id === 'tsukuba' ? [D.length - 150, 120] : [D.length + D.pit[0], D.pit[1]];
   const C = {
+    id, data: D,
     n: N, x: new Float64Array(N), z: new Float64Array(N), y: new Float64Array(N), hw: new Float64Array(N), s: new Float64Array(N),
     tx: new Float64Array(N), tz: new Float64Array(N), curv: new Float64Array(N),
     runL: new Float64Array(N), runR: new Float64Array(N), // コース端からバリアまでの距離（左・右）
@@ -104,16 +107,29 @@ export const CIRCUIT = (() => {
     const s = C.s[i];
     if (s > PIT_WALL[0] || s < PIT_WALL[1]) { C.runR[i] = Math.min(C.runR[i], 1.6); C.pavedR[i] = 1; C.gravelL[i] = C.gravelR[i] = 0; C.kerbR[i] = 0; }
   }
+  C.pitWall = PIT_WALL;
+  C.stand = id === 'tsukuba' ? [-70, 90] : D.stand;
+  C.crossings = (D.crossings || []).map(([i, j]) => ({ i, j, s: [C.s[i], C.s[j]] }));
+  C.terrain = decodeTerrain(D.terrain);
+  buildCorners(C);
   return C;
-})();
+}
 
-const C = CIRCUIT;
-const wrap = (i) => ((i % N) + N) % N;
+function decodeTerrain(T) {
+  const bin = typeof atob === 'function' ? atob(T.data) : Buffer.from(T.data, 'base64').toString('binary');
+  const H = new Float32Array(T.nx * T.nz);
+  for (let i = 0; i < H.length; i++) H[i] = T.hmin + (bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8)) * T.scale;
+  return { ...T, H };
+}
 
 // ---------------- 路面（高さ・種類） ----------------
 const GCELL = 16;
 export class CircuitGround {
-  constructor() {
+  constructor(C) {
+    this.C = C;
+    const N = C.n, wrap = (i) => ((i % N) + N) % N;
+    this.wrap = wrap;
+    this.refY = null; // 車体の高さ（立体交差でどちらの路面か選ぶ。null＝最寄り）
     this.grid = new Map();
     for (let i = 0; i < N; i++) {
       const j = wrap(i + 1);
@@ -129,17 +145,20 @@ export class CircuitGround {
   }
 
   // 最寄りの中心線区間 { i, t, s, lat(右正), d }
-  nearest(x, z) {
+  nearest(x, z, refY = this.refY) {
+    const C = this.C, wrap = this.wrap;
     const arr = this.grid.get(Math.floor(x / GCELL) * 73856093 ^ Math.floor(z / GCELL) * 19349663);
     if (!arr) return null;
-    let best = -1, bd = 1e18, bt = 0;
+    let best = -1, bd = 1e18, bt = 0, bs = 1e18;
     for (const i of arr) {
       const j = wrap(i + 1);
       const ax = C.x[i], az = C.z[i], dx = C.x[j] - ax, dz = C.z[j] - az, l2 = dx * dx + dz * dz;
       let t = l2 > 0 ? ((x - ax) * dx + (z - az) * dz) / l2 : 0;
       t = t < 0 ? 0 : t > 1 ? 1 : t;
       const ex = x - (ax + dx * t), ez = z - (az + dz * t), d = ex * ex + ez * ez;
-      if (d < bd) { bd = d; best = i; bt = t; }
+      // 立体交差：車体の高さと3m以上違う路面は選ばない（どちらも違えば最寄り）
+      const score = d + (refY != null && Math.abs(C.y[i] + (C.y[j] - C.y[i]) * t - refY) > 3 ? 1e6 : 0);
+      if (score < bs) { bs = score; bd = d; best = i; bt = t; }
     }
     const i = best, j = wrap(i + 1);
     const dx = C.x[j] - C.x[i], dz = C.z[j] - C.z[i], l = Math.hypot(dx, dz) || 1;
@@ -149,6 +168,7 @@ export class CircuitGround {
 
   // 路面の種類（lat：右正）
   surfAt(i, lat) {
+    const C = this.C;
     const hw = C.hw[i], a = Math.abs(lat);
     if (a <= hw) return SURF.asphalt;
     const right = lat > 0;
@@ -160,9 +180,10 @@ export class CircuitGround {
 
   // 高さ（横断は水平。縁石は少し高く、芝・グラベルは路面より少し低い）。lastSurf に路面の種類を残す
   h(x, z) {
+    const C = this.C;
     const q = this.nearest(x, z);
-    if (!q) { this.lastSurf = SURF.grass; return terrainAt(x, z); }
-    const j = wrap(q.i + 1);
+    if (!q) { this.lastSurf = SURF.grass; return terrainAt(C, x, z); }
+    const j = this.wrap(q.i + 1);
     const y = C.y[q.i] + (C.y[j] - C.y[q.i]) * q.t;
     const sf = this.surfAt(q.i, q.lat);
     this.lastSurf = sf;
@@ -171,12 +192,38 @@ export class CircuitGround {
     if (sf === SURF.kerb) return y + 0.03 * Math.sin(Math.min(1, e / 1.3) * Math.PI);
     return y - Math.min(0.08, e * 0.04);
   }
+
+  // 景観の地面の高さ：近くのコースのうち一番低い路面に合わせる（立体交差の下の道を地面で埋めない）
+  groundY(x, z) {
+    const C = this.C, wrap = this.wrap;
+    const arr = this.grid.get(Math.floor(x / GCELL) * 73856093 ^ Math.floor(z / GCELL) * 19349663);
+    const T = terrainAt(C, x, z);
+    if (!arr) return T;
+    let ymin = 1e9, dmin = 1e9, hwm = 8;
+    for (const i of arr) {
+      const j = wrap(i + 1);
+      const ax = C.x[i], az = C.z[i], dx = C.x[j] - ax, dz = C.z[j] - az, l2 = dx * dx + dz * dz;
+      let t = l2 > 0 ? ((x - ax) * dx + (z - az) * dz) / l2 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
+      const reach = C.hw[i] + Math.max(C.runL[i], C.runR[i]) + 10;
+      if (d < reach) ymin = Math.min(ymin, C.y[i] + (C.y[j] - C.y[i]) * t);
+      if (d - C.hw[i] < dmin) { dmin = d - C.hw[i]; hwm = C.hw[i]; }
+    }
+    if (ymin > 1e8) { // 少し離れている：最寄りの路面から地形へなめらかに
+      const q = this.nearest(x, z, null);
+      ymin = C.y[q.i];
+    }
+    const k = Math.max(0, Math.min(1, 1 - (dmin - 24) / 30));
+    return T * (1 - k) + (ymin - 0.12) * k;
+  }
 }
 
 // ---------------- 走行可能領域（コース＋ランオフ。外周はバリア） ----------------
-let corr = null;
-export function circuitCorridor() {
-  if (corr) return corr;
+const corrCache = {};
+export function circuitCorridor(C) {
+  if (corrCache[C.id]) return corrCache[C.id];
+  const N = C.n, wrap = (i) => ((i % N) + N) % N;
   const segs = [];
   const off = new Float64Array(N), hwAll = new Float64Array(N);
   for (let i = 0; i < N; i++) {
@@ -186,27 +233,16 @@ export function circuitCorridor() {
   for (let i = 0; i < N; i++) {
     const j = wrap(i + 1);
     const rxi = -C.tz[i], rzi = C.tx[i], rxj = -C.tz[j], rzj = C.tx[j];
-    segs.push({ ax: C.x[i] + rxi * off[i], az: C.z[i] + rzi * off[i], bx: C.x[j] + rxj * off[j], bz: C.z[j] + rzj * off[j], hw: Math.min(hwAll[i], hwAll[j]), road: 'circuit' });
+    segs.push({ ax: C.x[i] + rxi * off[i], az: C.z[i] + rzi * off[i], bx: C.x[j] + rxj * off[j], bz: C.z[j] + rzj * off[j], hw: Math.min(hwAll[i], hwAll[j]), y: (C.y[i] + C.y[j]) / 2, road: 'circuit' });
   }
-  // ピットロード（ホームストレート右側・ピットビルの前）
-  for (const p of PIT_LANE_SEGS()) segs.push(p);
-  corr = new Corridor(segs, 20);
-  return corr;
+  const corr = new Corridor(segs, 20);
+  if (C.crossings.length) corr.leveled = true; // 立体交差：車体の高さの路面だけを壁判定に使う
+  return (corrCache[C.id] = corr);
 }
 
-export const PIT_WALL_RANGE = PIT_WALL;
-function PIT_LANE_SEGS() { return []; }
-
 // ---------------- 地形 ----------------
-export const TERRAIN = (() => {
-  const T = TSUKUBA.terrain;
-  const bin = typeof atob === 'function' ? atob(T.data) : Buffer.from(T.data, 'base64').toString('binary');
-  const H = new Float32Array(T.nx * T.nz);
-  for (let i = 0; i < H.length; i++) H[i] = T.hmin + (bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8)) * T.scale;
-  return { ...T, H };
-})();
-export function terrainAt(x, z) {
-  const T = TERRAIN;
+export function terrainAt(C, x, z) {
+  const T = C.terrain;
   const fx = Math.max(0, Math.min(T.nx - 1.001, (x - T.x0) / T.cell)), fz = Math.max(0, Math.min(T.nz - 1.001, (z - T.z0) / T.cell));
   const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
   const at = (a, b) => T.H[b * T.nx + a];
@@ -222,6 +258,8 @@ export class CircuitPath {
     this.name = layout.name;
     this.laps = c.laps;
     this.circuit = true;
+    const C = (this.C = CIRCUITS[c.circuit]);
+    const N = C.n;
     this.n = N;
     this.x = Float32Array.from(C.x); this.z = Float32Array.from(C.z); this.y = Float32Array.from(C.y);
     this.hw = Float32Array.from(C.hw); this.s = Float32Array.from(C.s);
@@ -230,9 +268,8 @@ export class CircuitPath {
     this.extra = new Float32Array(N);
     this.length = C.length;
     this.corners = [];
-    this.corridor = circuitCorridor();
-    // セクター：1コーナー〜S字／第1ヘアピン〜第2ヘアピン／バックストレート〜最終コーナー
-    this.sectorBounds = SECTOR_BOUNDS;
+    this.corridor = circuitCorridor(C);
+    this.sectorBounds = C.sectorBounds;
     this.sectors = [0, ...this.sectorBounds];
     this.buildRacingLine();
   }
@@ -246,7 +283,7 @@ export class CircuitPath {
 
   posAt(s, lat = 0) {
     const p = CoursePath.prototype.posAt.call(this, s, lat);
-    const j = (p.i + 1) % N;
+    const j = (p.i + 1) % this.n;
     const s0 = this.s[p.i], s1 = j === 0 ? this.length : this.s[j];
     const ss = ((s % this.length) + this.length) % this.length;
     const t = s1 > s0 ? Math.max(0, Math.min(1, (ss - s0) / (s1 - s0))) : 0;
@@ -255,8 +292,9 @@ export class CircuitPath {
   }
 }
 
-// 曲率のピーク（コーナーの頂点）
-export const CORNER_PEAKS = (() => {
+// コーナーの頂点（曲率のピーク）・セクター境界・コーナー名の看板
+function buildCorners(C) {
+  const N = C.n, wrap = (i) => ((i % N) + N) % N;
   const peaks = [];
   for (let i = 0; i < N; i++) {
     const k = Math.abs(C.curv[i]);
@@ -265,26 +303,37 @@ export const CORNER_PEAKS = (() => {
     for (let d = -20; d <= 20; d++) if (Math.abs(C.curv[wrap(i + d)]) > k) { isMax = false; break; }
     if (isMax) peaks.push({ i, s: C.s[i], k: C.curv[i] });
   }
-  return peaks;
-})();
-const tight = CORNER_PEAKS.filter((p) => 1 / Math.abs(p.k) < 25);
-const HP1 = tight.find((p) => p.k < 0 && p.s > 400 && p.s < 900) || { s: C.length * 0.29 }; // 第1ヘアピン（左）
-const HP2 = tight.find((p) => p.k > 0 && p.s > 900 && p.s < 1500) || { s: C.length * 0.56 }; // 第2ヘアピン（右）
-// セクター：S1 ホームストレート〜S字／S2 第1ヘアピン〜第2ヘアピン／S3 バックストレート〜最終コーナー
-const SECTOR_BOUNDS = [HP1.s - 50, HP2.s + 100];
-// コーナー名の看板位置（コース上の距離 s）
-export const CORNER_SIGNS = (() => {
-  const near = (s0, s1, sign) => CORNER_PEAKS.filter((p) => p.s >= s0 && p.s <= s1 && Math.sign(p.k) === sign)[0];
+  C.peaks = peaks;
+  const near = (s0, s1, sign) => peaks.filter((p) => p.s >= s0 && p.s <= s1 && Math.sign(p.k) === sign)[0];
   const list = [];
   const add = (name, p, s) => { if (p || s != null) list.push({ name, s: p ? p.s : s, right: p ? p.k > 0 : true }); };
-  const c1 = near(100, 300, 1);
-  add('1コーナー', null, c1 ? c1.s - 35 : 150);
-  add('2コーナー', null, c1 ? c1.s + 45 : 230);
-  add('S字', near(380, HP1.s - 60, 1), null);
-  add('第1ヘアピン', HP1, null);
-  add('ブリッジコーナー', near(HP1.s + 60, HP1.s + 260, 1), null);
-  add('第2ヘアピン', HP2, null);
-  add('バックストレート', null, HP2.s + 260);
-  add('最終コーナー', near(C.length - 400, C.length - 150, 1), null);
-  return list;
-})();
+  if (C.id === 'tsukuba') {
+    const tight = peaks.filter((p) => 1 / Math.abs(p.k) < 25);
+    const HP1 = tight.find((p) => p.k < 0 && p.s > 400 && p.s < 900) || { s: C.length * 0.29 }; // 第1ヘアピン（左）
+    const HP2 = tight.find((p) => p.k > 0 && p.s > 900 && p.s < 1500) || { s: C.length * 0.56 }; // 第2ヘアピン（右）
+    // セクター：S1 ホームストレート〜S字／S2 第1ヘアピン〜第2ヘアピン／S3 バックストレート〜最終コーナー
+    C.sectorBounds = [HP1.s - 50, HP2.s + 100];
+    const c1 = near(100, 300, 1);
+    add('1コーナー', null, c1 ? c1.s - 35 : 150);
+    add('2コーナー', null, c1 ? c1.s + 45 : 230);
+    add('S字', near(380, HP1.s - 60, 1), null);
+    add('第1ヘアピン', HP1, null);
+    add('ブリッジコーナー', near(HP1.s + 60, HP1.s + 260, 1), null);
+    add('第2ヘアピン', HP2, null);
+    add('バックストレート', null, HP2.s + 260);
+    add('最終コーナー', near(C.length - 400, C.length - 150, 1), null);
+  } else {
+    // 設定のコーナー位置（s）の前後60mで一番きつい所。向きは曲率の符号
+    for (const [name, s0] of C.data.corners) {
+      let bi = -1, bk = 0;
+      for (let i = 0; i < N; i++) { let ds = Math.abs(C.s[i] - s0); ds = Math.min(ds, C.length - ds); if (ds <= 60 && Math.abs(C.curv[i]) > Math.abs(bk)) { bk = C.curv[i]; bi = i; } }
+      list.push({ name, s: bi >= 0 ? C.s[bi] : s0, right: bk >= 0 });
+    }
+    // セクター：全長の1/3・2/3付近（前後150m）で一番まっすぐな所
+    const pick = (target) => { let best = target, bv = 1e9; for (let i = 0; i < N; i++) { if (Math.abs(C.s[i] - target) > 150) continue; let c = 0; for (let k = -15; k <= 15; k++) c += Math.abs(C.curv[wrap(i + k)]); if (c < bv) { bv = c; best = C.s[i]; } } return best; };
+    C.sectorBounds = [pick(C.length / 3), pick((C.length * 2) / 3)];
+  }
+  C.signs = list;
+}
+
+export const CIRCUITS = { tsukuba: buildCircuit('tsukuba', TSUKUBA), suzuka: buildCircuit('suzuka', SUZUKA), fuji: buildCircuit('fuji', FUJI) };

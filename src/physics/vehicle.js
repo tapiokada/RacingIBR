@@ -109,6 +109,7 @@ export class Vehicle {
   sampleRoad(out) {
     const f0 = Math.sin(this.h), f1 = Math.cos(this.h);
     const r0 = -f1, r1 = f0;
+    if (this.ground && 'refY' in this.ground) this.ground.refY = this.y; // 立体交差：今いる高さの路面を選ぶ
     for (let i = 0; i < 4; i++) {
       const wh = this.wheels[i];
       out[i] = this.groundAt(this.x + f0 * wh.pu + r0 * wh.pv, this.z + f1 * wh.pu + r1 * wh.pv);

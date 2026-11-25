@@ -29,7 +29,7 @@ export class PracticeMode {
     g.rig.setGallerySpots(path);
     this.session = new DriveSession(g, { corridor: path.corridor, path });
     const P = this.session.addCar({ carId, equipped, setup: this.opts.setup || null, color, isPlayer: true });
-    this.laps = path.open ? 1 : TA_LAPS;
+    this.laps = path.open ? 1 : layout.course.circuit ? layout.course.laps : TA_LAPS; // サーキットはコースごとの周回数（鈴鹿・富士は2周）
     const sp = path.posAt((path.open ? path.startS : 0) - 8, 0);
     P.car.place(sp.x, sp.z, sp.h, 0);
     this.P = P;
@@ -77,11 +77,11 @@ export class PracticeMode {
     this.hud.update(dt);
     this.hud.drawTach(this.P.car);
     const cur = this.state === 'run' ? this.t - tr.lapStart : 0;
-    const lapNo = this.path.open ? `残り <b>${(Math.max(0, this.path.raceLen - (tr.dist - tr.lap * this.path.raceLen)) / 1000).toFixed(2)}</b> km` : this.ta ? `LAP <b>${Math.min(TA_LAPS, tr.lap + 1)}</b>/${TA_LAPS}` : `LAP <b>${tr.lap + 1}</b>`;
+    const lapNo = this.path.open ? `残り <b>${(Math.max(0, this.path.raceLen - (tr.dist - tr.lap * this.path.raceLen)) / 1000).toFixed(2)}</b> km` : this.ta ? `LAP <b>${Math.min(this.laps, tr.lap + 1)}</b>/${this.laps}` : `LAP <b>${tr.lap + 1}</b>`;
     this.hud.tc.innerHTML = `<div class="lap">${lapNo}</div><div class="time">${fmtTime(cur)}</div><div class="sectors">${this.sectorFlash}</div>`;
     const rows = tr.laps.map((l, i) => `<div class="${l === tr.best ? 'best' : ''}">L${i + 1} ${fmtTime(l)}</div>`).slice(-5).join('');
     this.hud.tr.innerHTML = `<div class="lbl">BEST</div><div class="big">${fmtTime(tr.best)}</div>${this.ta ? `<div class="lbl">RECORD ${fmtTime(this.recordBest)}</div>` : ''}<div class="laps">${rows}</div>`;
-    this.hud.tl.innerHTML = `<div class="who">${this.opts.layout.name}</div><div class="hint">${this.ta ? (this.path.open ? 'TIME ATTACK' : 'TIME ATTACK ' + TA_LAPS + '周') : 'FREE RUN　Escでメニュー'}</div>`;
+    this.hud.tl.innerHTML = `<div class="who">${this.opts.layout.name}</div><div class="hint">${this.ta ? (this.path.open ? 'TIME ATTACK' : 'TIME ATTACK ' + this.laps + '周') : 'FREE RUN　Escでメニュー'}</div>`;
     this.hud.drawMap([{ x: this.P.car.x, z: this.P.car.z, h: this.P.car.h, color: '#33e1ff' }]);
   }
 

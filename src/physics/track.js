@@ -2,7 +2,7 @@
 import { NODES, AREAS, roadWidthBetween, roadPolyline, LAYOUTS, areaOfLayout } from '../data/map.js';
 
 import { TougePath, harunaCorridor } from './touge.js';
-import { CircuitPath, circuitCorridor } from './circuit.js';
+import { CircuitPath, circuitCorridor, CIRCUITS } from './circuit.js';
 
 const roadsOf = (area) => AREAS[area || 'west'].roads;
 // 榛名山の施設への引き込み（峠の本線以外の道路）
@@ -54,8 +54,10 @@ export class Corridor {
     const arr = this.grid.get(k);
     let best = 1e9, bnx = 0, bnz = 0;
     if (!arr) return { d: 50, nx: 0, nz: 0, far: true };
+    const lv = this.leveled ? this.levelY : null;
     for (const i of arr) {
       const s = this.segs[i];
+      if (lv != null && s.y != null && Math.abs(s.y - lv) > 3.5) continue; // 立体交差の別の高さの路面
       const dx = s.bx - s.ax, dz = s.bz - s.az;
       const l2 = dx * dx + dz * dz;
       let t = l2 > 0 ? ((x - s.ax) * dx + (z - s.az) * dz) / l2 : 0;
@@ -91,6 +93,7 @@ export class Corridor {
 // 車両を壁から押し戻す
 export function resolveWalls(car, corridor) {
   let hit = 0;
+  if (corridor.leveled) corridor.levelY = car.y;
   for (const [px, pz] of car.corners()) {
     const q = corridor.query(px, pz);
     if (q.d > 0) {
@@ -172,7 +175,7 @@ export function townCornerPads(area = 'west') {
 
 export function townCorridor(area = 'west') {
   if (AREAS[area].touge) return getHarunaCorridor();
-  if (AREAS[area].circuit) return circuitCorridor();
+  if (AREAS[area].circuit) return circuitCorridor(CIRCUITS[AREAS[area].circuit]);
   const ROADS = roadsOf(area);
   const segs = [];
   for (const p of townCornerPads(area)) segs.push({ ax: p.x, az: p.z, bx: p.x, bz: p.z, hw: p.r, road: 'corner' });

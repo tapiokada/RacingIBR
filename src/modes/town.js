@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { DriveSession } from '../session.js';
 import { Hud } from '../ui/hud.js';
 import { el, Menu, panel } from '../ui/ui.js';
-import { NODES, AREAS, LAYOUTS, COURSES, TOUGE_LAYOUTS, HARUNA_UNLOCK_WINS, CIRCUIT_LAYOUTS, CIRCUIT_ENTRY_FEE, townRoadBetween, laneOffset, areaStart, arriveSpot } from '../data/map.js';
+import { NODES, AREAS, LAYOUTS, COURSES, TOUGE_LAYOUTS, HARUNA_UNLOCK_WINS, CIRCUIT_LAYOUTS, townRoadBetween, laneOffset, areaStart, arriveSpot } from '../data/map.js';
 import { TrackDayMode, SESSION_TIME } from './trackday.js';
 import { ALL_RIVALS } from '../data/rivals.js';
 import { CARS, PLAYER } from '../data/cars.js';
@@ -399,13 +399,13 @@ export class TownMode {
       }),
       ...CIRCUIT_LAYOUTS.map((L) => {
         const best = st.trackday?.[L.key]?.best;
-        const poor = st.money < CIRCUIT_ENTRY_FEE;
+        const fee = L.course.fee, poor = st.money < fee;
         return {
           label: `サーキット走行会：${L.course.name.replace(/ .*$/, '')}`, disabled: poor,
-          sub: `参加費 ${fmtMoney(CIRCUIT_ENTRY_FEE)}／1枠${SESSION_TIME / 60}分。今のマシン（チューニング・燃料そのまま）で周回タイムを計測${best ? `　自己ベスト ${fmtTime(best)}` : ''}${poor ? '　（所持金が足りません）' : ''}`,
+          sub: `参加費 ${fmtMoney(fee)}／1枠${SESSION_TIME / 60}分。今のマシン（チューニング・燃料そのまま）で周回タイムを計測${best ? `　自己ベスト ${fmtTime(best)}` : ''}${poor ? '　（所持金が足りません）' : ''}`,
           action: () => {
             menu.destroy(); dlg.remove(); this.paused = false;
-            st.money -= CIRCUIT_ENTRY_FEE;
+            st.money -= fee;
             const P = this.session.player.car;
             const pos = { x: P.x, z: P.z, h: P.h, area: this.area };
             this.leaving = true; this.session.controlsEnabled = false;
