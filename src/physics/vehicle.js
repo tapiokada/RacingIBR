@@ -240,21 +240,27 @@ export class Vehicle {
   // 燃料消費：エンジンが発生しているトルク（摩擦分を含む図示出力）× 燃料消費率。アイドル時はアイドル流量。
   // 燃料消費率は最良約235g/kWh。低負荷（ポンプ損失）・高回転・過給（燃料増量で冷却）で悪化。
   // ゲームでは減り方を実燃費の FUEL_RATE 倍にする
-  burnFuel(dt, Te, rpm, thr) {
+  // loaded=false：クラッチが切れている・滑っている（停車中の空ぶかし・発進時）。
+  // 駆動輪に仕事をしていないので、エンジンが消費するのは内部摩擦とフライホイールを回す分だけ
+  burnFuel(dt, Te, rpm, thr, loaded = true) {
     const s = this.spec;
     const om = (rpm * 2 * Math.PI) / 60;
-    const P = Math.max(0, Te * om); // W
+    const Tfr = s.maxTorque * (0.03 + 0.12 * (rpm / s.redline)); // 摩擦トルク（エンジンブレーキと同じ）
+    const P = Math.max(0, (loaded ? Te : Math.min(Te, Tfr * 1.3)) * om); // W
     const disp = (s.engine.displacement || 2000) / 1000;
     const idle = 0.16 * disp; // g/s（アイドル 約0.8L/h @2L）
     const load = Math.min(1, thr);
-    const boostK = s.boostMax > 0 ? Math.max(0, this.boost) / s.boostMax : 0;
+    const boostK = loaded && s.boostMax > 0 ? Math.max(0, this.boost) / s.boostMax : 0; // 無負荷ではほとんど過給しない
     let bsfc = 235 * (1 + 0.25 * (1 - load) ** 2) * (1 + 0.1 * (rpm / s.redline) ** 2); // 図示（摩擦込み）出力あたり
     bsfc *= 1 + 0.3 * boostK; // 過給時の燃料増量
     if (load > 0.9) bsfc *= 1.08; // 全開時の出力空燃比
     const gps = Math.max(thr > 0.01 || rpm < s.idle * 1.3 ? idle : idle * 0.2, idle * 0.3 + (P * bsfc) / 3.6e6); // 減速時は燃料カット
     const lph = (gps * 3600) / 740; // ガソリン密度 0.74kg/L
     this.fuelLph += (lph - this.fuelLph) * Math.min(1, dt * 3);
-    this.fuel.liters = Math.max(0, this.fuel.liters - (lph / 3600) * dt * FUEL_RATE);
+    // 減りを実燃費の FUEL_RATE 倍にするのは、走って距離を稼いでいるとき（駆動輪に仕事をしている）だけ。
+    // 停車中のアイドリングや空ぶかしは実際の燃費どおり（すぐにガス欠にならないように）
+    const rate = loaded && Math.abs(this.vu) > 1 ? FUEL_RATE : 1;
+    this.fuel.liters = Math.max(0, this.fuel.liters - (lph / 3600) * dt * rate);
   }
 
   step(dt) {
@@ -373,7 +379,7 @@ export class Vehicle {
       thr = Math.min(thr, 0.35) * Math.max(0, Math.min(1, (v30 - speed) / 1.5));
     }
     const Te = s.fullTorque(rpm, this.boost) * thr;
-    if (this.fuel) this.burnFuel(dt, Te, rpm, thr);
+    if (this.fuel) this.burnFuel(dt, Te, rpm, thr, engaged && !slipping);
     const Tf = (s.maxTorque * (0.03 + 0.12 * (rpm / s.redline))) * (1 - thr);
     let Teng = Te - Tf;
     if (rpm <= s.idle * 1.02 && Teng < 0) Teng = 0;

@@ -26,3 +26,12 @@ const v = new Vehicle(buildSpec('86-GR', stockEquip('86-GR')), { auto: true, fue
 v.place(0, 0, 0, 0); v.input = { throttle: 1, brake: 0, steer: 0 };
 for (let t = 0; t < 30; t += dt) v.step(dt);
 console.log('ガス欠で全開30秒後', v.kmh.toFixed(1), 'km/h');
+
+// 停車中の空ぶかし（ニュートラル）と、ATで停車中にアクセル全開（半クラッチ）を60秒
+for (const [label, setup] of [['停車・アイドリング', (v) => { v.input = { throttle: 0, brake: 1, steer: 0 }; }], ['ニュートラルで空ぶかし（全開）', (v) => { v.gear = 0; v.input = { throttle: 1, brake: 0, steer: 0 }; }], ['ブレーキを踏んだまま全開', (v) => { v.input = { throttle: 1, brake: 1, steer: 0 }; }]]) {
+  const fuel = { liters: 50, tank: 50 };
+  const v = new Vehicle(buildSpec('80-Supra', stockEquip('80-Supra')), { auto: false, fuel });
+  v.place(0, 0, 0, 0);
+  for (let t = 0; t < 60; t += dt) { setup(v); v.step(dt); }
+  console.log(`80-Supra ${label} 60秒：${(50 - fuel.liters).toFixed(2)}L 消費（停車中は実燃費どおりに減る＝${((50 - fuel.liters) * 60).toFixed(1)}L/h）rpm ${v.rpm | 0}`);
+}
