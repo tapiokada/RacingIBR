@@ -173,7 +173,8 @@ export class TownMode {
     this.hud.update(dt);
     this.hud.drawTach(P.car);
     this.hud.tl.innerHTML = `<div class="who">${PLAYER.name}　<span>${CARS[P.carId].name}</span></div><div>エリア <b>${AREAS[this.area].name}</b></div><div>所持金 <b>${fmtMoney(st.money)}</b></div><div>戦績 <b>${st.wins}</b>勝 ${st.losses}敗</div>`;
-    const cars = s.entries.map((e) => ({ x: e.car.x, z: e.car.z, h: e.car.h, color: e.isPlayer ? '#33e1ff' : '#ff4d6d' }));
+    // マップ：自車＝水色、倒したことのあるライバル＝緑、まだ倒していないライバル＝赤
+    const cars = s.entries.map((e) => ({ x: e.car.x, z: e.car.z, h: e.car.h, color: e.isPlayer ? '#33e1ff' : e.rival && st.defeated[e.rival.id] ? '#3ddc6a' : '#ff4d6d' }));
     const pois = g.world.poiMarkers.map((m) => ({ x: m.x, z: m.z, color: m.poi.type === 'shop' ? '#ff3b6b' : '#2ee6a8', label: m.poi.type === 'shop' ? 'SHOP' : 'GS' }));
     this.hud.drawMap(cars, pois);
     this.updateLabels();

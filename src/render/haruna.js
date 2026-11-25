@@ -41,15 +41,19 @@ function strip(lat0, lat1, yOff, mat, { from = 0, to = N - 1, step = 1, uvScale 
 }
 
 // 地形の高さ（道路まわりは路面の少し下まで削る/盛る）
-function buildCarvedHeights() {
+function buildCarvedHeights(extra = []) {
   const T = TERRAIN;
   const H = new Float32Array(T.H);
   const D = new Float32Array(H.length).fill(1e9);
   const R = new Float32Array(H.length);
   // 道路点から近傍の格子点へ距離と路面高さを書き込む
   const rad = 30;
-  for (let i = 0; i < N; i += 2) {
-    const x = ROAD.x[i], z = ROAD.z[i];
+  // 道路の点＋施設の引き込み・駐車場の点（{x,z,y}）
+  const pts = [];
+  for (let i = 0; i < N; i += 2) pts.push({ x: ROAD.x[i], z: ROAD.z[i], y: ROAD.y[i] });
+  pts.push(...extra);
+  for (const pt of pts) {
+    const x = pt.x, z = pt.z;
     const ci = Math.round((x - T.x0) / T.cell), cj = Math.round((z - T.z0) / T.cell);
     const r = Math.ceil(rad / T.cell);
     for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) {
@@ -58,7 +62,7 @@ function buildCarvedHeights() {
       const gx = T.x0 + gi * T.cell, gz = T.z0 + gj * T.cell;
       const d = Math.hypot(gx - x, gz - z);
       const k = gj * T.nx + gi;
-      if (d < D[k]) { D[k] = d; R[k] = ROAD.y[i]; }
+      if (d < D[k]) { D[k] = d; R[k] = pt.y; }
     }
   }
   for (let k = 0; k < H.length; k++) {
@@ -122,7 +126,18 @@ export class HarunaWorld {
 
   buildTerrain() {
     const T = TERRAIN;
-    const { H } = buildCarvedHeights();
+    // 施設への引き込み道路と駐車場も地形を削って平らにする（入口が斜面に埋もれないように）
+    const extra = [];
+    for (const r of this.areaDef.roads) {
+      if (r.touge) continue;
+      for (let k = 0; k < r.nodes.length - 1; k++) {
+        const a = NODES[r.nodes[k]], b = NODES[r.nodes[k + 1]];
+        const len = Math.hypot(b.x - a.x, b.z - a.z);
+        for (let t = 0; t <= len; t += 2) { const x = a.x + (b.x - a.x) * (t / len), z = a.z + (b.z - a.z) * (t / len); extra.push({ x, z, y: this.ground.h(x, z) }); }
+      }
+    }
+    for (const L of this.lots) for (let a = 0; a < 12; a++) for (const rr of [0, 6, 11]) extra.push({ x: L.x + Math.cos(a / 2) * rr, z: L.z + Math.sin(a / 2) * rr, y: L.y });
+    const { H } = buildCarvedHeights(extra);
     this.terrainH = H;
     const pos = new Float32Array(T.nx * T.nz * 3);
     const col = new Float32Array(T.nx * T.nz * 3);
@@ -214,8 +229,8 @@ export class HarunaWorld {
     const STEP = 2; // データ点4m毎
     for (const side of [-1, 1]) {
       for (let i = 0; i < N - STEP; i += STEP) {
-        if (this.nearLot(ROAD.x[i], ROAD.z[i])) continue;
         const lat = side * (ROAD.hw[i] + 0.25);
+        { const rp = roadPoint(i, lat); if (this.nearLot(rp.x, rp.z) || this.nearEntrance(rp.x, rp.z, 7)) continue; }
         const a = roadPoint(i, lat), b = roadPoint(i + STEP, side * (ROAD.hw[i + STEP] + 0.25));
         // 外側の地形が路面より高ければ山側（擁壁）
         const out = roadPoint(i, side * (ROAD.hw[i] + 12));
@@ -253,7 +268,21 @@ export class HarunaWorld {
     }
   }
 
-  nearLot(x, z) { return this.lots.some((L) => Math.hypot(L.x - x, L.z - z) < L.r + 9); }
+  nearLot(x, z) { return this.lots.some((L) => Math.hypot(L.x - x, L.z - z) < L.r + 9) || this.nearEntrance(x, z); }
+
+  // 施設への引き込み道路の付近（ガードレール・擁壁・標識・木を置かない）
+  nearEntrance(x, z, margin = 9) {
+    if (!this._spurs) {
+      this._spurs = [];
+      for (const r of this.areaDef.roads) if (!r.touge) for (let k = 0; k < r.nodes.length - 1; k++) this._spurs.push([NODES[r.nodes[k]], NODES[r.nodes[k + 1]], r.width / 2]);
+    }
+    for (const [a, b, hw] of this._spurs) {
+      const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz || 1;
+      const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / l2));
+      if (Math.hypot(x - a.x - dx * t, z - a.z - dz * t) < hw + margin) return true;
+    }
+    return false;
+  }
 
   // 杉・広葉樹の森（道路から離して配置）
   buildForest() {
@@ -305,6 +334,7 @@ export class HarunaWorld {
       // カーブ外側に矢印板（進行方向に向けて両面）
       const side = k > 0 ? -1 : 1; // 右カーブの外側＝左
       const pt = roadPoint(i, side * (ROAD.hw[i] + 0.9));
+      if (this.nearEntrance(pt.x, pt.z, 6)) continue;
       const board = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), arrowMat);
       board.position.set(pt.x, pt.y + 1.25, pt.z);
       board.rotation.y = Math.atan2(pt.rx, pt.rz) + (k > 0 ? Math.PI : 0);

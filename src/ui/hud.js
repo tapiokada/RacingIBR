@@ -101,8 +101,16 @@ export class Hud {
       const sc = Math.min((W - 30) / (maxX - minX), (H - 30) / (maxZ - minZ));
       this.mapBounds = { sc, ox: W / 2 - ((minX + maxX) / 2) * sc, oz: H / 2 - ((minZ + maxZ) / 2) * sc };
     }
-    const { sc, ox, oz } = this.mapBounds;
+    let { sc, ox, oz } = this.mapBounds;
+    // 拡大表示（バトル中）：mapZoom[m]四方を、mapCenter（自車）を中心に表示
+    if (this.mapZoom && this.mapCenter) {
+      sc = Math.min(W, H) / this.mapZoom;
+      ox = W / 2 - this.mapCenter.x * sc; oz = H / 2 - this.mapCenter.z * sc;
+    }
     const P = (x, z) => [ox + x * sc, oz + z * sc];
+    c.save();
+    c.beginPath(); c.roundRect(0, 0, W, H, 14); c.clip();
+    const lw = this.mapZoom && this.mapCenter ? Math.max(4, 9 * sc) : 4; // 拡大時は実際の道幅に近い太さ
     c.fillStyle = 'rgba(5,10,20,0.6)';
     c.beginPath(); c.roundRect(0, 0, W, H, 14); c.fill();
     c.lineCap = 'round'; c.lineJoin = 'round';
@@ -115,14 +123,14 @@ export class Hud {
         for (let i = 0; i < C.n; i += 3) { if (C.s[i] < from || C.s[i] > to) continue; const [x, y] = P(C.x[i], C.z[i]); first ? c.moveTo(x, y) : c.lineTo(x, y); first = false; }
         c.stroke();
       };
-      seg(0, C.length, 'rgba(140,160,200,0.45)', 3);
-      seg(C.startS, C.finishS, 'rgba(200,220,255,0.95)', 4);
+      seg(0, C.length, 'rgba(140,160,200,0.45)', lw * 0.75);
+      seg(C.startS, C.finishS, 'rgba(200,220,255,0.95)', lw);
       const a = C.posAt(C.startS), b = C.posAt(C.finishS);
       const [sx, sy] = P(a.x, a.z), [fx, fy] = P(b.x, b.z);
       c.fillStyle = '#fff'; c.fillRect(sx - 4, sy - 4, 8, 8);
       c.fillStyle = '#ffd23f'; c.beginPath(); c.moveTo(fx, fy - 6); c.lineTo(fx + 6, fy); c.lineTo(fx, fy + 6); c.lineTo(fx - 6, fy); c.closePath(); c.fill();
     } else if (this.course) {
-      c.strokeStyle = 'rgba(200,220,255,0.85)'; c.lineWidth = 4;
+      c.strokeStyle = 'rgba(200,220,255,0.85)'; c.lineWidth = lw;
       c.beginPath();
       for (let i = 0; i <= this.course.n; i++) { const k = i % this.course.n; const [x, y] = P(this.course.x[k], this.course.z[k]); i ? c.lineTo(x, y) : c.moveTo(x, y); }
       c.stroke();
@@ -148,5 +156,10 @@ export class Hud {
       c.fillStyle = car.color; c.beginPath(); c.moveTo(0, -7); c.lineTo(5, 5); c.lineTo(-5, 5); c.closePath(); c.fill();
       c.restore();
     }
+    if (this.mapZoom && this.mapCenter) {
+      c.fillStyle = 'rgba(220,230,255,0.75)'; c.font = '10px sans-serif'; c.textAlign = 'right';
+      c.fillText(`${this.mapZoom}m`, W - 10, H - 8);
+    }
+    c.restore();
   }
 }

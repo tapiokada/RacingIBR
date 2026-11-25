@@ -123,6 +123,8 @@ export class BattleMode {
       <div class="gapbar"><div class="mid"></div><div class="fill" style="left:${50 + Math.min(0, pct) * 50}%;width:${Math.abs(pct) * 50}%;background:${ahead ? '#33e1ff' : '#ff4d6d'}"></div></div>
       <div class="rival">${this.opts.rival.name}（${CARS[this.opts.rival.car].name}）</div>`;
     this.hud.tl.innerHTML = `<div class="who">${this.opts.layout.name}</div><div class="hint">${SNAP_GAP}m引き離しで勝利</div>`;
+    // バトル中はマップを自車中心に約300m四方へ拡大
+    this.hud.mapZoom = 300; this.hud.mapCenter = { x: this.P.car.x, z: this.P.car.z };
     this.hud.drawMap([
       { x: this.R.car.x, z: this.R.car.z, h: this.R.car.h, color: '#ff4d6d' },
       { x: this.P.car.x, z: this.P.car.z, h: this.P.car.h, color: '#33e1ff' },
