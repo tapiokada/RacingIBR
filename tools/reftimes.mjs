@@ -22,7 +22,7 @@ for (const L of LAYOUTS) {
   for (const r of ALL_RIVALS.filter((x) => x.area === area)) {
     const car = new Vehicle(buildSpec(r.car, r.parts, r.setup || null), { auto: true, ground: area === 'haruna' ? ground : null });
     const p = path.posAt(s0 - 9, 0); car.place(p.x, p.z, p.h, 0);
-    const ai = new RaceAI(car, path, r.skill);
+    const ai = new RaceAI(car, path, r.skill, { mistakes: false }); // 参考タイムはミスなし
     let t = 0, dist = -9, hint = -1, prevS = null, done = null;
     while (t < 900) {
       ai.update(dt); car.step(dt); resolveWalls(car, path.corridor); t += dt;

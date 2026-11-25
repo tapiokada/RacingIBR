@@ -20,13 +20,22 @@ function steerToward(car, tx, tz) {
   return clamp(delta / lim, -1, 1);
 }
 
+// レースAI
+// opts.margin：他車との横の間隔の余裕[m]（性格：攻撃的0.35〜慎重1.4、標準0.8）
+// opts.mistakes：ミスをするか（タイムランキングの計算では false）
 export class RaceAI {
-  constructor(car, path, skill = 0.85) {
+  constructor(car, path, skill = 0.85, opts = {}) {
     this.car = car; this.path = path; this.skill = skill;
     this.profile = path.speedProfile(car.spec, skill);
     this.hint = -1; this.offset = 0; this.offTarget = 0;
     this.stuck = 0; this.reverseT = 0;
     this.boost = 1;
+    this.margin = opts.margin ?? 0.8;
+    // ミスの起こりやすさ（コーナー1つあたり）：腕が上がるほど減り、トップクラス（0.955以上）はほぼゼロ
+    this.mistakeRate = opts.mistakes === false ? 0 : clamp((0.955 - skill) * 1.6, 0, 0.22);
+    this.mistake = null; // { type: 'late'|'throttle', until, apex }
+    this.cornerSeen = -1;
+    this.rand = opts.rand || Math.random;
   }
 
   update(dt, others = []) {
@@ -35,20 +44,59 @@ export class RaceAI {
     this.hint = pr.i;
     const n = path.n;
     const v = car.speed;
-    // 回避
-    let want = 0;
+    // ---- 他車の回避（ぶつけない・追い抜きは横に間隔を空ける）----
+    const W = car.spec.car.width, CL = car.spec.car.length;
+    const G = W + this.margin; // 中心間で確保したい横の間隔
+    const hwNow = path.hw[pr.i];
+    let want = 0, conflict = false, vCap = 1e9;
     for (const o of others) {
       const po = path.project(o.x, o.z, -1);
       let ds = po.s - pr.s;
-      if (ds < -path.length / 2) ds += path.length;
-      if (ds > path.length / 2) ds -= path.length;
-      const myLat = pr.lat;
-      if (ds > 0 && ds < 18 + v * 0.4 && Math.abs(po.lat - myLat) < 2.6) {
-        const hw = path.hw[pr.i];
-        want = po.lat > 0 ? -Math.min(hw - 1.5, 3) : Math.min(hw - 1.5, 3);
+      if (!path.open) { if (ds < -path.length / 2) ds += path.length; if (ds > path.length / 2) ds -= path.length; }
+      // 自車基準の相対位置（前後u・左右w）。ヘアピンなどでコース上の距離がずれても実際の位置で判断する
+      const f0 = Math.sin(car.h), f1 = Math.cos(car.h);
+      const rx0 = o.x - car.x, rz0 = o.z - car.z;
+      const u = rx0 * f0 + rz0 * f1, w = rx0 * -f1 + rz0 * f0;
+      if (Math.abs(u) < 12 && Math.abs(ds) > 15) ds = u; // コースの射影が別の区間を拾ったとき
+      const dlat = Math.abs(ds - u) < 6 ? po.lat - pr.lat : w;
+      const closing = v - Math.max(0, o.vu);
+      // 近づいて追い越しにかかる距離（並走中を含む）だけ回避する。離れていればレーシングラインを走る
+      const ahead = ds > -(CL + 1) && ds < CL + 3 + Math.max(0, closing) * 1.2 + v * 0.15;
+      if (!ahead || Math.abs(dlat) >= G + 0.6) continue;
+      conflict = true;
+      // 追い抜く側：相手の横に G だけ離れた位置（コース内に収まる側。広い方を優先）
+      const lim = hwNow - W / 2 - 0.3;
+      // 相手はこの先レーシングラインへ寄っていく（プレイヤーも大抵ライン取りをする）ので、その位置とも間隔を取れる側を選ぶ
+      let pred = po.lat;
+      for (let k = 2; k <= 12; k += 2) { const j = path.open ? Math.min(n - 1, po.i + k) : (po.i + k) % n; const L2 = path.lineOff[j]; if (Math.abs(L2 - po.lat) > Math.abs(pred - po.lat)) pred = L2; }
+      const okSide = (x) => Math.abs(x) <= lim && Math.abs(x - pred) >= G - 0.2;
+      const sides = [Math.min(po.lat, pred) - G, Math.max(po.lat, pred) + G].filter(okSide);
+      const pref = dlat > 0 ? Math.min(po.lat, pred) - G : Math.max(po.lat, pred) + G; // 今いる側
+      let tgt = sides.includes(pref) ? pref : sides.length ? sides[0] : null;
+      if (Math.abs(ds) < CL + 1) {
+        // 並走中：反対側へ横切らない。今の側で端いっぱいまで離れ、それでも間隔が足りなければアクセルを戻して後ろへ下がる
+        const away = dlat > 0 ? -1 : 1;
+        tgt = clamp(po.lat + away * G, -lim, lim);
+        if (Math.abs(tgt - po.lat) < G - 0.3) vCap = Math.min(vCap, Math.max(0, o.vu) - 2.5);
+      }
+      if (tgt != null) {
+        want = tgt - path.lineOff[pr.i];
+      }
+      // 横に並べない／まだ横にずれきっていないときは後ろで待つ（追突しない）
+      if (ds > 0 && (tgt == null || Math.abs(dlat) < G - 0.2)) {
+        const vo = Math.max(0, o.vu);
+        const gap = Math.min(ds, u > 0 ? u : ds) - (CL + 1.0 + this.margin + v * 0.12);
+        vCap = Math.min(vCap, vo + Math.max(-3, gap) * 0.9);
       }
     }
-    this.offTarget += (want - this.offTarget) * Math.min(1, dt * 1.5);
+    // 最終安全策：実際の位置で前方近くに相手がいて横の間隔が足りなければ減速（追突防止）
+    for (const o of others) {
+      const f0 = Math.sin(car.h), f1 = Math.cos(car.h);
+      const rx0 = o.x - car.x, rz0 = o.z - car.z;
+      const u = rx0 * f0 + rz0 * f1, w = rx0 * -f1 + rz0 * f0;
+      if (u > 0 && u < CL + 4 + v * 0.3 && Math.abs(w) < W + 0.35) vCap = Math.min(vCap, Math.max(0, o.vu * Math.cos(o.h - car.h)) + Math.max(-3, u - CL - 1.2) * 0.8);
+    }
+    this.offTarget += (want - this.offTarget) * Math.min(1, dt * (conflict ? 3 : 1.2));
 
     const Ld = 4 + v * 0.4;
     let ti = pr.i, acc = 0;
@@ -73,9 +121,30 @@ export class RaceAI {
     let vt = 1e9;
     for (let k = 1, d = 0; d < 8; k++) { const j = path.open ? Math.min(n - 1, pr.i + k) : (pr.i + k) % n; vt = Math.min(vt, this.profile[j]); d += path.lseg[j]; if (path.open && j === n - 1) break; }
     vt *= this.boost;
+    // ---- ミス（オーバーラン・立ち上がりでアクセルを開けすぎる）----
+    {
+      let jMin = -1, vMin = 1e9;
+      for (let k = 1, d = 0; d < 70; k++) { const j = path.open ? Math.min(n - 1, pr.i + k) : (pr.i + k) % n; if (this.profile[j] < vMin) { vMin = this.profile[j]; jMin = j; } d += path.lseg[j]; if (path.open && j === n - 1) break; }
+      const corner = vMin < v * 0.82 ? jMin : -1; // この先で大きく減速するコーナー
+      if (corner >= 0 && Math.abs(corner - this.cornerSeen) > 20 && !this.mistake) {
+        this.cornerSeen = corner;
+        if (!conflict && this.rand() < this.mistakeRate) this.mistake = { type: this.rand() < 0.55 ? 'late' : 'throttle', apex: corner, t: 0 };
+      }
+      const m = this.mistake;
+      if (m) {
+        m.t += dt;
+        const past = ((pr.i - m.apex + n) % n) < n / 2 && ((pr.i - m.apex + n) % n) < 60;
+        if (conflict) this.mistake = null; // 他車と競り合っている間はミスを引きずらない（ぶつけない）
+        else if (m.type === 'late') { const toApex = (m.apex - pr.i + n) % n; if (!past && toApex > 12) vt *= 1.08; else this.mistake = null; } // ブレーキが遅れて突っ込み、アウトへはらむ // ブレーキが遅れて突っ込む
+        else if (past) { m.exit = (m.exit || 0) + dt; if (m.exit > 0.8) this.mistake = null; } // 立ち上がりで開けすぎ
+        if (m.t > 8) this.mistake = null;
+      }
+    }
+    vt = Math.min(vt, vCap);
     const err = vt - v;
     let throttle = clamp(0.35 + err * 0.35, 0, 1);
     let brake = clamp(-err * 0.22 - 0.05, 0, 1);
+    if (vCap < 1e8 && v > vCap) { throttle = 0; brake = Math.max(brake, clamp((v - vCap) * 0.45, 0, 1)); } // 前の車に追突しない
     if (brake > 0) throttle = 0;
     // スライド時のカウンターステア（車体スリップ角の方向へ当て舵）とアクセルオフ
     {
@@ -83,9 +152,13 @@ export class RaceAI {
       const k = clamp((Math.abs(beta) - 0.09) / 0.22, 0, 1) * clamp((v - 7) / 5, 0, 1); // 低速の小回りでは効かせない
       if (k > 0) { steer = steer * (1 - k) + Math.sign(beta) * k; throttle *= 1 - 0.85 * k; }
     }
-    // トラクション
-    if (car.slipLong > car.spec.peakRatio * 1.4) throttle *= 0.4;
-    if (car.slip > 1.6) throttle *= 0.6;
+    // トラクション（開けすぎのミス中は抑えない）
+    const overThrottle = this.mistake && this.mistake.type === 'throttle' && this.mistake.exit > 0 && vCap > 1e8;
+    if (overThrottle) throttle = 1;
+    else {
+      if (car.slipLong > car.spec.peakRatio * 1.4) throttle *= 0.4;
+      if (car.slip > 1.6) throttle *= 0.6;
+    }
     // コース外れの補正
     if (Math.abs(pr.lat) > path.hw[pr.i] - 0.5) throttle *= 0.7;
 

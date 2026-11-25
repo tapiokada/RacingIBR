@@ -177,6 +177,9 @@ for (const r of HARUNA_RIVALS) r.area = 'haruna';
 for (const r of RIVALS) r.area = 'west';
 for (const r of EAST_RIVALS) r.area = 'east';
 export const ALL_RIVALS = [...RIVALS, ...EAST_RIVALS, ...HARUNA_RIVALS];
+// 走りの性格（他車との間隔）：aggressive＝ギリギリまで寄せる、cautious＝大きめに避ける、それ以外はフェア
+const STYLE = { gou: 'aggressive', kenji: 'aggressive', ryuu: 'aggressive', zero: 'aggressive', yuuri: 'cautious', kanade: 'cautious', sakura: 'cautious', mio: 'cautious', kaede: 'cautious' };
+for (const r of [...RIVALS, ...EAST_RIVALS, ...HARUNA_RIVALS]) { r.style = STYLE[r.id] || 'fair'; r.margin = { aggressive: 0.35, cautious: 1.4, fair: 0.8 }[r.style]; }
 // 賞金は実勢の中古車価格に合わせて2倍に
 for (const r of ALL_RIVALS) r.reward *= 2;
 

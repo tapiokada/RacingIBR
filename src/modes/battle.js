@@ -37,7 +37,7 @@ export class BattleMode {
     const pp = path.posAt(s0 - 9, lat), rp = path.posAt(s0 - 9, -lat);
     P.car.place(pp.x, pp.z, pp.h, 0);
     R.car.place(rp.x, rp.z, rp.h, 0);
-    R.ai = new RaceAI(R.car, path, rival.skill);
+    R.ai = new RaceAI(R.car, path, rival.skill, { margin: rival.margin });
     this.P = P; this.R = R;
     this.tp = new LapTracker(path, -9);
     this.tr = new LapTracker(path, -9);
