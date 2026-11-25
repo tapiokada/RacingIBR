@@ -3,6 +3,7 @@
 // yawRate w: 右旋回(上から見て時計回り)を正。dh/dt = -w
 
 const G = 9.81;
+export const FUEL_RATE = 10; // 燃料の減り方（実燃費の何倍で減るか）
 
 // トラクションコントロールの段階配分：許容スリップ＝ピークスリップ比×1.1×10^((10-L)/9)
 // （L10≒ピーク付近、L1≒ピークの約11倍＝かなり空転を許す）
@@ -49,6 +50,9 @@ export class Vehicle {
     this.absLevel = levelOf(opts.abs, 10);
     this.tcsLevel = levelOf(opts.tcs, 0);
     this.spinAssist = !!opts.spinAssist; // スピン防止アシスト
+    // 燃料（ストーリーのプレイヤー車のみ。null＝燃料を計算しない）{ liters, tank }
+    this.fuel = opts.fuel || null;
+    this.fuelLph = 0; // 瞬間燃費[L/h]（実燃費相当）
     this.limiterHit = 0;
     this.wheelLoads = [0, 0, 0, 0];
     this.wheelSlip = [0, 0, 0, 0];
@@ -210,10 +214,17 @@ export class Vehicle {
     const wr = this.wheelRpm();
     const rpm = Math.min(wr, Math.abs((this.vu / s.tireRadius) * this.ratio() * 60 / (2 * Math.PI)) * 1.12);
     if (wr > s.redline - 120 && rpm > s.redline * 0.8 && this.gear < s.gears.length) { this.shiftUp(); this.shiftCool = 1.0; return; }
+    // 軽いアクセルで巡航しているときは早めにシフトアップ（燃費）。踏み込めばキックダウン
+    this.thrAvg = (this.thrAvg || 0) + (inp.throttle - (this.thrAvg || 0)) * Math.min(1, dt * 2);
+    const eco = this.thrAvg < 0.3 && inp.throttle < 0.45 && inp.brake < 0.05;
+    if (eco && this.gear < s.gears.length && this.shiftCool <= 0) {
+      const next = (rpm * s.gears[this.gear]) / s.gears[this.gear - 1];
+      if (rpm > 2600 && next > 1700) { this.shiftUp(); this.shiftCool = 1.0; return; }
+    }
     if (this.gear > 1 && this.shiftCool <= 0) {
       const lower = (rpm * s.gears[this.gear - 2]) / s.gears[this.gear - 1];
       const thr = inp.brake > 0.2 ? 0.72 : 0.5;
-      if (rpm < s.redline * thr && lower < s.redline - 700) this.shiftDown();
+      if (eco ? rpm < 1300 : rpm < s.redline * thr && lower < s.redline - 700) this.shiftDown();
     }
   }
 
@@ -224,6 +235,26 @@ export class Vehicle {
       const t = throttle; throttle = brake; brake = t;
     }
     return { throttle, brake };
+  }
+
+  // 燃料消費：エンジンが発生しているトルク（摩擦分を含む図示出力）× 燃料消費率。アイドル時はアイドル流量。
+  // 燃料消費率は最良約235g/kWh。低負荷（ポンプ損失）・高回転・過給（燃料増量で冷却）で悪化。
+  // ゲームでは減り方を実燃費の FUEL_RATE 倍にする
+  burnFuel(dt, Te, rpm, thr) {
+    const s = this.spec;
+    const om = (rpm * 2 * Math.PI) / 60;
+    const P = Math.max(0, Te * om); // W
+    const disp = (s.engine.displacement || 2000) / 1000;
+    const idle = 0.16 * disp; // g/s（アイドル 約0.8L/h @2L）
+    const load = Math.min(1, thr);
+    const boostK = s.boostMax > 0 ? Math.max(0, this.boost) / s.boostMax : 0;
+    let bsfc = 235 * (1 + 0.25 * (1 - load) ** 2) * (1 + 0.1 * (rpm / s.redline) ** 2); // 図示（摩擦込み）出力あたり
+    bsfc *= 1 + 0.3 * boostK; // 過給時の燃料増量
+    if (load > 0.9) bsfc *= 1.08; // 全開時の出力空燃比
+    const gps = Math.max(thr > 0.01 || rpm < s.idle * 1.3 ? idle : idle * 0.2, idle * 0.3 + (P * bsfc) / 3.6e6); // 減速時は燃料カット
+    const lph = (gps * 3600) / 740; // ガソリン密度 0.74kg/L
+    this.fuelLph += (lph - this.fuelLph) * Math.min(1, dt * 3);
+    this.fuel.liters = Math.max(0, this.fuel.liters - (lph / 3600) * dt * FUEL_RATE);
   }
 
   step(dt) {
@@ -336,7 +367,13 @@ export class Vehicle {
       } else this.assistCut = Math.max(0, (this.assistCut || 0) - dt * 3);
       thr *= 1 - this.assistCut;
     } else this.assistCut = 0;
+    // ガス欠：エンジンはほとんど力が出ず、時速30km以下でだけ自走できる（GSまでの救済措置）
+    if (this.fuel && this.fuel.liters <= 0) {
+      const v30 = 30 / 3.6;
+      thr = Math.min(thr, 0.35) * Math.max(0, Math.min(1, (v30 - speed) / 1.5));
+    }
     const Te = s.fullTorque(rpm, this.boost) * thr;
+    if (this.fuel) this.burnFuel(dt, Te, rpm, thr);
     const Tf = (s.maxTorque * (0.03 + 0.12 * (rpm / s.redline))) * (1 - thr);
     let Teng = Te - Tf;
     if (rpm <= s.idle * 1.02 && Teng < 0) Teng = 0;

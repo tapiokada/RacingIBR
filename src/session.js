@@ -21,12 +21,12 @@ export class DriveSession {
     this.flash = 0;
   }
 
-  addCar({ carId, equipped, setup = null, color, isPlayer = false, name = '', ai = null }) {
+  addCar({ carId, equipped, setup = null, color, isPlayer = false, name = '', ai = null, fuel = null }) {
     const spec = buildSpec(carId, equipped, setup);
     const s = this.game.settings;
     // ABS・TCSはセッティング（車ごと）。未設定なら共通設定の値
     const lv = (k) => (setup && setup[k] != null ? setup[k] : s[k]);
-    const car = new Vehicle(spec, { auto: isPlayer ? s.transmission === 'AT' : true, abs: isPlayer ? lv('absLevel') : 10, tcs: isPlayer ? lv('tcsLevel') : 0, spinAssist: isPlayer && !!s.spinAssist, ground: this.game.world.ground || null });
+    const car = new Vehicle(spec, { auto: isPlayer ? s.transmission === 'AT' : true, abs: isPlayer ? lv('absLevel') : 10, tcs: isPlayer ? lv('tcsLevel') : 0, spinAssist: isPlayer && !!s.spinAssist, fuel, ground: this.game.world.ground || null });
     const model = buildCarModel(CARS[carId], color, { aero: equipped.aero, wing: equipped.aero === 'aero_wing' || equipped.aero === 'aero_full' ? 'gt' : undefined });
     this.game.world.scene.add(model);
     if (isPlayer) addHeadlights(model);
@@ -43,7 +43,9 @@ export class DriveSession {
     const spec = buildSpec(e.carId, e.equipped, setup);
     const c = e.car;
     const keep = { x: c.x, z: c.z, h: c.h, vu: c.vu, vv: c.vv, w: c.w, gear: c.gear };
+    const fuel = c.fuel;
     c.setSpec(spec);
+    c.fuel = fuel;
     const gs = this.game.settings;
     if (e.isPlayer) { c.absLevel = setup?.absLevel ?? gs.absLevel; c.tcsLevel = setup?.tcsLevel ?? gs.tcsLevel; }
     c.place(keep.x, keep.z, keep.h, 0);

@@ -10,6 +10,8 @@ import { CruiseAI } from '../ai.js';
 import { townGraph, getCoursePath } from '../physics/track.js';
 import { buildSpec } from '../physics/spec.js';
 import { saveGame, activeCar, fmtMoney } from '../save.js';
+import { fuelState } from '../save.js';
+import { FUEL_PRICE } from '../data/cars.js';
 import { openShop } from '../ui/shop.js';
 import { openSetup } from '../ui/setup.js';
 import { GarageMode } from './garage.js';
@@ -40,7 +42,7 @@ export class TownMode {
     this.graph = townGraph(area);
     this.session = new DriveSession(g, { corridor: g.world.corridor });
     const mine = activeCar(st);
-    const p = this.session.addCar({ carId: mine.carId, equipped: mine.equipped, setup: mine.setup || null, color: mine.color, isPlayer: true, name: PLAYER.name });
+    const p = this.session.addCar({ carId: mine.carId, equipped: mine.equipped, setup: mine.setup || null, color: mine.color, isPlayer: true, name: PLAYER.name, fuel: fuelState(mine) });
     const saved = st.pos && (st.pos.area || 'west') === area ? st.pos : null;
     const pos = this.opts.returnPos || saved || areaStart(area);
     p.car.place(pos.x, pos.z, pos.h, 0);
@@ -162,7 +164,7 @@ export class TownMode {
     }
     if (near && !this.dialog) {
       const slow = Math.abs(P.car.vu) < 4;
-      this.hud.prompt.textContent = slow ? `${keyName(g, 'interact')}：${near.poi.type === 'shop' ? 'チューニングショップに入る' : 'セーブする（GS）'}` : `${near.poi.name}　— 停車してください`;
+      this.hud.prompt.textContent = slow ? `${keyName(g, 'interact')}：${near.poi.type === 'shop' ? 'チューニングショップに入る' : 'GSに入る（給油・セーブ）'}` : `${near.poi.name}　— 停車してください`;
       this.hud.prompt.style.display = 'block';
       if (slow && inp.hit('interact') && this.poiCool <= 0) {
         if (near.poi.type === 'shop') this.openShop();
@@ -317,7 +319,7 @@ export class TownMode {
     const g = this.game;
     const s = this.session;
     s.controlsEnabled = false; s.frozen = true;
-    const box = panel('GS — セーブポイント', el('div', { class: 'hint' }, `${m.poi.name}`), el('div', {}, '現在の進行状況をセーブしますか？'));
+    const box = panel('GS — 給油・セーブ', el('div', { class: 'hint' }, `${m.poi.name}`), el('div', {}, '現在の進行状況をセーブしますか？'));
     const dlg = el('div', { class: 'screen dialog' }, box);
     const close = (msg) => { g.input.pressed.clear(); menu.destroy(); dlg.remove(); this.dialog = null; s.controlsEnabled = true; s.frozen = false; this.poiCool = 1; if (msg) this.hud.flash(msg, 1.6); };
     const menu = new Menu(g, [
@@ -329,6 +331,7 @@ export class TownMode {
           close(saveGame(g.story) ? 'セーブしました' : 'セーブに失敗しました');
         },
       },
+      ...this.refuelItems(close),
       {
         label: 'タイムランキング', sub: 'この街の各コースで、誰が速いか・あなたが何位か',
         action: () => { menu.destroy(); dlg.remove(); openRanking(g, this.area, () => { this.dialog = null; s.controlsEnabled = true; s.frozen = false; this.poiCool = 1; }); this.dialog = true; },
@@ -338,6 +341,30 @@ export class TownMode {
     box.appendChild(menu.root);
     g.ui.appendChild(dlg);
     this.dialog = dlg;
+  }
+
+  // GSでの給油（ハイオク FUEL_PRICE 円/L）。所持金が足りない分は入れられるだけ入れる
+  refuelItems(close) {
+    const g = this.game, st = g.story, rec = activeCar(st), f = fuelState(rec);
+    const need = Math.max(0, f.tank - f.liters);
+    const fill = (liters) => {
+      let L = Math.min(liters, f.tank - f.liters);
+      const afford = Math.floor(st.money / FUEL_PRICE);
+      let free = 0;
+      // 救済：所持金が5L分もないときは5Lまで無料
+      if (afford < 5) { free = Math.min(5, L); L = Math.max(free, Math.min(L, afford)); }
+      else L = Math.min(L, afford);
+      if (L <= 0) { close('給油できません'); return; }
+      const cost = Math.round(Math.max(0, L - free) * FUEL_PRICE);
+      st.money -= cost; f.liters = f.liters + L;
+      g.audio.beep(900, 0.08, 0.1);
+      close(`${L.toFixed(1)}L 給油しました（${cost ? fmtMoney(cost) : '救済給油・無料'}）`);
+    };
+    if (need < 0.05) return [{ label: '給油', disabled: true, sub: `満タンです（${f.tank}L）` }];
+    return [
+      { label: `給油：満タン（${need.toFixed(1)}L）`, sub: `ハイオク ${FUEL_PRICE}円/L　${fmtMoney(Math.round(need * FUEL_PRICE))}　残量 ${f.liters.toFixed(1)} / ${f.tank}L`, action: () => fill(need) },
+      { label: '給油：10L', sub: fmtMoney(10 * FUEL_PRICE), action: () => fill(10) },
+    ];
   }
 
   pause() {

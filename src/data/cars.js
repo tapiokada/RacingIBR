@@ -136,6 +136,11 @@ const CHASSIS = {
 };
 for (const [id, c] of Object.entries(CHASSIS)) Object.assign(CARS[id], c);
 
+// 燃料タンク容量[L]（公表値）。いずれもハイオク指定
+const TANKS = { '86-GR': 50, 'BRZ-ZD': 50, 'RS-RS': 40, 'S2K-AP': 50, 'SWIFT-S': 37, '80-Supra': 70, 'Z-32': 72, 'WRX-IMP': 60, 'EVO-IX': 55, 'R34-GTR': 65 };
+for (const [id, t] of Object.entries(TANKS)) CARS[id].tank = t;
+export const FUEL_PRICE = 185; // ハイオク 円/L
+
 export const CAR_IDS = Object.keys(CARS);
 
 export const CAR_COLORS = {

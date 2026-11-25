@@ -133,7 +133,7 @@ export class GarageMode {
       const row = el('div', { class: 'garage-row' + (i === this.idx ? ' sel' : ''), onclick: () => { this.idx = i; this.showCar(); } },
         el('b', {}, CARS[c.carId].name), i === st.active ? el('span', { class: 'tag' }, '乗車中') : '',
         el('small', {}, `${CARS[c.carId].drive}　${s2.maxPowerPS.toFixed(0)}PS　${s2.mass.toFixed(0)}kg　戦闘力 ${s2.rating}`),
-        el('small', {}, `${c.year ? c.year + '年式　' : ''}${c.colorName ? c.colorName + '　' : ''}走行 ${Math.round(c.km || 0).toLocaleString('ja-JP')}km`));
+        el('small', {}, `${c.year ? c.year + '年式　' : ''}${c.colorName ? c.colorName + '　' : ''}走行 ${Math.round(c.km || 0).toLocaleString('ja-JP')}km　燃料 ${(typeof c.fuel === 'number' ? c.fuel : CARS[c.carId].tank).toFixed(0)}/${CARS[c.carId].tank}L`));
       list.appendChild(row);
     });
     const q = 0.5 * 1.2 * (200 / 3.6) ** 2 * sp.area / 9.81;

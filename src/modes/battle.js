@@ -6,6 +6,7 @@ import { RaceAI } from '../ai.js';
 import { CARS, PLAYER } from '../data/cars.js';
 import { PART_BY_ID, CATEGORY_NAME, RANK_STARS } from '../data/parts.js';
 import { activeCar, addPart, fmtMoney, fmtTime } from '../save.js';
+import { fuelState } from '../save.js';
 import { VIEW_NAMES } from '../render/cameras.js';
 import { LapTracker, Countdown, pauseMenu } from './common.js';
 import { coursePath, TownMode } from './town.js';
@@ -28,7 +29,7 @@ export class BattleMode {
     g.rig.setGallerySpots(path);
     this.session = new DriveSession(g, { corridor: path.corridor, path });
     const mine = activeCar(g.story);
-    const P = this.session.addCar({ carId: mine.carId, equipped: mine.equipped, setup: mine.setup || null, color: mine.color, isPlayer: true, name: PLAYER.name });
+    const P = this.session.addCar({ carId: mine.carId, equipped: mine.equipped, setup: mine.setup || null, color: mine.color, isPlayer: true, name: PLAYER.name, fuel: fuelState(mine) });
     const R = this.session.addCar({ carId: rival.car, equipped: rival.parts, setup: rival.setup || null, color: rival.color, name: rival.name });
     const hw = path.hw[0];
     const lat = Math.min(2.4, hw - 1.4);

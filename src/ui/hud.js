@@ -79,6 +79,20 @@ export class Hud {
       c.font = '12px sans-serif'; c.fillStyle = '#9ab'; c.textAlign = 'left';
       c.fillText(`BOOST ${car.boost.toFixed(2)}bar`, cx - 110, cy - 2);
     }
+    // 燃料計（ストーリーのみ）
+    if (car.fuel) {
+      const f = car.fuel, r = Math.max(0, Math.min(1, f.liters / f.tank));
+      const x0 = 8, y0 = 18, bw = 70, bh = 8; // 回転計の弧より上（キャンバス左上）
+      const low = r < 0.15;
+      c.font = 'bold 11px sans-serif'; c.textAlign = 'left';
+      c.fillStyle = f.liters <= 0 ? (Math.sin(performance.now() / 150) > 0 ? '#ff2d55' : '#661020') : low ? '#ff9f1a' : '#9ab';
+      c.fillText(f.liters <= 0 ? 'GAS EMPTY 〜30km/h' : 'FUEL', x0, y0 - 3);
+      c.fillStyle = 'rgba(255,255,255,0.15)'; c.fillRect(x0, y0, bw, bh);
+      c.fillStyle = low ? '#ff9f1a' : '#3ddc6a'; c.fillRect(x0, y0, bw * r, bh);
+      c.fillStyle = '#dde'; c.font = '11px sans-serif';
+      const kmpl = car.fuelLph > 0.05 && Math.abs(car.vu) > 1 ? (Math.abs(car.vu) * 3.6) / car.fuelLph : null;
+      c.fillText(`${f.liters.toFixed(1)}L ${kmpl ? `${Math.min(99, kmpl).toFixed(1)}km/L` : ''}`, x0 + bw + 6, y0 + 8);
+    }
     // 作動中のアシスト
     const tags = [];
     if ((car.tcsCut || 0) > 0.05 && car.input.throttle > 0.05) tags.push(['TCS', '#ffb020']);

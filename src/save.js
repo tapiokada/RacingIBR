@@ -54,6 +54,13 @@ export function addPart(state, partId, n = 1) {
 
 export function activeCar(state) { return state.garage[state.active]; }
 
+// ガレージの車の燃料（未設定＝満タン）。Vehicle に渡すとそのまま残量が書き換わる
+export function fuelState(rec) {
+  const tank = CARS[rec.carId].tank || 50;
+  if (typeof rec.fuel !== 'number') rec.fuel = tank;
+  return { get liters() { return rec.fuel; }, set liters(v) { rec.fuel = v; }, tank };
+}
+
 // ---------------- PRACTICE用のセッティング（車種＋パーツ構成ごと） ----------------
 const PSET_KEY = 'ibr.practiceSetup.v1';
 export function loadPracticeSetup(key) {
