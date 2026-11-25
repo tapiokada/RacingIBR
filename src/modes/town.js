@@ -13,6 +13,7 @@ import { saveGame, activeCar, fmtMoney } from '../save.js';
 import { openShop } from '../ui/shop.js';
 import { openSetup } from '../ui/setup.js';
 import { GarageMode } from './garage.js';
+import { openRanking } from '../ui/ranking.js';
 import { VIEW_NAMES } from '../render/cameras.js';
 import { BattleMode } from './battle.js';
 import { TitleMode } from './title.js';
@@ -327,6 +328,10 @@ export class TownMode {
           g.story.area = this.area;
           close(saveGame(g.story) ? 'セーブしました' : 'セーブに失敗しました');
         },
+      },
+      {
+        label: 'タイムランキング', sub: 'この街の各コースで、誰が速いか・あなたが何位か',
+        action: () => { menu.destroy(); dlg.remove(); openRanking(g, this.area, () => { this.dialog = null; s.controlsEnabled = true; s.frozen = false; this.poiCool = 1; }); this.dialog = true; },
       },
       { label: 'やめる', action: () => close() },
     ], { onBack: () => close() });

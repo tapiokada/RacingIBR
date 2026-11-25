@@ -195,3 +195,8 @@ input[type=range] { width: 200px; accent-color: var(--pink); }
 .shop .part-row.car-row { grid-template-columns: 150px 1fr 80px 150px; }
 .part-row.special { background: rgba(255,210,63,.08); border-left-color: var(--yellow); }
 .special-sep { color: var(--yellow); }
+.car-preview { display: block; border-radius: 8px; margin: 4px 0 8px; }
+.preview-info .stat b { text-align: right; margin-left: 8px; font-size: 12px; }
+.ranking .panel { width: min(860px, 96vw); }
+.rank-table tr.me td { background: rgba(51,225,255,.18); color: #fff; font-weight: 700; }
+.rank-table tr.beaten td:last-child { color: #3ddc6a; }

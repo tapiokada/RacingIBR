@@ -90,7 +90,14 @@ export class BattleMode {
 
     if (this.state === 'race') {
       let res = null;
-      if (this.tp.dist >= this.total) res = { win: true, how: 'finish' };
+      if (this.tp.dist >= this.total) {
+        res = { win: true, how: 'finish' };
+        // 完走タイムを記録（GSのタイムランキング用）
+        const st = g.story, k = this.opts.layout.key, mine = activeCar(st);
+        st.bestTimes ||= {};
+        const prev = st.bestTimes[k];
+        if (!prev || this.raceT < prev.time) st.bestTimes[k] = { time: +this.raceT.toFixed(2), carId: mine.carId, date: new Date().toISOString() };
+      }
       else if (this.tr.dist >= this.total) res = { win: false, how: 'finish' };
       else if (gap >= SNAP_GAP) res = { win: true, how: 'snap' };
       else if (gap <= -SNAP_GAP) res = { win: false, how: 'snap' };

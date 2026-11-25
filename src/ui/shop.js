@@ -6,6 +6,7 @@ import { freeCount, addPart, activeCar, fmtMoney } from '../save.js';
 import { CARS } from '../data/cars.js';
 import { dealerStock, dealerBuy } from '../data/dealer.js';
 import { powerGraph } from './graph.js';
+import { CarPreview } from './carPreview.js';
 
 export function sellPrice(p) {
   return p.price ? Math.round(p.price * 0.5) : p.rank * 90000;
@@ -118,7 +119,8 @@ export function openShop(game, state, area, onClose) {
           el('span', { class: 'pname' }, `${c.name}　${L.year}年式　${L.km.toLocaleString('ja-JP')}km`, el('small', {}, `　${c.ref}　${sp.maxPowerPS.toFixed(0)}PS・${c.drive}・${sp.mass.toFixed(0)}kg${extra}`)),
           el('span', { class: 'cnt' }, L.left > 0 ? `在庫 ${L.left}台` : 'SOLD OUT'),
           el('button', { class: 'buy', onclick: buy }, fmtMoney(L.price)));
-        rows.push({ row: r, act: buy });
+        rows.push({ row: r, act: buy, preview: L });
+        r.addEventListener('mouseenter', () => { index = rows.findIndex((x) => x.row === r); hl(); });
         return r;
       };
       list.appendChild(el('div', { class: 'key-sep' }, `入荷 第${stock.period + 1}期（バトル2回ごとに入れ替え）`));
@@ -152,12 +154,28 @@ export function openShop(game, state, area, onClose) {
     wrap.appendChild(panel(`TUNE SHOP — ${CARS[car.carId].name}`,
       el('div', { class: 'shop-head' }, el('span', {}, `所持金 ${fmtMoney(state.money)}`), el('span', { class: 'hint' }, 'Tab:タブ切替　↑↓:選択　←→:パーツ変更　Enter:購入/売却　Esc:出る')),
       tabs,
-      el('div', { class: 'shop-body' }, list, el('div', { class: 'shop-side' }, statsBox(spec, buildSpec(car.carId, CARS[car.carId].stock)), el('div', { class: 'key-sep' }, 'パワー・トルク曲線（点線：純正）'), powerGraph(spec, buildSpec(car.carId, CARS[car.carId].stock), { w: 330, h: 180 }))),
+      el('div', { class: 'shop-body' }, list, tab === 'car' ? el('div', { class: 'shop-side' }, previewBox()) : el('div', { class: 'shop-side' }, statsBox(spec, buildSpec(car.carId, CARS[car.carId].stock)), el('div', { class: 'key-sep' }, 'パワー・トルク曲線（点線：純正）'), powerGraph(spec, buildSpec(car.carId, CARS[car.carId].stock), { w: 330, h: 180 }))),
       close));
     hl();
   };
 
-  const hl = () => rows.forEach((r, i) => r.row.classList.toggle('sel', i === index));
+  // 中古車：選択中の車を3Dで表示
+  let preview = null, previewInfo = null;
+  const previewBox = () => {
+    if (!preview) preview = new CarPreview(330, 200);
+    previewInfo = el('div', { class: 'stats preview-info' });
+    return el('div', {}, el('div', { class: 'key-sep' }, '選択中の車'), preview.canvas, previewInfo);
+  };
+  const showPreview = () => {
+    const L = rows[index]?.preview;
+    if (!preview || !L) return;
+    preview.show(L.carId, L.color, L.equipped);
+    const c = CARS[L.carId], sp = buildSpec(L.carId, L.equipped);
+    previewInfo.innerHTML = '';
+    for (const [k, v] of [['車種', `${c.name}（${c.ref}）`], ['年式・走行', `${L.year}年式　${L.km.toLocaleString('ja-JP')}km`], ['色', L.colorName], ['性能', `${sp.maxPowerPS.toFixed(0)}PS・${sp.mass.toFixed(0)}kg・${c.drive}　戦闘力 ${sp.rating}`], ['価格', fmtMoney(L.price)]])
+      previewInfo.appendChild(el('div', { class: 'stat' }, el('span', {}, k), el('b', {}, v)));
+  };
+  const hl = () => { rows.forEach((r, i) => r.row.classList.toggle('sel', i === index)); showPreview(); };
 
   const off = game.input.onKey((e) => {
     if (!wrap.isConnected) return;
@@ -170,7 +188,7 @@ export function openShop(game, state, area, onClose) {
     else if (e.code === 'Escape') done();
   });
 
-  const done = () => { off(); wrap.remove(); onClose && onClose(); };
+  const done = () => { off(); preview?.dispose(); wrap.remove(); onClose && onClose(); };
   build();
   game.ui.appendChild(wrap);
 }
