@@ -58,6 +58,7 @@ export class Vehicle {
     this.wheelSlip = [0, 0, 0, 0];
     this.reverseHold = 0;
     this.offRoad = 0;
+    this.surfMu = [1, 1, 1, 1]; this.surfRr = [0, 0, 0, 0]; // 各輪の路面（摩擦倍率・転がり抵抗）
     this.bottom = 0; // 底打ち
     this.air = 0; // 全輪接地していない時間
   }
@@ -111,6 +112,9 @@ export class Vehicle {
     for (let i = 0; i < 4; i++) {
       const wh = this.wheels[i];
       out[i] = this.groundAt(this.x + f0 * wh.pu + r0 * wh.pv, this.z + f1 * wh.pu + r1 * wh.pv);
+      // 路面の種類（サーキットの縁石・芝・グラベル）
+      const sf = this.ground && this.ground.lastSurf;
+      this.surfMu[i] = sf ? sf.mu : 1; this.surfRr[i] = sf ? sf.rr : 0;
     }
   }
 
@@ -261,7 +265,7 @@ export class Vehicle {
     this.fuelLph += (lph - this.fuelLph) * Math.min(1, dt * 3);
     // 減りを実燃費の FUEL_RATE 倍にするのは、走って距離を稼いでいるとき（駆動輪に仕事をしている）だけ。
     // 停車中のアイドリングや空ぶかしは実際の燃費どおり（すぐにガス欠にならないように）
-    const rate = loaded && Math.abs(this.vu) > 1 ? FUEL_RATE : 1;
+    const rate = loaded && Math.abs(this.vu) > 1 ? (this.fuelRate ?? FUEL_RATE) : 1;
     this.fuel.liters = Math.max(0, this.fuel.liters - (lph / 3600) * dt * rate);
   }
 
@@ -432,7 +436,7 @@ export class Vehicle {
       // キャンバー：ネガティブ量（ロールで外輪は減る）。横グリップは2.5°付近が最大、縦グリップは静的キャンバーで低下
       const e = wh.camber - wh.side * relRollDeg * 0.35;
       const latMul = 1 + 0.024 * e - 0.0048 * e * e;
-      const mu = s.mu * Math.max(0.6, 1 - 0.08 * (Fz / fz0 - 1)) * offMul;
+      const mu = s.mu * Math.max(0.6, 1 - 0.08 * (Fz / fz0 - 1)) * offMul * this.surfMu[i];
       const sx = kappa / kp, sy = alpha / ap;
       const sm = Math.hypot(sx, sy);
       let fx = 0, fy = 0, slope = 0;
@@ -539,7 +543,9 @@ export class Vehicle {
       Fu -= (dragF * this.vu) / speed;
       Fv -= (dragF * this.vv) / speed;
     }
-    const rr = (s.rrK || 0.011) * sumN + (this.offRoad ? 0.08 * sumN : 0) + bump * 0.5;
+    let surfDrag = 0;
+    for (let i = 0; i < 4; i++) surfDrag += this.surfRr[i] * Math.max(0, loads[i]);
+    const rr = (s.rrK || 0.011) * sumN + (this.offRoad ? 0.08 * sumN : 0) + surfDrag + bump * 0.5;
     if (Math.abs(this.vu) > 0.05) Fu -= Math.sign(this.vu) * Math.min(rr, Math.abs(this.vu) * this.m / dt * 0.5);
 
     // ---- 車体運動（平面） ----

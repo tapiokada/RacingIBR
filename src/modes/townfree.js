@@ -58,7 +58,7 @@ export class TownFreeMode {
       { label: '再開', action: () => { this.paused = false; } },
       { label: 'セッティング', sub: '足回り・ブレーキ・ギア比・LSD・ダウンフォースの調整とパワー/トルク曲線', action: () => this.openSetting() },
       { label: 'スタート地点へ戻る', action: () => g.transition(() => g.setMode(new TownFreeMode(g, { ...this.opts, pos: null }))) },
-      ...Object.values(AREAS).filter((a) => a.id !== this.area).map((a) => ({ label: `エリア切り替え：${a.name}へ`, action: () => this.changeArea(a.id, areaStart(a.id)) })),
+      ...Object.values(AREAS).filter((a) => a.id !== this.area && !a.hidden).map((a) => ({ label: `エリア切り替え：${a.name}へ`, action: () => this.changeArea(a.id, areaStart(a.id)) })),
       { label: 'PRACTICEメニューへ', action: () => g.transition(() => g.setMode(new TitleMode(g, 'practice'))) },
     ], () => { this.paused = false; });
   }

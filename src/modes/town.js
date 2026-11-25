@@ -3,13 +3,14 @@ import * as THREE from 'three';
 import { DriveSession } from '../session.js';
 import { Hud } from '../ui/hud.js';
 import { el, Menu, panel } from '../ui/ui.js';
-import { NODES, AREAS, LAYOUTS, COURSES, TOUGE_LAYOUTS, HARUNA_UNLOCK_WINS, townRoadBetween, laneOffset, areaStart, arriveSpot } from '../data/map.js';
+import { NODES, AREAS, LAYOUTS, COURSES, TOUGE_LAYOUTS, HARUNA_UNLOCK_WINS, CIRCUIT_LAYOUTS, CIRCUIT_ENTRY_FEE, townRoadBetween, laneOffset, areaStart, arriveSpot } from '../data/map.js';
+import { TrackDayMode, SESSION_TIME } from './trackday.js';
 import { ALL_RIVALS } from '../data/rivals.js';
 import { CARS, PLAYER } from '../data/cars.js';
 import { CruiseAI } from '../ai.js';
 import { townGraph, getCoursePath } from '../physics/track.js';
 import { buildSpec } from '../physics/spec.js';
-import { saveGame, activeCar, fmtMoney } from '../save.js';
+import { saveGame, activeCar, fmtMoney, fmtTime } from '../save.js';
 import { fuelState } from '../save.js';
 import { FUEL_PRICE } from '../data/cars.js';
 import { openShop } from '../ui/shop.js';
@@ -388,12 +389,28 @@ export class TownMode {
         },
       },
       { label: 'セッティング', sub: '足回り・ブレーキ・ギア比・LSD・ダウンフォースの調整（★5フルカスタマイズパーツ）とパワー/トルク曲線', action: () => { menu.destroy(); dlg.remove(); this.openSetting(); } },
-      ...Object.values(AREAS).filter((a) => a.id !== this.area).map((a) => {
+      ...Object.values(AREAS).filter((a) => a.id !== this.area && !a.hidden).map((a) => {
         const locked = (a.unlockWins || 0) > st.wins;
         return {
           label: `エリア切り替え：${a.name}へ`, disabled: locked,
           sub: locked ? `${a.unlockWins}勝で解放（あと${a.unlockWins - st.wins}勝）` : `${a.name}エリアの開始地点（GS前）へ移動します`,
           action: () => { menu.destroy(); dlg.remove(); this.paused = false; this.changeArea(a.id, areaStart(a.id)); },
+        };
+      }),
+      ...CIRCUIT_LAYOUTS.map((L) => {
+        const best = st.trackday?.[L.key]?.best;
+        const poor = st.money < CIRCUIT_ENTRY_FEE;
+        return {
+          label: `サーキット走行会：${L.course.name.replace(/ .*$/, '')}`, disabled: poor,
+          sub: `参加費 ${fmtMoney(CIRCUIT_ENTRY_FEE)}／1枠${SESSION_TIME / 60}分。今のマシン（チューニング・燃料そのまま）で周回タイムを計測${best ? `　自己ベスト ${fmtTime(best)}` : ''}${poor ? '　（所持金が足りません）' : ''}`,
+          action: () => {
+            menu.destroy(); dlg.remove(); this.paused = false;
+            st.money -= CIRCUIT_ENTRY_FEE;
+            const P = this.session.player.car;
+            const pos = { x: P.x, z: P.z, h: P.h, area: this.area };
+            this.leaving = true; this.session.controlsEnabled = false;
+            g.transition(() => g.setMode(new TrackDayMode(g, { layout: L, returnPos: pos, townMode: TownMode })), 450);
+          },
         };
       }),
       { label: 'タイトルへ戻る', sub: '未セーブの進行は失われます', action: () => { menu.destroy(); g.transition(() => g.setMode(new TitleMode(g))); } },

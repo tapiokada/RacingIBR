@@ -2,6 +2,7 @@
 import { NODES, AREAS, roadWidthBetween, roadPolyline, LAYOUTS, areaOfLayout } from '../data/map.js';
 
 import { TougePath, harunaCorridor } from './touge.js';
+import { CircuitPath, circuitCorridor } from './circuit.js';
 
 const roadsOf = (area) => AREAS[area || 'west'].roads;
 // 榛名山の施設への引き込み（峠の本線以外の道路）
@@ -171,6 +172,7 @@ export function townCornerPads(area = 'west') {
 
 export function townCorridor(area = 'west') {
   if (AREAS[area].touge) return getHarunaCorridor();
+  if (AREAS[area].circuit) return circuitCorridor();
   const ROADS = roadsOf(area);
   const segs = [];
   for (const p of townCornerPads(area)) segs.push({ ax: p.x, az: p.z, bx: p.x, bz: p.z, hw: p.r, road: 'corner' });
@@ -452,7 +454,7 @@ const pathCache = {};
 let harunaCorr = null;
 export function getHarunaCorridor() { return (harunaCorr ||= harunaCorridor(harunaSpurSegs())); }
 export function getCoursePath(layout) {
-  if (!pathCache[layout.key]) pathCache[layout.key] = layout.course.touge ? new TougePath(layout, getHarunaCorridor()) : new CoursePath(layout);
+  if (!pathCache[layout.key]) pathCache[layout.key] = layout.course.touge ? new TougePath(layout, getHarunaCorridor()) : layout.course.circuit ? new CircuitPath(layout) : new CoursePath(layout);
   return pathCache[layout.key];
 }
 

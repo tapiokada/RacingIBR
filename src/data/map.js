@@ -245,6 +245,15 @@ export const TOUGE_LAYOUTS = TOUGE_COURSES.flatMap((c) => [
 COURSES.push(...TOUGE_COURSES);
 LAYOUTS.push(...TOUGE_LAYOUTS);
 
+// つくば山麓サーキット（実在の筑波サーキット TC2000 を国土地理院データから再現。施設名は架空）
+// 走行は時計回りのみ。セクター境界は src/physics/circuit.js で決める
+export const CIRCUIT_COURSES = [
+  { id: 'tsukuba', area: 'tsukuba', name: 'つくば山麓サーキット 2000コース', laps: 3, circuit: true, desc: '茨城県下妻市の常設サーキット（実在コースの実寸・実標高）。1・2コーナー、S字、2つのヘアピン、長いバックストレートを持つテクニカルコース' },
+];
+export const CIRCUIT_LAYOUTS = CIRCUIT_COURSES.map((c) => ({ key: `${c.id}_2000`, course: c, area: c.area, reverse: false, name: c.name }));
+COURSES.push(...CIRCUIT_COURSES);
+LAYOUTS.push(...CIRCUIT_LAYOUTS);
+
 export function roadWidthBetween(a, b) {
   for (const r of RACE_ROADS) {
     for (let i = 0; i < r.nodes.length - 1; i++) {
@@ -323,6 +332,12 @@ AREAS.haruna = {
 // 道路データ上の距離（下り方向）でのコース区間。区間境界は touge.js で直線的な地点に決める
 const HR_LEN = (() => { let a = 0; for (let i = 1; i < HR_RAW.length; i++) a += Math.hypot(HR_RAW[i][0] - HR_RAW[i - 1][0], HR_RAW[i][1] - HR_RAW[i - 1][1]); return a; })();
 export const HARUNA_LENGTH = HR_LEN;
+
+AREAS.tsukuba = {
+  id: 'tsukuba', name: 'つくば山麓サーキット', roads: [], pois: [], circuit: true, hidden: true, // 街のエリア移動には出さない（走行会・PRACTICEから）
+  start: null, gates: [],
+};
+export const CIRCUIT_ENTRY_FEE = 25000; // 走行会の参加費（1枠）
 
 export const ALL_ROADS = [...WEST_ROADS, ...EAST_ROADS, ...HARUNA_ROADS];
 export function areaOfLayout(L) { return L.area || L.course?.area || 'west'; }
