@@ -131,7 +131,7 @@ export const HARUNA_RIVALS = [
     lines: { meet: '峠は軽さと足だよ。ついてこれる？', win: '…下りでこの差。あんた何者？', lose: '榛名の路面は、足が柔らかい方が速いの。' },
   },
   {
-    id: 'tetsu', name: '岩城テツ', team: '榛名ダウンヒラーズ', car: '86-GR', color: 0x1a1a1a, minWins: 10, skill: 0.9, reward: 260000,
+    id: 'tetsu_h', name: '岩城テツ', team: '榛名ダウンヒラーズ', car: '86-GR', color: 0x1a1a1a, minWins: 10, skill: 0.9, reward: 260000,
     parts: tune('86-GR', { tire: 'tire_high', suspension: 'sus_full', transmission: 'tm_full', brake: 'brk_full', muffler: 'muf_sport' }),
     setup: setupOf('86-GR', { freqF: 2.5, freqR: 2.7, arbF: 6, arbR: 4, lsdInitR: 12, lsdAccR: 35, lsdDecR: 20, brakeBal: -1, final: 4.3 }),
     lines: { meet: '同じ86でも、峠の86は別物だぜ。', win: '平地の走り屋に負けるとはな…', lose: '下りのブレーキング、まだまだだな。' },
@@ -155,7 +155,7 @@ export const HARUNA_RIVALS = [
     lines: { meet: '……霧の夜は、私の時間。', win: '……見えなくなるほど離されたのは、初めて。', lose: '……追いつけなかったでしょう。' },
   },
   {
-    id: 'daichi', name: '大門ダイチ', team: '上州ストリート連合', car: '80-Supra', color: 0xc8102e, minWins: 14, skill: 0.92, reward: 380000,
+    id: 'daichi_h', name: '大門ダイチ', team: '上州ストリート連合', car: '80-Supra', color: 0xc8102e, minWins: 14, skill: 0.92, reward: 380000,
     parts: tune('80-Supra', { tire: 'tire_s', suspension: 'sus_full', transmission: 'tm_full', brake: 'brk_full', turbo: 'tb_twin', intercooler: 'ic_front', muffler: 'muf_straight', aero: 'aero_wing' }),
     setup: setupOf('80-Supra', { freqF: 2.7, freqR: 2.9, arbF: 6, arbR: 4, toeR: 0.3, lsdAccR: 40, lsdDecR: 25, brakeBal: -1, dfR: 150 }),
     lines: { meet: '上りの直線で、全部ねじ伏せる。', win: 'パワーだけじゃ峠は勝てねぇか…', lose: 'これが上州の直6ツインターボだ！' },
@@ -184,3 +184,5 @@ for (const r of [...RIVALS, ...EAST_RIVALS, ...HARUNA_RIVALS]) { r.style = STYLE
 for (const r of ALL_RIVALS) r.reward *= 2;
 
 export const RIVAL_BY_ID = Object.fromEntries(ALL_RIVALS.map((r) => [r.id, r]));
+// IDの重複チェック（撃破記録などをIDで管理しているため）
+if (Object.keys(RIVAL_BY_ID).length !== ALL_RIVALS.length) console.error('ライバルIDが重複しています');
