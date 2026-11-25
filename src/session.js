@@ -118,6 +118,7 @@ export class DriveSession {
 
   update(dt) {
     this.readPlayerInput(dt);
+    for (const e of this.entries) e.car.held = this.frozen; // 停止保持中（店・GS・カウントダウン等）
     if (this.frozen) {
       for (const e of this.entries) { e.car.vu = 0; e.car.vv = 0; e.car.w = 0; }
     }

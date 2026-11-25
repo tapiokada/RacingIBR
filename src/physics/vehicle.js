@@ -201,8 +201,10 @@ export class Vehicle {
   autoShift(dt) {
     const s = this.spec;
     const inp = this.input;
+    // 停止保持中（店・GSなど）はブレーキを踏んだ扱いでもリバースに入れない
+    if (this.held) { if (this.gear === -1) this.gear = 1; this.reverseHold = 0; }
     // 停止付近：ブレーキでR、アクセルで1速
-    if (this.speed < 1.0) {
+    else if (this.speed < 1.0) {
       if (inp.brake > 0.5 && inp.throttle < 0.05) {
         this.reverseHold += dt;
         if (this.reverseHold > 0.45 && this.gear !== -1) { this.gear = -1; }
