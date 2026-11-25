@@ -7,7 +7,7 @@ import { RaceAI } from '../src/ai.js';
 const dt = 1 / 500;
 const id = process.env.CAR || '86-GR';
 const path = getCoursePath(LAYOUTS.find((l) => l.key === 'rikkyo_f'));
-for (const [label, wheel, tw] of [['純正', 'wh_stock', 'tw_stock'], ['軽量鍛造', 'wh_forged', 'tw_stock'], ['+1inch', 'wh_plus1', 'tw_stock'], ['+2inch', 'wh_plus2', 'tw_stock'], ['幅+20mm', 'wh_stock', 'tw_20'], ['+1inch 幅+20', 'wh_plus1', 'tw_20'], ['+2inch 幅+30', 'wh_plus2', 'tw_30']]) {
+for (const [label, wheel, tw] of [['純正', 'wh_stock', 'tw_stock'], ['軽量鍛造', 'wh_forged', 'tw_stock'], ['+1inch', 'wh_plus1', 'tw_stock'], ['+2inch', 'wh_plus2', 'tw_stock'], ['鍛造+1inch', 'wh_plus1_forged', 'tw_stock'], ['鍛造+2inch', 'wh_plus2_forged', 'tw_stock'], ['幅+20mm', 'wh_stock', 'tw_20'], ['+1inch 幅+20', 'wh_plus1', 'tw_20'], ['+2inch 幅+30', 'wh_plus2', 'tw_30']]) {
   const eq = { ...stockEquip(id), wheel, tirewidth: tw };
   const s = buildSpec(id, eq);
   const v = new Vehicle(s, { auto: true, tcs: 10 });

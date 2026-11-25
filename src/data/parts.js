@@ -153,7 +153,8 @@ export const PARTS = [
   P({ id: 'wh_forged', cat: 'wheel', name: '軽量鍛造ホイール（純正サイズ）', rank: 2, price: 160000, weight: 0, desc: '1輪−2.0kg、回転慣性−18%。加速・減速・ハンドリングが軽くなる', inch: 0, wmass: -2.0, inertia: 0.82 }),
   P({ id: 'wh_plus1', cat: 'wheel', name: 'インチアップ +1インチ', rank: 2, price: 120000, weight: 0, desc: '扁平タイヤで横剛性↑・グリップ+1.5%、応答が鋭くなる。1輪+1.6kg、回転慣性+12%', inch: 1, wmass: 1.6, inertia: 1.12 }),
   P({ id: 'wh_plus2', cat: 'wheel', name: 'インチアップ +2インチ', rank: 3, price: 200000, weight: 0, desc: 'さらに扁平。グリップ+2.5%、応答最速。1輪+3.4kg、回転慣性+26%', inch: 2, wmass: 3.4, inertia: 1.26 }),
-  P({ id: 'wh_plus1_forged', cat: 'wheel', name: '鍛造ホイール +1インチ', rank: 4, price: null, weight: 0, desc: '+1インチの性能で重量増なし（1輪−0.3kg、回転慣性−2%）', inch: 1, wmass: -0.3, inertia: 0.98 }),
+  P({ id: 'wh_plus1_forged', cat: 'wheel', name: '軽量鍛造ホイール +1インチ', rank: 4, price: 280000, weight: 0, desc: '+1インチの性能で重量増なし（1輪−0.3kg、回転慣性−2%）', inch: 1, wmass: -0.3, inertia: 0.98 }),
+  P({ id: 'wh_plus2_forged', cat: 'wheel', name: '軽量鍛造ホイール +2インチ', rank: 4, price: 380000, weight: 0, desc: '+2インチの性能で重量増を最小限に（1輪+0.8kg、回転慣性+6%）', inch: 2, wmass: 0.8, inertia: 1.06 }),
 
   // ---------------- タイヤ幅（純正幅からの増分。ホイールのリム幅も合わせる） ----------------
   P({ id: 'tw_stock', cat: 'tirewidth', name: '純正幅', rank: 1, price: null, weight: 0, free: true, desc: '純正サイズ', dw: 0 }),
