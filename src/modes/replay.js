@@ -23,7 +23,7 @@ export class ReplayMode {
     g.rig.setGallerySpots(this.path);
     g.audio.playBgm(null);
     const spec = buildSpec(replay.carId, replay.equipped, replay.setup || null);
-    this.model = buildCarModel(CARS[replay.carId], replay.color, { aero: replay.equipped.aero, wing: replay.equipped.aero === 'aero_wing' || replay.equipped.aero === 'aero_full' ? 'gt' : undefined });
+    this.model = buildCarModel(CARS[replay.carId], replay.color, { aero: replay.equipped.aero, tirewidth: replay.equipped.tirewidth, wheel: replay.equipped.wheel, wing: replay.equipped.aero === 'aero_wing' || replay.equipped.aero === 'aero_full' ? 'gt' : undefined });
     g.world.scene.add(this.model);
     addHeadlights(this.model);
     const L = spec.wheelbase;

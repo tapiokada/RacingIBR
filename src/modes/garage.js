@@ -76,7 +76,7 @@ export class GarageMode {
     const def = CARS[car.carId];
     this.spec = buildSpec(car.carId, car.equipped, car.setup || null);
     const sp = this.spec;
-    const m = buildCarModel(def, car.color, { aero: car.equipped.aero, wing: car.equipped.aero === 'aero_wing' || car.equipped.aero === 'aero_full' ? 'gt' : undefined });
+    const m = buildCarModel(def, car.color, { aero: car.equipped.aero, tirewidth: car.equipped.tirewidth, wheel: car.equipped.wheel, wing: car.equipped.aero === 'aero_wing' || car.equipped.aero === 'aero_full' ? 'gt' : undefined });
     const L = sp.wheelbase, b = L * sp.frontWeight, a = L - b;
     this.stub = { x: 0, z: 0, h: 0, a, b, gy: 0, gp: 0, gr: 0, heave: 0, pitch: 0, roll: 0, steer: 0, spinF: 0, spinR: 0, gear: 1, input: { brake: 0, throttle: 0, steer: 0 } };
     syncCarModel(m, this.stub);

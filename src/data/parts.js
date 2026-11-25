@@ -14,6 +14,8 @@ export const CATEGORIES = [
   { id: 'brake', name: 'ブレーキ', required: true },
   { id: 'transmission', name: 'トランスミッション', required: true },
   { id: 'aero', name: 'エアロ', required: false },
+  { id: 'wheel', name: 'ホイール', required: true },
+  { id: 'tirewidth', name: 'タイヤ幅', required: true },
 ];
 
 export const CATEGORY_NAME = Object.fromEntries(CATEGORIES.map((c) => [c.id, c.name]));
@@ -144,6 +146,20 @@ export const PARTS = [
   P({ id: 'aero_lip', cat: 'aero', name: 'フロントリップスポイラー', rank: 1, price: 60000, weight: 2, desc: 'フロントダウンフォース小', clF: 0.10, clR: 0.0, cd: 0.005 }),
   P({ id: 'aero_wing', cat: 'aero', name: 'GTウイング', rank: 3, price: null, weight: 5, desc: 'リアダウンフォース大。空気抵抗増。ダウンフォース調整可', clF: 0.0, clR: 0.38, cd: 0.03, adjustable: true }),
   P({ id: 'aero_full', cat: 'aero', name: 'フルエアロキット', rank: 4, price: null, weight: 8, desc: '前後バランスの取れたダウンフォース。前後とも調整可', clF: 0.2, clR: 0.34, cd: 0.02, adjustable: true }),
+
+  // ---------------- ホイール（純正サイズ基準。外径は変えずに扁平率で合わせる） ----------------
+  // inch: 純正からのリム径差、wmass: 1輪あたりの重量差[kg]（ホイール＋タイヤ）、inertia: 回転慣性の倍率
+  P({ id: 'wh_stock', cat: 'wheel', name: '純正ホイール', rank: 1, price: null, weight: 0, free: true, desc: '純正サイズ', inch: 0, wmass: 0, inertia: 1.0 }),
+  P({ id: 'wh_forged', cat: 'wheel', name: '軽量鍛造ホイール（純正サイズ）', rank: 2, price: 160000, weight: 0, desc: '1輪−2.0kg、回転慣性−18%。加速・減速・ハンドリングが軽くなる', inch: 0, wmass: -2.0, inertia: 0.82 }),
+  P({ id: 'wh_plus1', cat: 'wheel', name: 'インチアップ +1インチ', rank: 2, price: 120000, weight: 0, desc: '扁平タイヤで横剛性↑・グリップ+1.5%、応答が鋭くなる。1輪+1.6kg、回転慣性+12%', inch: 1, wmass: 1.6, inertia: 1.12 }),
+  P({ id: 'wh_plus2', cat: 'wheel', name: 'インチアップ +2インチ', rank: 3, price: 200000, weight: 0, desc: 'さらに扁平。グリップ+2.5%、応答最速。1輪+3.4kg、回転慣性+26%', inch: 2, wmass: 3.4, inertia: 1.26 }),
+  P({ id: 'wh_plus1_forged', cat: 'wheel', name: '鍛造ホイール +1インチ', rank: 4, price: null, weight: 0, desc: '+1インチの性能で重量増なし（1輪−0.3kg、回転慣性−2%）', inch: 1, wmass: -0.3, inertia: 0.98 }),
+
+  // ---------------- タイヤ幅（純正幅からの増分。ホイールのリム幅も合わせる） ----------------
+  P({ id: 'tw_stock', cat: 'tirewidth', name: '純正幅', rank: 1, price: null, weight: 0, free: true, desc: '純正サイズ', dw: 0 }),
+  P({ id: 'tw_10', cat: 'tirewidth', name: 'タイヤ幅 +10mm', rank: 1, price: 60000, weight: 0, desc: '接地面積↑でグリップ微増。1輪+0.6kg、転がり抵抗・空気抵抗わずかに増', dw: 10 }),
+  P({ id: 'tw_20', cat: 'tirewidth', name: 'タイヤ幅 +20mm', rank: 2, price: 90000, weight: 0, desc: 'グリップ↑。1輪+1.2kg、転がり抵抗・空気抵抗増', dw: 20 }),
+  P({ id: 'tw_30', cat: 'tirewidth', name: 'タイヤ幅 +30mm', rank: 3, price: 130000, weight: 0, desc: 'グリップ大きく↑（フェンダーぎりぎり）。1輪+1.9kg、抵抗増', dw: 30 }),
 ];
 
 // 価格は実勢の中古車価格に合わせて2倍に

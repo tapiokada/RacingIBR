@@ -1,7 +1,7 @@
 // チューニングショップ（パーツ交換・購入・売却）
 import { el, panel } from './ui.js';
 import { CATEGORIES, PARTS, PART_BY_ID, CATEGORY_NAME, RANK_STARS } from '../data/parts.js';
-import { buildSpec } from '../physics/spec.js';
+import { buildSpec, tireSize } from '../physics/spec.js';
 import { freeCount, addPart, activeCar, fmtMoney } from '../save.js';
 import { CARS } from '../data/cars.js';
 import { dealerStock, dealerBuy } from '../data/dealer.js';
@@ -19,6 +19,7 @@ export function specSummary(spec) {
     ['車両重量', `${spec.mass.toFixed(0)} kg`],
     ['パワーウェイトレシオ', `${spec.pwr.toFixed(2)} kg/PS`],
     ['グリップ', spec.mu.toFixed(2)],
+    ['タイヤサイズ', tireSize(spec)],
     ['ダウンフォース係数', (spec.clF + spec.clR).toFixed(2)],
     ['レブリミット', `${spec.redline} rpm`],
     ['戦闘力', String(spec.rating)],
@@ -36,7 +37,7 @@ export function openShop(game, state, area, onClose) {
 
   const options = (cat) => {
     const c = CATEGORIES.find((x) => x.id === cat);
-    const ids = PARTS.filter((p) => p.cat === cat && (freeCount(state, p.id) > 0 || car.equipped[cat] === p.id)).map((p) => p.id);
+    const ids = PARTS.filter((p) => p.cat === cat && (p.free || freeCount(state, p.id) > 0 || car.equipped[cat] === p.id)).map((p) => p.id); // 純正ホイール・純正幅はいつでも戻せる
     if (!c.required) ids.unshift(null);
     return ids;
   };
@@ -62,7 +63,7 @@ export function openShop(game, state, area, onClose) {
     if (tab === 'equip') {
       for (const c of CATEGORIES) {
         const opts = options(c.id);
-        const cur = car.equipped[c.id];
+        const cur = car.equipped[c.id] ?? (c.id === 'wheel' ? 'wh_stock' : c.id === 'tirewidth' ? 'tw_stock' : null);
         const p = cur ? PART_BY_ID[cur] : null;
         const shift = (d) => {
           const i = opts.indexOf(cur);
@@ -132,7 +133,7 @@ export function openShop(game, state, area, onClose) {
       for (const L of stock.cars) list.appendChild(row(L));
       list.appendChild(el('div', { class: 'hint' }, '価格は実際の中古車相場（年式・走行距離で変動）を参考にしています。購入した車はパーツ付きでガレージに入り、乗り換えはポーズメニューの「ガレージ」から。'));
     } else {
-      const sellable = PARTS.filter((p) => freeCount(state, p.id) > 0);
+      const sellable = PARTS.filter((p) => !p.free && freeCount(state, p.id) > 0);
       if (!sellable.length) list.appendChild(el('div', { class: 'hint' }, '売却できる（未装着の）パーツはありません'));
       for (const p of sellable) {
         const sell = () => {

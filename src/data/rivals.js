@@ -63,7 +63,7 @@ export const RIVALS = [
   },
   {
     id: 'zero', name: '不知火ゼロ', team: '池袋の亡霊', car: '86-GR', color: 0x1a1a1f, minWins: 10, skill: 0.96, reward: 400000,
-    parts: tune('86-GR', { engine: 'eng_v6_30', turbo: 'tb_sc', intercooler: 'ic_front', boreup: 'bore_3', muffler: 'muf_straight', tire: 'tire_s', suspension: 'sus_circuit', brake: 'brk_big', transmission: 'tm_close', aero: 'aero_full' }),
+    parts: tune('86-GR', { wheel: 'wh_plus1_forged', tirewidth: 'tw_20', engine: 'eng_v6_30', turbo: 'tb_sc', intercooler: 'ic_front', boreup: 'bore_3', muffler: 'muf_straight', tire: 'tire_s', suspension: 'sus_circuit', brake: 'brk_big', transmission: 'tm_close', aero: 'aero_full' }),
     lines: { meet: '……その86、どこまで行ける。', win: '……カケル、か。覚えておく。', lose: '……まだ遠い。' },
   },
 ];
@@ -117,7 +117,7 @@ export const EAST_RIVALS = [
   },
   {
     id: 'gai', name: '鳳ガイ', team: '東池袋の王', car: 'R34-GTR', color: 0x7a8088, minWins: 11, skill: 0.96, reward: 450000,
-    parts: tune('R34-GTR', { turbo: 'tb_large', intercooler: 'ic_front', boreup: 'bore_3', muffler: 'muf_straight', tire: 'tire_s', suspension: 'sus_circuit', brake: 'brk_big', transmission: 'tm_close', aero: 'aero_full' }),
+    parts: tune('R34-GTR', { wheel: 'wh_plus1_forged', tirewidth: 'tw_20', turbo: 'tb_large', intercooler: 'ic_front', boreup: 'bore_3', muffler: 'muf_straight', tire: 'tire_s', suspension: 'sus_circuit', brake: 'brk_big', transmission: 'tm_close', aero: 'aero_full' }),
     lines: { meet: 'サンシャインの下で、俺に挑むか。', win: '……西の86が、ここまで来たか。', lose: '東池袋は、まだお前の街じゃない。' },
   },
 ];
@@ -168,7 +168,7 @@ export const HARUNA_RIVALS = [
   },
   {
     id: 'kanata', name: '天城カナタ', team: '榛名山の主', car: 'EVO-IX', color: 0xe6e6e6, minWins: 17, skill: 0.97, reward: 700000,
-    parts: tune('EVO-IX', { tire: 'tire_s', suspension: 'sus_full', transmission: 'tm_full', brake: 'brk_full', turbo: 'tb_twin', intercooler: 'ic_front', boreup: 'bore_3', muffler: 'muf_straight', aero: 'aero_full' }),
+    parts: tune('EVO-IX', { wheel: 'wh_plus1_forged', tirewidth: 'tw_20', tire: 'tire_s', suspension: 'sus_full', transmission: 'tm_full', brake: 'brk_full', turbo: 'tb_twin', intercooler: 'ic_front', boreup: 'bore_3', muffler: 'muf_straight', aero: 'aero_full' }),
     setup: setupOf('EVO-IX', { freqF: 2.9, freqR: 3.0, arbF: 6, arbR: 4, toeR: 0.3, camberF: 3.0, camberR: 2.2, lsdInitF: 12, lsdAccF: 25, lsdDecF: 8, lsdInitR: 15, lsdAccR: 45, lsdDecR: 25, brakeBal: 0 }),
     lines: { meet: 'この山で、俺の前を走った者はいない。', win: '……いい山を、いい走りで降りたな。', lose: '榛名は、まだお前を認めていない。' },
   },

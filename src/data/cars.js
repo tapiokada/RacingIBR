@@ -136,6 +136,10 @@ const CHASSIS = {
 };
 for (const [id, c] of Object.entries(CHASSIS)) Object.assign(CARS[id], c);
 
+// 純正タイヤサイズ（公表値。前後異径は平均）：幅[mm]・リム径[inch]
+const TIRES = { '86-GR': [215, 18], 'BRZ-ZD': [215, 18], 'RS-RS': [205, 17], 'SWIFT-S': [195, 17], '80-Supra': [245, 17], 'S2K-AP': [230, 17], 'WRX-IMP': [245, 18], 'EVO-IX': [235, 17], 'Z-32': [235, 16], 'R34-GTR': [245, 18] };
+for (const [id, [w, r]] of Object.entries(TIRES)) { CARS[id].tireW = w; CARS[id].rimIn = r; CARS[id].stock.wheel = 'wh_stock'; CARS[id].stock.tirewidth = 'tw_stock'; }
+
 // 燃料タンク容量[L]（公表値）。いずれもハイオク指定
 const TANKS = { '86-GR': 50, 'BRZ-ZD': 50, 'RS-RS': 40, 'S2K-AP': 50, 'SWIFT-S': 37, '80-Supra': 70, 'Z-32': 72, 'WRX-IMP': 60, 'EVO-IX': 55, 'R34-GTR': 65 };
 for (const [id, t] of Object.entries(TANKS)) CARS[id].tank = t;

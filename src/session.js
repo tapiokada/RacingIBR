@@ -27,7 +27,7 @@ export class DriveSession {
     // ABS・TCSはセッティング（車ごと）。未設定なら共通設定の値
     const lv = (k) => (setup && setup[k] != null ? setup[k] : s[k]);
     const car = new Vehicle(spec, { auto: isPlayer ? s.transmission === 'AT' : true, abs: isPlayer ? lv('absLevel') : 10, tcs: isPlayer ? lv('tcsLevel') : 0, spinAssist: isPlayer && !!s.spinAssist, fuel, ground: this.game.world.ground || null });
-    const model = buildCarModel(CARS[carId], color, { aero: equipped.aero, wing: equipped.aero === 'aero_wing' || equipped.aero === 'aero_full' ? 'gt' : undefined });
+    const model = buildCarModel(CARS[carId], color, { aero: equipped.aero, tirewidth: equipped.tirewidth, wheel: equipped.wheel, wing: equipped.aero === 'aero_wing' || equipped.aero === 'aero_full' ? 'gt' : undefined });
     this.game.world.scene.add(model);
     if (isPlayer) addHeadlights(model);
     const engine = this.game.audio.createEngine(spec);

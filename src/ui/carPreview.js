@@ -38,7 +38,7 @@ export class CarPreview {
     if (this.model) this.scene.remove(this.model);
     if (!carId) { this.model = null; return; }
     const def = CARS[carId];
-    const m = buildCarModel(def, color, { aero: equipped.aero, wing: equipped.aero === 'aero_wing' || equipped.aero === 'aero_full' ? 'gt' : undefined });
+    const m = buildCarModel(def, color, { aero: equipped.aero, tirewidth: equipped.tirewidth, wheel: equipped.wheel, wing: equipped.aero === 'aero_wing' || equipped.aero === 'aero_full' ? 'gt' : undefined });
     syncCarModel(m, { x: 0, z: 0, h: 0, a: 0, b: 0, gy: 0, gp: 0, gr: 0, heave: 0, pitch: 0, roll: 0, steer: 0, spinF: 0, spinR: 0, gear: 1, input: { brake: 0, throttle: 0, steer: 0 } });
     m.position.set(0, 0, 0);
     m.userData.cockpit.visible = false;

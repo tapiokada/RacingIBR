@@ -72,7 +72,7 @@ export class Vehicle {
     this.Iz = s.mass * this.a * this.b * (s.car.yawK || 0.95) * 1.08;
     this.Ip = (s.mass * (s.car.length ** 2 + s.car.height ** 2)) / 12 * 0.9; // ピッチ
     this.Ir = (s.mass * (s.car.width ** 2 + s.car.height ** 2)) / 12 * 0.8; // ロール
-    this.Iw = 1.1 * s.car.inertiaK; // 1輪あたり
+    this.Iw = 1.1 * s.car.inertiaK * (s.wheelInertiaK || 1); // 1輪あたり（ホイール・タイヤで変わる）
     const W = s.mass * G;
     const sp = s.susp;
     const deg = Math.PI / 180;
@@ -269,7 +269,7 @@ export class Vehicle {
     // ---- ステアリング（速度感応・カウンター許容） ----
     const target = this.input.steer;
     const beta = Math.atan2(this.vv, Math.max(Math.abs(this.vu), 2));
-    let lim = Math.min(s.steerLock, (this.L * s.mu * G) / Math.max(speed * speed, 1) + s.peakAngle * 1.25);
+    let lim = Math.min(s.steerLock, (this.L * s.mu * G) / Math.max(speed * speed, 1) + (s.steerRef || s.peakAngle) * 1.25);
     lim = Math.max(lim, 0.06);
     let desired = target * lim;
     // カウンターステア：滑っている方向へは車体スリップ角分まで追加で切れる
@@ -526,7 +526,7 @@ export class Vehicle {
       Fu -= (dragF * this.vu) / speed;
       Fv -= (dragF * this.vv) / speed;
     }
-    const rr = 0.011 * sumN + (this.offRoad ? 0.08 * sumN : 0) + bump * 0.5;
+    const rr = (s.rrK || 0.011) * sumN + (this.offRoad ? 0.08 * sumN : 0) + bump * 0.5;
     if (Math.abs(this.vu) > 0.05) Fu -= Math.sign(this.vu) * Math.min(rr, Math.abs(this.vu) * this.m / dt * 0.5);
 
     // ---- 車体運動（平面） ----

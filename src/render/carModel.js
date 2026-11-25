@@ -1,6 +1,13 @@
 // 手続き生成の車モデル（ローポリ）
 import * as THREE from 'three';
 import { buildGlbCarModel, hasGlbModel } from './glbCars.js';
+import { PART_BY_ID } from '../data/parts.js';
+
+// タイヤ幅パーツによる見た目の幅の倍率
+export function tireWidthScale(carDef, opts) {
+  const tw = opts.tirewidth ? PART_BY_ID[opts.tirewidth] : null;
+  return tw ? (carDef.tireW + tw.dw) / carDef.tireW : 1;
+}
 
 const glassMat = new THREE.MeshStandardMaterial({ color: 0x0b0f16, metalness: 0.6, roughness: 0.15 });
 const tireMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
@@ -29,7 +36,22 @@ function extrudeSide(pts, width, mat, bevel = 0.06) {
 
 // carDef: data/cars.js のエントリ, color: 0xRRGGBB, opts: { aero, wing }
 export function buildCarModel(carDef, color, opts = {}) {
-  if (hasGlbModel(carDef.id)) return buildGlbCarModel(carDef, color, opts);
+  if (hasGlbModel(carDef.id)) return applyTireWidth(buildGlbCarModel(carDef, color, opts), carDef, opts);
+  return applyTireWidth(buildProcCarModel(carDef, color, opts), carDef, opts);
+}
+
+// タイヤ幅アップ：車輪を左右方向へ広げ、外側にはみ出す分だけ外へずらす（トレッドは変えない）
+function applyTireWidth(root, carDef, opts) {
+  const k = tireWidthScale(carDef, opts);
+  if (k !== 1) for (const w of root.userData.wheels) {
+    w.spin.scale.x = k;
+    const extra = ((k - 1) * carDef.tireW) / 1000 / 2;
+    w.spin.position.x += Math.sign(w.pivot.position.x || 1) * extra;
+  }
+  return root;
+}
+
+function buildProcCarModel(carDef, color, opts = {}) {
   const root = new THREE.Group();
   const body = new THREE.Group(); // ピッチ/ロール用
   root.add(body);

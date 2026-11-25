@@ -16,7 +16,7 @@ function steerToward(car, tx, tz) {
   let delta = Math.atan(car.L * kappa);
   if (u < 0) delta = Math.sign(v || 1) * car.spec.steerLock;
   const speed = car.speed;
-  const lim = Math.max(0.06, Math.min(car.spec.steerLock, (car.L * car.spec.mu * 9.81) / Math.max(speed * speed, 1) + car.spec.peakAngle * 1.25));
+  const lim = Math.max(0.06, Math.min(car.spec.steerLock, (car.L * car.spec.mu * 9.81) / Math.max(speed * speed, 1) + (car.spec.steerRef || car.spec.peakAngle) * 1.25));
   return clamp(delta / lim, -1, 1);
 }
 

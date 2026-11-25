@@ -68,10 +68,10 @@ function carListing(r, carId, extra = {}) {
 // スペシャルカー：純正以外のパーツ付き。パーツ価値の約40%で買える
 const SPECIAL_SETS = [
   { name: 'ストリート仕様', cats: { muffler: 'muf_sport', suspension: 'sus_street', tire: 'tire_high', brake: 'brk_pad' } },
-  { name: '峠仕様', cats: { suspension: 'sus_circuit', tire: 'tire_high', brake: 'brk_big', aero: 'aero_lip', muffler: 'muf_sport' } },
+  { name: '峠仕様', cats: { suspension: 'sus_circuit', tire: 'tire_high', brake: 'brk_big', aero: 'aero_lip', muffler: 'muf_sport', wheel: 'wh_plus1', tirewidth: 'tw_10' } },
   { name: 'パワー仕様', cats: { boreup: 'bore_2', muffler: 'muf_straight', intercooler: 'ic_large', tire: 'tire_high' }, turbo: 'tb_mid' },
-  { name: 'サーキット仕様', cats: { suspension: 'sus_circuit', tire: 'tire_s', brake: 'brk_big', transmission: 'tm_close', aero: 'aero_full' } },
-  { name: 'フルチューン', cats: { boreup: 'bore_3', muffler: 'muf_straight', intercooler: 'ic_front', suspension: 'sus_full', tire: 'tire_s', brake: 'brk_full', transmission: 'tm_full', aero: 'aero_wing' }, turbo: 'tb_twin', minWins: 8 },
+  { name: 'サーキット仕様', cats: { suspension: 'sus_circuit', tire: 'tire_s', brake: 'brk_big', transmission: 'tm_close', aero: 'aero_full', wheel: 'wh_forged', tirewidth: 'tw_20' } },
+  { name: 'フルチューン', cats: { boreup: 'bore_3', muffler: 'muf_straight', intercooler: 'ic_front', suspension: 'sus_full', tire: 'tire_s', brake: 'brk_full', transmission: 'tm_full', aero: 'aero_wing', wheel: 'wh_plus1_forged', tirewidth: 'tw_30' }, turbo: 'tb_twin', minWins: 8 },
 ];
 
 // 店の在庫一覧 { cars: [...], special: listing|null }
