@@ -15,7 +15,7 @@ export const SURF = {
   kerb: { mu: 0.9, rr: 0.004 },
   paved: { mu: 0.95, rr: 0 }, // 舗装されたランオフ
   grass: { mu: 0.55, rr: 0.05 },
-  gravel: { mu: 0.45, rr: 0.22 },
+  gravel: { mu: 0.45, rr: 0.15 },
 };
 
 export function buildCircuit(id, D) {
@@ -183,14 +183,38 @@ export class CircuitGround {
     const C = this.C;
     const q = this.nearest(x, z);
     if (!q) { this.lastSurf = SURF.grass; return terrainAt(C, x, z); }
-    const j = this.wrap(q.i + 1);
-    const y = C.y[q.i] + (C.y[j] - C.y[q.i]) * q.t;
+    const y = this.blendY(x, z, q);
     const sf = this.surfAt(q.i, q.lat);
     this.lastSurf = sf;
     if (sf === SURF.asphalt || sf === SURF.paved) return y;
     const e = Math.abs(q.lat) - C.hw[q.i];
     if (sf === SURF.kerb) return y + 0.03 * Math.sin(Math.min(1, e / 1.3) * Math.PI);
     return y - Math.min(0.08, e * 0.04);
+  }
+
+  // 路面の高さ：近くの区間（同じ高さの階層だけ）を距離で重み付けして連続にする。
+  // シケインやヘアピンで高さの違う区間どうしが近いとき、最寄りの区間が切り替わる所で段差ができないように
+  blendY(x, z, q) {
+    const C = this.C, wrap = this.wrap;
+    const arr = this.grid.get(Math.floor(x / GCELL) * 73856093 ^ Math.floor(z / GCELL) * 19349663);
+    const j0 = wrap(q.i + 1);
+    const y0 = C.y[q.i] + (C.y[j0] - C.y[q.i]) * q.t;
+    if (!arr) return y0;
+    let sw = 0, sy = 0;
+    for (const i of arr) {
+      const j = wrap(i + 1);
+      const ax = C.x[i], az = C.z[i], dx = C.x[j] - ax, dz = C.z[j] - az, l2 = dx * dx + dz * dz;
+      let t = l2 > 0 ? ((x - ax) * dx + (z - az) * dz) / l2 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const yi = C.y[i] + (C.y[j] - C.y[i]) * t;
+      if (Math.abs(yi - y0) > 4) continue; // 立体交差の別の階層
+      const d = Math.hypot(x - ax - dx * t, z - az - dz * t);
+      const e = (d - q.d) / 3;
+      if (e > 3) continue;
+      const w = Math.exp(-e * e);
+      sw += w; sy += w * yi;
+    }
+    return sw > 0 ? sy / sw : y0;
   }
 
   // 景観の地面の高さ：近くのコースのうち一番低い路面に合わせる（立体交差の下の道を地面で埋めない）

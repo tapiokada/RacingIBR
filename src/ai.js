@@ -170,8 +170,15 @@ export class RaceAI {
       if (this.reverseT <= 0) car.gear = 1;
       return;
     }
-    if (v < 1.5 && this.started && !(path.open && pr.i > n - 40)) { this.stuck += dt; if (this.stuck > 2.2) { this.stuck = 0; this.reverseT = 1.4; } }
-    else this.stuck = 0;
+    if (v < 1.5 && this.started && !(path.open && pr.i > n - 40)) { this.stuck += dt; this.stuckLong = (this.stuckLong || 0) + dt; if (this.stuck > 2.2) { this.stuck = 0; this.reverseT = 1.4; } }
+    else { this.stuck = 0; if (v > 4) this.stuckLong = 0; }
+    // グラベル・バリアで長く動けないとき（約8秒）はコースへ戻す（オフィシャルの救出に相当。その分のタイムは失う）
+    if ((this.stuckLong || 0) > 8 && Math.abs(pr.lat) > path.hw[pr.i] - 0.5) {
+      this.stuckLong = 0; this.reverseT = 0;
+      const p = path.posAt(pr.s - 6, path.lineOff[pr.i]);
+      car.place(p.x, p.z, p.h, 0); car.gear = 1;
+      return;
+    }
     if (car.gear < 1) car.gear = 1;
     car.input = { throttle, brake, steer };
     this.started = true;

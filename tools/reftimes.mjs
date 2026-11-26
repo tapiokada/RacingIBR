@@ -5,16 +5,22 @@ import fs from 'fs';
 import { LAYOUTS, areaOfLayout } from '../src/data/map.js';
 import { getCoursePath, resolveWalls } from '../src/physics/track.js';
 import { HarunaGround } from '../src/physics/touge.js';
+import { CircuitGround, CIRCUITS } from '../src/physics/circuit.js';
+import { REF_TIMES } from '../src/data/reftimes.js';
 import { buildSpec } from '../src/physics/spec.js';
 import { Vehicle } from '../src/physics/vehicle.js';
 import { RaceAI } from '../src/ai.js';
 import { ALL_RIVALS } from '../src/data/rivals.js';
 const dt = 1 / 500;
 const ground = new HarunaGround();
-const out = {};
+// ONLY=circuit：サーキット（全ライバル・フライングラップ1周）だけ計算し直して、他は既存の値を残す
+const ONLY = process.env.ONLY || '';
+const out = ONLY ? { ...REF_TIMES } : {};
 const t0 = Date.now();
 for (const L of LAYOUTS) {
   const area = areaOfLayout(L);
+  if (ONLY === 'circuit' && !L.course.circuit) continue;
+  if (L.course.circuit) { out[L.key] = circuitRef(L); console.log(L.key, JSON.stringify(out[L.key]), ((Date.now() - t0) / 1000).toFixed(0) + 's'); continue; }
   const path = getCoursePath(L);
   const total = path.open ? path.raceLen : path.length * L.course.laps;
   const s0 = path.open ? path.startS : 0;
@@ -34,5 +40,27 @@ for (const L of LAYOUTS) {
     if (done) out[L.key][r.id] = +done.toFixed(2);
   }
   console.log(L.key, JSON.stringify(out[L.key]), ((Date.now() - t0) / 1000).toFixed(0) + 's');
+}
+// サーキット：全ライバルが単独で走ったときのフライングラップ（グリッド後方からスタートし、コントロールライン通過から1周）。
+// サーキットレース（プラクティス・予選）でライバルのタイムを見積もる基準に使う
+function circuitRef(L) {
+  const path = getCoursePath(L);
+  const g = new CircuitGround(CIRCUITS[L.course.circuit]);
+  const res = {};
+  for (const r of ALL_RIVALS) {
+    const car = new Vehicle(buildSpec(r.car, r.parts, r.setup || null), { auto: true, ground: g });
+    const p = path.posAt(-150, 0); car.place(p.x, p.z, p.h, 0);
+    const ai = new RaceAI(car, path, r.skill, { mistakes: false });
+    let t = 0, dist = -150, hint = -1, prevS = null, t1 = null;
+    while (t < 600) {
+      ai.update(dt); car.step(dt); resolveWalls(car, path.corridor); t += dt;
+      const pr = path.project(car.x, car.z, hint); hint = pr.i;
+      if (prevS != null) { let ds = pr.s - prevS; if (ds < -path.length / 2) ds += path.length; if (ds > path.length / 2) ds -= path.length; if (Math.abs(ds) < 30) dist += ds; }
+      prevS = pr.s;
+      if (t1 === null && dist >= 0) t1 = t;
+      if (t1 !== null && dist >= path.length) { res[r.id] = +(t - t1).toFixed(2); break; }
+    }
+  }
+  return res;
 }
 fs.writeFileSync('src/data/reftimes.js', `// 自動生成（tools/reftimes.mjs）：各ライバルが各コースを単独で完走したときの参考タイム[秒]\nexport const REF_TIMES = ${JSON.stringify(out)};\n`);

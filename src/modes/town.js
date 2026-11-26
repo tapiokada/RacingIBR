@@ -5,6 +5,8 @@ import { Hud } from '../ui/hud.js';
 import { el, Menu, panel } from '../ui/ui.js';
 import { NODES, AREAS, LAYOUTS, COURSES, TOUGE_LAYOUTS, HARUNA_UNLOCK_WINS, CIRCUIT_LAYOUTS, townRoadBetween, laneOffset, areaStart, arriveSpot } from '../data/map.js';
 import { TrackDayMode, SESSION_TIME } from './trackday.js';
+import { raceEntryItems } from './raceweekend.js';
+import { pauseMenu } from './common.js';
 import { ALL_RIVALS } from '../data/rivals.js';
 import { CARS, PLAYER } from '../data/cars.js';
 import { CruiseAI } from '../ai.js';
@@ -397,6 +399,16 @@ export class TownMode {
           action: () => { menu.destroy(); dlg.remove(); this.paused = false; this.changeArea(a.id, areaStart(a.id)); },
         };
       }),
+      {
+        label: 'サーキットレース（8台出走）', sub: '筑波・鈴鹿・富士でクラス別のレース。プラクティス・予選・決勝。順位に応じて賞金',
+        action: () => {
+          menu.destroy(); dlg.remove();
+          const P = this.session.player.car;
+          const returnPos = { x: P.x, z: P.z, h: P.h, area: this.area };
+          const cancel = () => { g.input.pressed.clear(); this.paused = false; };
+          pauseMenu(g, 'サーキットレース', [...raceEntryItems(g, { returnPos, townMode: TownMode, close: () => {}, onCancel: cancel }), { label: '戻る', action: cancel }], cancel);
+        },
+      },
       ...CIRCUIT_LAYOUTS.map((L) => {
         const best = st.trackday?.[L.key]?.best;
         const fee = L.course.fee, poor = st.money < fee;

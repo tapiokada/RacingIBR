@@ -1,0 +1,60 @@
+// ストーリー：サーキットレース（エントリー → プラクティス途中終了 → 予選 → 決勝AI走行 → 結果 → 街）
+module.exports = async (pg, OUT) => {
+  const KEY = process.env.KEY || 'tsukuba_2000';
+  const clickLabel = async (re) => {
+    const i = await pg.evaluate((src) => { const r = new RegExp(src); return [...document.querySelectorAll('.menu-item')].findIndex((b) => r.test(b.textContent) && !b.disabled); }, re);
+    if (i < 0) throw new Error('menu not found: ' + re + ' / ' + (await pg.evaluate(() => [...document.querySelectorAll('.menu-item')].map((b) => b.textContent).join(' | '))));
+    await pg.evaluate((k) => document.querySelectorAll('.menu-item')[k].click(), i);
+    await pg.waitForTimeout(400);
+  };
+  await pg.evaluate(() => { const { game } = window.__dbg; const { TownMode, newGameState } = window.__dbgModes; game.story = newGameState(); game.story.money = 2000000; game.setMode(new TownMode(game)); });
+  await pg.waitForTimeout(1500);
+  await pg.keyboard.press('Escape'); await pg.waitForTimeout(400);
+  await clickLabel('サーキットレース（8台出走）');
+  await pg.screenshot({ path: OUT + '/r_list.png' });
+  const circ = { tsukuba_2000: 'つくば', suzuka_gp: '鈴鹿', fuji_gp: '富士' }[KEY];
+  await clickLabel('サーキットレース：' + circ);
+  await pg.screenshot({ path: OUT + '/r_entry.png' });
+  await clickLabel('参加する');
+  await pg.waitForTimeout(2500);
+  await pg.screenshot({ path: OUT + '/r_hub.png' });
+  await clickLabel('プラクティス（');
+  await pg.waitForTimeout(2500);
+  const aiDrive = () => pg.evaluate(() => { const { game, RaceAI } = window.__dbg; const m = game.mode; const ai = new RaceAI(m.P.car, m.path, 0.95); m.P.car.auto = true; const orig = m.session.readPlayerInput.bind(m.session); m.session.readPlayerInput = (dt) => { if (m.session.controlsEnabled && !m.session.frozen) ai.update(dt, m.cars.filter((e) => e !== m.P).map((e) => e.car)); else orig(dt); }; });
+  await aiDrive();
+  await pg.evaluate(() => window.__dbg.game.debugStep(70));
+  await pg.screenshot({ path: OUT + '/r_practice.png' });
+  // ポーズ → 現在の順位
+  await pg.keyboard.press('Escape'); await pg.waitForTimeout(400);
+  await clickLabel('現在の順位');
+  await pg.screenshot({ path: OUT + '/r_standings.png' });
+  await clickLabel('戻る');
+  await clickLabel('を終了して次へ');
+  await pg.waitForTimeout(1500);
+  await pg.screenshot({ path: OUT + '/r_practice_result.png' });
+  console.log('practice', JSON.stringify(await pg.evaluate(() => window.__dbg.game.mode.wk.practice)));
+  await clickLabel('次へ'); await pg.waitForTimeout(2500);
+  await clickLabel('予選（'); await pg.waitForTimeout(2500);
+  await aiDrive();
+  await pg.evaluate(() => { const m = window.__dbg.game.mode; m.remain = 200; });
+  await pg.evaluate(() => window.__dbg.game.debugStep(330));
+  await pg.waitForTimeout(1500);
+  await pg.screenshot({ path: OUT + '/r_qual_result.png' });
+  console.log('qualify', JSON.stringify(await pg.evaluate(() => [window.__dbg.game.mode.state, window.__dbg.game.mode.wk.qualify])));
+  await clickLabel('次へ'); await pg.waitForTimeout(2500);
+  await pg.screenshot({ path: OUT + '/r_hub2.png' });
+  await clickLabel('決勝'); await pg.waitForTimeout(2500);
+  await pg.evaluate(() => window.__dbg.game.debugStep(3));
+  await pg.screenshot({ path: OUT + '/r_grid.png' });
+  await aiDrive();
+  await pg.evaluate(() => window.__dbg.game.debugStep(10));
+  await pg.screenshot({ path: OUT + '/r_start.png' });
+  await pg.evaluate(() => window.__dbg.game.debugStep(60));
+  await pg.screenshot({ path: OUT + '/r_race.png' });
+  for (let k = 0; k < 12; k++) { const st = await pg.evaluate(() => window.__dbg.game.mode.state); if (st === 'result') break; await pg.evaluate(() => window.__dbg.game.debugStep(60)); }
+  await pg.waitForTimeout(2000);
+  await pg.screenshot({ path: OUT + '/r_result.png' });
+  console.log('race', JSON.stringify(await pg.evaluate(() => { const m = window.__dbg.game.mode; return { state: m.state, money: window.__dbg.game.story.money, rec: window.__dbg.game.story.raceRecords, order: m.raceOrder().map((x) => [x.e.id, x.o.finish && +x.o.finish.toFixed(1), x.o.laps.length]) }; })));
+  await clickLabel('街へ戻る'); await pg.waitForTimeout(2500);
+  console.log('back', await pg.evaluate(() => window.__dbg.game.mode.constructor.name));
+};
