@@ -7,6 +7,7 @@
 //       法線方向に左右の道路縁を探して中心へ寄せる（4回反復・移動平均）→ 幅員・標高を付ける
 import fs from 'fs';
 import path from 'path';
+import { robustSmooth } from './profile_smooth.mjs';
 
 const [dataDir, outFile] = process.argv.slice(2);
 const LAT0 = 36.151, LON0 = 139.921;
@@ -137,9 +138,9 @@ function dem(lon, lat) {
   return ws ? s / ws : null;
 }
 const yRaw = P.map(([x, z]) => dem(...toLL(x, z)));
-// 路面はなめらか：前後20mの移動平均を2回
+// 縦断：ロバストな平滑化（tools/profile_smooth.mjs）。DEM の局所的な凹凸を消して上り下りだけを残す
 let yS = yRaw.map((v, i) => v ?? yRaw[(i + 1) % N]);
-for (let pass = 0; pass < 2; pass++) yS = yS.map((_, i) => { let s = 0; for (let k = -10; k <= 10; k++) s += yS[(i + k + N) % N]; return s / 21; });
+yS = robustSmooth(yS, { lambda: 3e4, closed: true });
 
 // ---- 周辺の地形（8m格子） ----
 const T = { x0: -320, z0: -320, cell: 8, nx: 91, nz: 91 };

@@ -12,6 +12,7 @@
 //   4. 幅員（縁の間隔）・標高（DEM5A）を付ける。立体交差では下を通る区間・上を通る区間の標高を補正
 import fs from 'fs';
 import path from 'path';
+import { robustSmooth } from './profile_smooth.mjs';
 
 const [name, dataDir, outFile] = process.argv.slice(2);
 const CFG = JSON.parse(fs.readFileSync(new URL('./circuits.json', import.meta.url)))[name];
@@ -186,16 +187,19 @@ for (let i = 0; i < N; i++) for (let j = i + 100; j < N; j++) {
   if (Math.hypot(P[i][0] - P[j][0], P[i][1] - P[j][1]) < 3 && !crossings.some(([a, b]) => Math.abs(a - i) < 40 && Math.abs(b - j) < 40)) crossings.push([i, j]);
 }
 const ring = (i) => ((i % N) + N) % N;
+// 縦断：ロバストな平滑化で、DEM が拾った局所的な凹凸（橋・盛土・スタンド・法面など、波長150m未満）を消し、
+// 実際のコースの上り下りだけを残す。立体交差の前後60mは相手の路面・橋を拾うので使わない（両側からつなぐ）
+{
+  const ignore = [];
+  for (const [i, j] of crossings) for (const c of [i, j]) for (let k = -30; k <= 30; k++) ignore.push(ring(c + k));
+  y = robustSmooth(y, { lambda: 3e4, closed: true, ignore });
+}
 for (const [i, j] of crossings) {
-  // 交差部の前後60mはDEMが相手の路面・橋を拾うので、両端を直線で結ぶ
-  for (const c of [i, j]) { const a = ring(c - 30), b = ring(c + 30), ya = y[a], yb = y[b]; for (let k = -29; k <= 29; k++) y[ring(c + k)] = ya + ((yb - ya) * (k + 30)) / 60; }
-  // 上を通る区間（設定で2回目に通る方）を、下の区間との差が7.5m以上になるまで前後150mかけて持ち上げる
+  // 上を通る区間（設定で2回目に通る方）を、下の区間との差が7.5m以上になるまで前後250mかけてなめらかに持ち上げる
   const [lo, up] = CFG.upperSecond ? [i, j] : [j, i];
   const need = y[lo] + 7.5 - y[up];
-  if (need > 0) for (let k = -75; k <= 75; k++) y[ring(up + k)] += need * (0.5 + 0.5 * Math.cos((k / 75) * Math.PI));
+  if (need > 0) for (let k = -125; k <= 125; k++) y[ring(up + k)] += need * (0.5 + 0.5 * Math.cos((k / 125) * Math.PI));
 }
-// 路面はなめらか：前後20mの移動平均を2回
-for (let pass = 0; pass < 2; pass++) y = y.map((_, i) => { let s = 0; for (let k = -10; k <= 10; k++) s += y[ring(i + k)]; return s / 21; });
 
 // ---- 周辺の地形（8m格子） ----
 let bx0 = 1e9, bz0 = 1e9, bx1 = -1e9, bz1 = -1e9;
