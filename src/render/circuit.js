@@ -54,6 +54,16 @@ function band(lat0, lat1, yOff, mat, { mask = null, uvLen = 0.1, uAcross = 1 } =
   return new THREE.Mesh(g, mat);
 }
 
+// 点(x,z)が、別の区間（s が離れた区間）の走行範囲（路面＋縁石＋2m）に入っているか。
+// 並走する区間・ヘアピンの近くで、片方の外周の壁・フェンスがもう片方のコース上に立たないように
+let GROUND = null;
+function onOtherTrack(i, x, z, y) {
+  const q = GROUND.nearest(x, z, y);
+  if (!q) return false;
+  let ds = Math.abs(C.s[q.i] - C.s[i]); ds = Math.min(ds, L - ds);
+  return ds > 40 && Math.abs(q.lat) < C.hw[q.i] + 3.3 && Math.abs(C.y[q.i] - y) < 3;
+}
+
 // コースに沿った壁（lat の位置に高さ h）
 function wall(lat, h, mat, { mask = null, yBase = 0, uvLen = 0.5 } = {}) {
   const pos = [], uv = [], idx = [];
@@ -64,6 +74,7 @@ function wall(lat, h, mat, { mask = null, yBase = 0, uvLen = 0.5 } = {}) {
     const on = !mask || mask(i) || (k > 0 && mask(W(k - 1)));
     if (!on) { prev = -1; continue; }
     const p = pt(i, f(lat, i), yBase);
+    if (onOtherTrack(i, p.x, p.z, p.y - yBase)) { prev = -1; continue; }
     const s = k === N ? L : C.s[i];
     pos.push(p.x, p.y, p.z, p.x, p.y + h, p.z);
     uv.push(s * uvLen, 0, s * uvLen, 1);
@@ -92,6 +103,7 @@ export class CircuitWorld {
     C = this.C = CIRCUITS[this.areaDef.circuit]; N = C.n; L = C.length;
     this.corridor = circuitCorridor(C);
     this.ground = new CircuitGround(C);
+    GROUND = this.ground;
     this.poiMarkers = [];
     this.gateMarkers = [];
     this.courseGroup = null;
@@ -333,7 +345,19 @@ export class CircuitWorld {
     if (C.id !== 'tsukuba') return;
     // パドックの建物（インフィールド・筑波）
     const bm = new THREE.MeshLambertMaterial({ color: 0xbfc4cc });
+    // コース（ランオフ・バリアを含む）から3m以上離れていない建物は置かない
+    const clear = (x, z, w, d, rot) => {
+      const c = Math.cos(rot), sn = Math.sin(rot);
+      for (let i = 0; i <= 6; i++) for (let j = 0; j <= 6; j++) {
+        const lx = (i / 6 - 0.5) * w, lz = (j / 6 - 0.5) * d;
+        const px = x + lx * c + lz * sn, pz = z - lx * sn + lz * c;
+        const q = this.ground.nearest(px, pz, null);
+        if (q && q.d < C.hw[q.i] + Math.max(C.runL[q.i], C.runR[q.i]) + 3) return false;
+      }
+      return true;
+    };
     const placeBld = (x, z, w, d, h, rot, mat = bm) => {
+      if (!clear(x, z, w, d, rot)) return;
       const y = terrainAt(x, z);
       const q = this.ground.nearest(x, z);
       const yy = q ? Math.max(y, C.y[q.i] - 0.12) : y;
@@ -544,11 +568,11 @@ export class CircuitWorld {
     // 看板（架空の広告）
     for (const cr of C.crossings) {
       const up = C.y[cr.i] > C.y[cr.j] ? cr.i : cr.j;
-      const p = pt(up, 0);
+      // 橋の側面（下を通る区間から見える面）に、路面より下へ吊り下げる
       for (const sd of [-1, 1]) {
-        const q = pt(up - sd * 4, 0);
-        const ad = new THREE.Mesh(new THREE.PlaneGeometry((C.hw[up] + 4) * 2, 1.6), new THREE.MeshBasicMaterial({ map: textSprite('RACING IBR', '#fff', 'rgba(20,20,120,0.95)', 96, '#8af'), side: THREE.DoubleSide }));
-        ad.position.set(q.x, p.y - 0.6, q.z); ad.rotation.y = Math.atan2(p.tx, p.tz) + Math.PI / 2;
+        const q = pt(up, sd * (C.hw[up] + (sd < 0 ? C.runL[up] : C.runR[up]) + 0.75));
+        const ad = new THREE.Mesh(new THREE.PlaneGeometry(22, 1.4), new THREE.MeshBasicMaterial({ map: textSprite('RACING IBR', '#fff', 'rgba(20,20,120,0.95)', 96, '#8af'), side: THREE.DoubleSide }));
+        ad.position.set(q.x, q.y - 2.1, q.z); ad.rotation.y = Math.atan2(-q.tz, q.tx);
         S.add(ad);
       }
     }
@@ -566,7 +590,7 @@ export class CircuitWorld {
         const lat = side * (C.hw[i] + (side < 0 ? C.runL[i] : C.runR[i]) + 1.4);
         const p = pt(i, lat);
         const gy = this.ground.groundY(p.x, p.z);
-        if (p.y - gy < 0.6 || this.overLower(i, lat)) { prev = -1; continue; }
+        if (p.y - gy < 0.6 || this.overLower(i, lat) || onOtherTrack(i, p.x, p.z, p.y)) { prev = -1; continue; }
         pos.push(p.x, p.y + 0.05, p.z, p.x, gy - 0.3, p.z);
         const v = pos.length / 3 - 2;
         if (prev >= 0) idx.push(prev, v, prev + 1, prev + 1, v, v + 1);

@@ -160,6 +160,8 @@ export class CircuitGround {
       const score = d + (refY != null && Math.abs(C.y[i] + (C.y[j] - C.y[i]) * t - refY) > 3 ? 1e6 : 0);
       if (score < bs) { bs = score; bd = d; best = i; bt = t; }
     }
+    // 格子のハッシュが遠くのセルと衝突したとき、遠く離れた区間を返さない
+    if (best < 0 || bd > 70 * 70) return null;
     const i = best, j = wrap(i + 1);
     const dx = C.x[j] - C.x[i], dz = C.z[j] - C.z[i], l = Math.hypot(dx, dz) || 1;
     const lat = ((x - C.x[i]) * -dz + (z - C.z[i]) * dx) / l;
@@ -236,6 +238,7 @@ export class CircuitGround {
     }
     if (ymin > 1e8) { // 少し離れている：最寄りの路面から地形へなめらかに
       const q = this.nearest(x, z, null);
+      if (!q) return T;
       ymin = C.y[q.i];
     }
     const k = Math.max(0, Math.min(1, 1 - (dmin - 24) / 30));
