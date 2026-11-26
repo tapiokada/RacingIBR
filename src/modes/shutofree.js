@@ -128,7 +128,7 @@ export class ShutoFreeMode {
       this.hud.tr.innerHTML = `<div class="lbl">BEST</div><div class="big">${fmtTime(tr.best)}</div>`;
     }
     this.hud.tc.innerHTML = lapHtml;
-    if (g.input.hit('view')) this.hud.setView(VIEW_NAMES[g.rig.cycle(['chase', 'cockpit', 'hood'])]);
+    if (g.input.hit('view')) this.hud.setView(VIEW_NAMES[g.rig.cycle(['chase', 'near', 'cockpit', 'hood'])]);
     if (g.input.hit('mirror')) g.mirrorOn = !g.mirrorOn;
     this.hud.mirrorFrame.style.display = g.mirrorOn ? 'block' : 'none';
     g.rig.update(dt, this.P.model, this.P.car);

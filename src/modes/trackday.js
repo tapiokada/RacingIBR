@@ -68,7 +68,7 @@ export class TrackDayMode {
     if (!tr.started && tr.dist >= 0) { tr.start(this.t); tr.dist = 0; tr.prevS = null; }
     if (ev) this.onEvent(ev);
     if (this.state === 'run' && this.remain <= 0) { this.remain = 0; this.state = 'checker'; this.hud.flash('CHECKER', 2.2, 'この周で走行終了です'); }
-    if (g.input.hit('view')) this.hud.setView(VIEW_NAMES[g.rig.cycle(['chase', 'cockpit', 'hood'])]);
+    if (g.input.hit('view')) this.hud.setView(VIEW_NAMES[g.rig.cycle(['chase', 'near', 'cockpit', 'hood'])]);
     if (g.input.hit('mirror')) g.mirrorOn = !g.mirrorOn;
     this.hud.mirrorFrame.style.display = g.mirrorOn ? 'block' : 'none';
     g.rig.update(dt, this.P.model, this.P.car);

@@ -9,7 +9,7 @@ import { coursePath } from './town.js';
 import { areaOfLayout } from '../data/map.js';
 import { keyLabel } from '../input.js';
 
-const VIEWS = ['chase', 'cockpit', 'hood', 'gallery'];
+const VIEWS = ['chase', 'near', 'cockpit', 'hood', 'gallery'];
 
 export class ReplayMode {
   constructor(game, opts) { this.game = game; this.opts = opts; }
@@ -77,7 +77,7 @@ export class ReplayMode {
     if (inp.hitCode('ArrowUp')) this.speed = Math.min(4, this.speed * 2);
     if (inp.hitCode('ArrowDown')) this.speed = Math.max(0.25, this.speed / 2);
     if (inp.hit('view')) this.hud.setView(VIEW_NAMES[g.rig.cycle(VIEWS)]);
-    for (let n = 1; n <= 4; n++) if (inp.hitCode('Digit' + n)) { g.rig.mode = VIEWS[n - 1]; g.rig.reset(); g.rig.galleryIdx = -1; this.hud.setView(VIEW_NAMES[g.rig.mode]); }
+    for (let n = 1; n <= 5; n++) if (inp.hitCode('Digit' + n)) { g.rig.mode = VIEWS[n - 1]; g.rig.reset(); g.rig.galleryIdx = -1; this.hud.setView(VIEW_NAMES[g.rig.mode]); }
     if (inp.hit('mirror')) g.mirrorOn = !g.mirrorOn;
     this.hud.mirrorFrame.style.display = g.mirrorOn ? 'block' : 'none';
     if (this.playing) this.t += dt * this.speed;

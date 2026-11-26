@@ -1,7 +1,7 @@
 // 視点：後方(chase) / 運転席(cockpit) / ボンネット(hood) / ギャラリー(gallery) / バックミラー
 import * as THREE from 'three';
 
-export const VIEW_NAMES = { chase: '後方視点', cockpit: '運転席視点', hood: 'ボンネット視点', gallery: 'ギャラリー視点' };
+export const VIEW_NAMES = { chase: '後方視点', near: '後方視点（近）', cockpit: '運転席視点', hood: 'ボンネット視点', gallery: 'ギャラリー視点' };
 
 const tmp = new THREE.Vector3();
 
@@ -81,14 +81,15 @@ export class CameraRig {
       cam.updateProjectionMatrix();
       return;
     }
-    // chase
+    // chase（near：車の約3m後方の近いカメラ）
     const speed = car.speed;
-    const back = 5.8 + Math.min(1.5, speed * 0.02);
+    const near = this.mode === 'near';
+    const back = near ? 3.0 + Math.min(0.6, speed * 0.008) : 5.8 + Math.min(1.5, speed * 0.02);
     const gy = car.gy || 0;
     const tx = car.x - f0 * back, tz = car.z - f1 * back;
-    let ty = gy + 2.1;
-    if (car.groundAt) ty = Math.max(ty, car.groundAt(tx, tz) + 1.7); // 坂道で後方の路面に潜らない
-    const lx = car.x + f0 * 3, lz = car.z + f1 * 3, ly = gy + 1.0 + Math.sin(car.gp || 0) * 3;
+    let ty = gy + (near ? 1.55 : 2.1);
+    if (car.groundAt) ty = Math.max(ty, car.groundAt(tx, tz) + (near ? 1.3 : 1.7)); // 坂道で後方の路面に潜らない
+    const la = near ? 4 : 3, lx = car.x + f0 * la, lz = car.z + f1 * la, ly = gy + (near ? 1.05 : 1.0) + Math.sin(car.gp || 0) * la;
     if (!this.init) {
       this.pos.set(tx, ty, tz); this.look.set(lx, ly, lz); this.init = true;
     } else {

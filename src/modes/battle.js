@@ -83,7 +83,7 @@ export class BattleMode {
     { const c = activeCar(g.story); c.km = (c.km || 0) + this.P.car.speed * dt / 1000; }
     this.tp.update(this.P.car, this.raceT);
     this.tr.update(this.R.car, this.raceT);
-    if (g.input.hit('view')) this.hud.setView(VIEW_NAMES[g.rig.cycle(['chase', 'cockpit', 'hood'])]);
+    if (g.input.hit('view')) this.hud.setView(VIEW_NAMES[g.rig.cycle(['chase', 'near', 'cockpit', 'hood'])]);
     if (g.input.hit('mirror')) g.mirrorOn = !g.mirrorOn;
     this.hud.mirrorFrame.style.display = g.mirrorOn ? 'block' : 'none';
     g.rig.update(dt, this.P.model, this.P.car);

@@ -411,7 +411,7 @@ export class RaceWeekendMode {
     this.session.update(dt);
     if (this.phase === 'race') this.updateRace(dt);
     else if (this.phase !== 'hub') this.updateTimed(dt);
-    if (g.input.hit('view')) this.hud.setView(VIEW_NAMES[g.rig.cycle(['chase', 'cockpit', 'hood'])]);
+    if (g.input.hit('view')) this.hud.setView(VIEW_NAMES[g.rig.cycle(['chase', 'near', 'cockpit', 'hood'])]);
     if (g.input.hit('mirror')) g.mirrorOn = !g.mirrorOn;
     this.hud.mirrorFrame.style.display = g.mirrorOn ? 'block' : 'none';
     g.rig.update(dt, this.P.model, this.P.car);

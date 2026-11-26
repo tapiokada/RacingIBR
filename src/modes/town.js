@@ -126,7 +126,7 @@ export class TownMode {
     if (inp.hitCode('Escape') && !this.dialog) { this.pause(); return; }
     s.update(dt);
     const P = s.player;
-    if (inp.hit('view')) this.hud.setView(VIEW_NAMES[g.rig.cycle(['chase', 'cockpit', 'hood'])]);
+    if (inp.hit('view')) this.hud.setView(VIEW_NAMES[g.rig.cycle(['chase', 'near', 'cockpit', 'hood'])]);
     if (inp.hit('mirror')) g.mirrorOn = !g.mirrorOn;
     this.hud.mirrorFrame.style.display = g.mirrorOn ? 'block' : 'none';
     g.rig.update(dt, P.model, P.car);

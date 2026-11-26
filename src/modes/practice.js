@@ -67,7 +67,7 @@ export class PracticeMode {
     if (this.recorder && this.state === 'run') this.recorder.sample(dt, this.P.car);
     const ev = this.tracker.update(this.P.car, this.t);
     if (ev && this.state === 'run') this.onEvent(ev);
-    if (g.input.hit('view')) this.hud.setView(VIEW_NAMES[g.rig.cycle(['chase', 'cockpit', 'hood'])]);
+    if (g.input.hit('view')) this.hud.setView(VIEW_NAMES[g.rig.cycle(['chase', 'near', 'cockpit', 'hood'])]);
     if (g.input.hit('mirror')) g.mirrorOn = !g.mirrorOn;
     this.hud.mirrorFrame.style.display = g.mirrorOn ? 'block' : 'none';
     g.rig.update(dt, this.P.model, this.P.car);

@@ -141,6 +141,22 @@ export class C1World {
       const v = 0.07 + r() * 0.03;
       col[k * 3] = v * 1.1; col[k * 3 + 1] = v; col[k * 3 + 2] = v * 0.95;
     }
+    // 地面より低い道路（掘割・トンネル）の上に地面がかぶらないように：
+    // 掘割は道路の周り（約16m）の地面を路面より下へ下げ、トンネルは地面を天井（路面＋5.6m）より上に保つ
+    let roadMin = 0;
+    for (const C of this.lanes) for (let i = 0; i < C.n; i++) {
+      roadMin = Math.min(roadMin, C.y[i]);
+      const kind = C.kind[i];
+      if (kind === 0 || i % 2) continue;
+      const ci = Math.round((C.x[i] - T.x0) / T.cell), cj = Math.round((C.z[i] - T.z0) / T.cell);
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const gi = ci + di, gj = cj + dj; if (gi < 0 || gj < 0 || gi >= nx || gj >= nz) continue;
+        const k = gj * nx + gi, d = Math.hypot(pos[k * 3] - C.x[i], pos[k * 3 + 2] - C.z[i]);
+        if (d > 16) continue;
+        if (kind === 1) pos[k * 3 + 1] = Math.min(pos[k * 3 + 1], C.y[i] - 1.0);
+        else pos[k * 3 + 1] = Math.max(pos[k * 3 + 1], C.y[i] + 6.2);
+      }
+    }
     const idx = new Uint32Array((nx - 1) * (nz - 1) * 6);
     let q = 0;
     for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) { const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1; idx[q++] = a; idx[q++] = c; idx[q++] = b; idx[q++] = b; idx[q++] = c; idx[q++] = d; }
@@ -151,7 +167,7 @@ export class C1World {
     g.computeVertexNormals();
     this.scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true })));
     const far = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000), new THREE.MeshLambertMaterial({ color: 0x0b0c10 }));
-    far.rotation.x = -Math.PI / 2; far.position.y = T.hmin - 1; this.scene.add(far);
+    far.rotation.x = -Math.PI / 2; far.position.y = Math.min(T.hmin, roadMin) - 30; this.scene.add(far); // 一番低い道路（トンネル）よりずっと下
   }
 
   buildLane(C) {
@@ -288,9 +304,9 @@ export class C1World {
   // 沿線の建物（外形を押し出し。窓の明かりのテクスチャ）。400m四方ごとにまとめる（視野外を描かない）
   buildBuildings() {
     const bin = typeof atob === 'function' ? atob(BLD.data) : Buffer.from(BLD.data, 'base64').toString('binary');
-    const n = bin.length / 2;
-    const I = new Int16Array(n);
-    for (let k = 0; k < n; k++) { const v = bin.charCodeAt(2 * k) | (bin.charCodeAt(2 * k + 1) << 8); I[k] = v > 32767 ? v - 65536 : v; }
+    const n = bin.length / 4; // Int32（デシメートル）
+    const I = new Int32Array(n);
+    for (let k = 0; k < n; k++) I[k] = bin.charCodeAt(4 * k) | (bin.charCodeAt(4 * k + 1) << 8) | (bin.charCodeAt(4 * k + 2) << 16) | (bin.charCodeAt(4 * k + 3) << 24);
     const winTex = canvasTex(256, 256, (g, w, h) => {
       g.fillStyle = '#20232a'; g.fillRect(0, 0, w, h);
       const r = rng(17);

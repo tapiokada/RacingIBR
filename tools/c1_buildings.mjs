@@ -4,7 +4,7 @@
 //   dataDir/fgd18/{x}_{y}.geojson : experimental_fgd z18（C1 の両側約300mの範囲）
 // 外周線はタイルの境界で切れているので、同じ fid の線分を端点でつないで閉じた輪にする。
 // 高さのデータはないので、種別（普通建物／堅ろう建物／無壁舎）と建築面積から推定（fid で決まる乱数で個体差）。
-// C1 の本線から 7m 以内に入る建物は除く（高架・掘割と重ならないように）
+// 道路（ゲームの走行線と実際の首都高の道路中心線。トンネルを除く）の端から5m以内にかかる建物は除く（視界の確保・道路との重なり防止）
 import fs from 'fs';
 import path from 'path';
 
@@ -19,6 +19,43 @@ const G = 80, grid = new Map();
 const ROADS = [C1.outer.road, C1.inner.road, ...(S5 ? ['U', 'D', 'UO', 'UI', 'DO', 'DI'].map((k) => S5[k].road) : [])];
 for (const r of ROADS) for (const p of r) { const key = Math.floor(p[0] / G) * 7919 + Math.floor(p[1] / G); (grid.get(key) || grid.set(key, []).get(key)).push(p); }
 const roadDist = (x, z) => { let bd = 1e9; const gx = Math.floor(x / G), gz = Math.floor(z / G); for (let a = -4; a <= 4; a++) for (let b = -4; b <= 4; b++) for (const p of grid.get((gx + a) * 7919 + gz + b) || []) bd = Math.min(bd, Math.hypot(p[0] - x, p[1] - z)); return bd; };
+
+// ---- 道路の空間（ここに建物を置かない）：ゲームの走行線（トンネル区間を除く）と、実際の首都高の道路中心線（dataDir/hwy*.json、トンネルを除く）
+// 道路の端（中心から約4m）からさらに5m以上、視界を空ける
+const CLEAR = 4.2 + 5.0;
+const CG = 20, cgrid = new Map();
+const addClear = (x, z) => { const k = Math.floor(x / CG) * 7919 + Math.floor(z / CG); (cgrid.get(k) || cgrid.set(k, []).get(k)).push([x, z]); };
+for (const r of ROADS) for (const p of r) if (p[3] !== 2) addClear(p[0], p[1]);
+let realPts = 0;
+for (const f of fs.readdirSync(dataDir).filter((f) => /^hwy.*\.json$/.test(f))) {
+  for (const ft of JSON.parse(fs.readFileSync(path.join(dataDir, f))).features) {
+    if (ft.properties.state === 'トンネル') continue;
+    const ls = ft.geometry.type === 'LineString' ? [ft.geometry.coordinates] : ft.geometry.coordinates;
+    for (const l of ls) for (let i = 0; i < l.length - 1; i++) {
+      const a = toXZ(l[i]), b = toXZ(l[i + 1]), n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 2));
+      for (let k = 0; k <= n; k++) { addClear(a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n); realPts++; }
+    }
+  }
+}
+// 多角形が道路の空間にかかるか（道路の点が多角形の中にある、または辺から CLEAR 以内）
+function hitsRoad(ring) {
+  let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+  for (const [x, z] of ring) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
+  for (let gx = Math.floor((x0 - CLEAR) / CG); gx <= Math.floor((x1 + CLEAR) / CG); gx++) for (let gz = Math.floor((z0 - CLEAR) / CG); gz <= Math.floor((z1 + CLEAR) / CG); gz++) {
+    for (const [px, pz] of cgrid.get(gx * 7919 + gz) || []) {
+      let inside = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [ax, az] = ring[i], [bx, bz] = ring[j];
+        if ((az > pz) !== (bz > pz) && px < ((bx - ax) * (pz - az)) / (bz - az) + ax) inside = !inside;
+        const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz || 1;
+        const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / l2));
+        if (Math.hypot(px - ax - dx * t, pz - az - dz * t) < CLEAR) return true;
+      }
+      if (inside) return true;
+    }
+  }
+  return false;
+}
 
 // ---- 線分を fid ごとに集める ----
 const byFid = new Map();
@@ -89,7 +126,7 @@ for (const [fid, e] of byFid) {
     let A = area(ring);
     if (Math.abs(A) < 12) { dbg.small++; continue; }
     if (A < 0) { ring.reverse(); A = -A; }
-    if (ring.some(([x, z]) => roadDist(x, z) < 7)) { dropRoad++; continue; }
+    if (hitsRoad(ring)) { dropRoad++; continue; }
     const cx = ring.reduce((s, p) => s + p[0], 0) / ring.length, cz = ring.reduce((s, p) => s + p[1], 0) / ring.length;
     if (roadDist(cx, cz) > 320) { dbg.far++; continue; }
     const t = TYPE[e.type] ?? 0, r = hash(fid);
@@ -105,7 +142,7 @@ for (const [fid, e] of byFid) {
 }
 // 詰める：[種別, 高さdm, 点数, x0, z0, x1, z1, ...]（Int16, dm）
 const arr = [];
-for (const b of out) { arr.push(b.t, Math.min(32767, b.h), b.p.length); for (const [x, z] of b.p) arr.push(x, z); }
-const buf = Buffer.from(Int16Array.from(arr).buffer);
-fs.writeFileSync(outFile, `// 自動生成（tools/c1_buildings.mjs）。国土地理院 基盤地図情報（建築物の外周線）を加工して作成。高さは種別と面積からの推定\n// data: Int16（デシメートル）[種別(0普通 1堅ろう 2無壁舎), 高さ, 点数, x0, z0, ...] を base64\nexport default { count: ${out.length}, data: '${buf.toString('base64')}' };\n`);
-console.log(JSON.stringify(dbg), byFid.size); console.log(`buildings ${out.length}  (dropped near road ${dropRoad}, open ${dropOpen})  points ${out.reduce((s, b) => s + b.p.length, 0)}  ${(buf.length / 1024).toFixed(0)}KB`);
+for (const b of out) { arr.push(b.t, b.h, b.p.length); for (const [x, z] of b.p) arr.push(x, z); }
+const buf = Buffer.from(Int32Array.from(arr).buffer); // 5号沿いは z が -7900m（-79000dm）まであるので 32bit
+fs.writeFileSync(outFile, `// 自動生成（tools/c1_buildings.mjs）。国土地理院 基盤地図情報（建築物の外周線）を加工して作成。高さは種別と面積からの推定\n// data: Int32（デシメートル）[種別(0普通 1堅ろう 2無壁舎), 高さ, 点数, x0, z0, ...] を base64\nexport default { count: ${out.length}, data: '${buf.toString('base64')}' };\n`);
+console.log(JSON.stringify(dbg), byFid.size, 'real road pts', realPts); console.log(`buildings ${out.length}  (dropped near road ${dropRoad}, open ${dropOpen})  points ${out.reduce((s, b) => s + b.p.length, 0)}  ${(buf.length / 1024).toFixed(0)}KB`);
