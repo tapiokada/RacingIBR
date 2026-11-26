@@ -104,6 +104,8 @@ export class Hud {
 
   // ミニマップ
   setMapCourse(path, area = 'west') { this.course = path; this.roads = AREAS[area].roads; this.mapBounds = null; }
+  // 任意の折れ線群（首都高のネットワークなど）。[[x,z],...] の配列
+  setMapLines(lines) { this.mapLines = lines; this.course = null; this.roads = []; this.mapBounds = null; }
 
   drawMap(cars, pois = []) {
     const c = this.map.getContext('2d');
@@ -111,7 +113,7 @@ export class Hud {
     c.clearRect(0, 0, W, H);
     if (!this.mapBounds) {
       let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
-      const pts = this.course ? Array.from({ length: this.course.n }, (_, i) => ({ x: this.course.x[i], z: this.course.z[i] })) : this.roads.flatMap((r) => r.nodes.map((id) => NODES[id]));
+      const pts = this.mapLines ? this.mapLines.flat().map(([x, z]) => ({ x, z })) : this.course ? Array.from({ length: this.course.n }, (_, i) => ({ x: this.course.x[i], z: this.course.z[i] })) : this.roads.flatMap((r) => r.nodes.map((id) => NODES[id]));
       for (const p of pts) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); }
       const sc = Math.min((W - 30) / (maxX - minX), (H - 30) / (maxZ - minZ));
       this.mapBounds = { sc, ox: W / 2 - ((minX + maxX) / 2) * sc, oz: H / 2 - ((minZ + maxZ) / 2) * sc };
@@ -129,7 +131,10 @@ export class Hud {
     c.fillStyle = 'rgba(5,10,20,0.6)';
     c.beginPath(); c.roundRect(0, 0, W, H, 14); c.fill();
     c.lineCap = 'round'; c.lineJoin = 'round';
-    if (this.course && this.course.open) {
+    if (this.mapLines) {
+      c.strokeStyle = 'rgba(200,220,255,0.8)'; c.lineWidth = Math.max(2, lw * 0.6);
+      for (const L of this.mapLines) { c.beginPath(); L.forEach(([x, z], i) => { const [px, py] = P(x, z); i ? c.lineTo(px, py) : c.moveTo(px, py); }); c.stroke(); }
+    } else if (this.course && this.course.open) {
       // 片道の峠コース：道全体を薄く、計測区間を明るく。■スタート ◆ゴール
       const C = this.course;
       const seg = (from, to, style, w) => {

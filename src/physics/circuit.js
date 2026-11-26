@@ -8,7 +8,9 @@ import TSUKUBA from '../data/tsukuba.js';
 import SUZUKA from '../data/suzuka.js';
 import FUJI from '../data/fuji.js';
 import C1 from '../data/c1.js';
+import S5 from '../data/shuto5.js';
 import { Corridor, CoursePath } from './track.js';
+import { TougePath } from './touge.js';
 
 // 路面の種類と摩擦係数倍率・転がり抵抗（荷重比）
 export const SURF = {
@@ -128,12 +130,14 @@ const GCELL = 16;
 export class CircuitGround {
   constructor(C) {
     this.C = C;
-    const N = C.n, wrap = (i) => ((i % N) + N) % N;
+    const N = C.n;
+    // 次の点（周回コースは輪、片道の車線・ネットワークは C.nxt で。端は -1）
+    const wrap = C.nxt ? (i) => C.nxt[((i % N) + N) % N] : (i) => ((i % N) + N) % N;
     this.wrap = wrap;
     this.refY = null; // 車体の高さ（立体交差でどちらの路面か選ぶ。null＝最寄り）
     this.grid = new Map();
     for (let i = 0; i < N; i++) {
-      const j = wrap(i + 1);
+      const j = C.nxt ? (C.nxt[i] < 0 ? i : C.nxt[i]) : wrap(i + 1);
       const pad = C.hw[i] + Math.max(C.runL[i], C.runR[i]) + 14;
       const x0 = Math.floor((Math.min(C.x[i], C.x[j]) - pad) / GCELL), x1 = Math.floor((Math.max(C.x[i], C.x[j]) + pad) / GCELL);
       const z0 = Math.floor((Math.min(C.z[i], C.z[j]) - pad) / GCELL), z1 = Math.floor((Math.max(C.z[i], C.z[j]) + pad) / GCELL);
@@ -145,6 +149,9 @@ export class CircuitGround {
     this.lastSurf = SURF.asphalt;
   }
 
+  // 区間 i の終点（片道の端は i 自身＝長さ0の区間）
+  nx(i) { const C = this.C; if (C.nxt) { const j = C.nxt[i]; return j < 0 ? i : j; } return (i + 1) % C.n; }
+
   // 最寄りの中心線区間 { i, t, s, lat(右正), d }
   nearest(x, z, refY = this.refY) {
     const C = this.C, wrap = this.wrap;
@@ -152,7 +159,7 @@ export class CircuitGround {
     if (!arr) return null;
     let best = -1, bd = 1e18, bt = 0, bs = 1e18;
     for (const i of arr) {
-      const j = wrap(i + 1);
+      const j = this.nx(i);
       const ax = C.x[i], az = C.z[i], dx = C.x[j] - ax, dz = C.z[j] - az, l2 = dx * dx + dz * dz;
       let t = l2 > 0 ? ((x - ax) * dx + (z - az) * dz) / l2 : 0;
       t = t < 0 ? 0 : t > 1 ? 1 : t;
@@ -163,7 +170,7 @@ export class CircuitGround {
     }
     // 格子のハッシュが遠くのセルと衝突したとき、遠く離れた区間を返さない
     if (best < 0 || bd > 70 * 70) return null;
-    const i = best, j = wrap(i + 1);
+    const i = best, j = this.nx(i);
     const dx = C.x[j] - C.x[i], dz = C.z[j] - C.z[i], l = Math.hypot(dx, dz) || 1;
     const lat = ((x - C.x[i]) * -dz + (z - C.z[i]) * dx) / l;
     return { i, t: bt, s: C.s[i] + bt * l, lat, d: Math.sqrt(bd) };
@@ -200,12 +207,12 @@ export class CircuitGround {
   blendY(x, z, q) {
     const C = this.C, wrap = this.wrap;
     const arr = this.grid.get(Math.floor(x / GCELL) * 73856093 ^ Math.floor(z / GCELL) * 19349663);
-    const j0 = wrap(q.i + 1);
+    const j0 = this.nx(q.i);
     const y0 = C.y[q.i] + (C.y[j0] - C.y[q.i]) * q.t;
     if (!arr) return y0;
     let sw = 0, sy = 0;
     for (const i of arr) {
-      const j = wrap(i + 1);
+      const j = this.nx(i);
       const ax = C.x[i], az = C.z[i], dx = C.x[j] - ax, dz = C.z[j] - az, l2 = dx * dx + dz * dz;
       let t = l2 > 0 ? ((x - ax) * dx + (z - az) * dz) / l2 : 0;
       t = t < 0 ? 0 : t > 1 ? 1 : t;
@@ -228,7 +235,7 @@ export class CircuitGround {
     if (!arr) return T;
     let ymin = 1e9, dmin = 1e9, hwm = 8;
     for (const i of arr) {
-      const j = wrap(i + 1);
+      const j = this.nx(i);
       const ax = C.x[i], az = C.z[i], dx = C.x[j] - ax, dz = C.z[j] - az, l2 = dx * dx + dz * dz;
       let t = l2 > 0 ? ((x - ax) * dx + (z - az) * dz) / l2 : 0;
       t = t < 0 ? 0 : t > 1 ? 1 : t;
@@ -251,7 +258,7 @@ export class CircuitGround {
 const corrCache = {};
 export function circuitCorridor(C) {
   if (corrCache[C.id]) return corrCache[C.id];
-  const N = C.n, wrap = (i) => ((i % N) + N) % N;
+  const N = C.n, wrap = C.nxt ? (i) => C.nxt[i] : (i) => ((i % N) + N) % N;
   const segs = [];
   const off = new Float64Array(N), hwAll = new Float64Array(N);
   for (let i = 0; i < N; i++) {
@@ -259,12 +266,13 @@ export function circuitCorridor(C) {
     off[i] = (R - L) / 2; hwAll[i] = (L + R) / 2;
   }
   for (let i = 0; i < N; i++) {
-    const j = wrap(i + 1);
+    const j = C.nxt ? C.nxt[i] : wrap(i + 1);
+    if (j < 0) continue;
     const rxi = -C.tz[i], rzi = C.tx[i], rxj = -C.tz[j], rzj = C.tx[j];
     segs.push({ ax: C.x[i] + rxi * off[i], az: C.z[i] + rzi * off[i], bx: C.x[j] + rxj * off[j], bz: C.z[j] + rzj * off[j], hw: Math.min(hwAll[i], hwAll[j]), y: (C.y[i] + C.y[j]) / 2, road: 'circuit' });
   }
   const corr = new Corridor(segs, 20);
-  if (C.crossings.length) corr.leveled = true; // 立体交差：車体の高さの路面だけを壁判定に使う
+  if (C.crossings.length || C.leveled) corr.leveled = true; // 立体交差：車体の高さの路面だけを壁判定に使う
   return (corrCache[C.id] = corr);
 }
 
@@ -389,10 +397,11 @@ export const C1_JCT = [
   ['江戸橋JCT', 1946, -1272], ['京橋JCT', 1600, -250], ['汐留JCT', 760, 940], ['浜崎橋JCT', 480, 1950], ['一ノ橋JCT', -1620, 1760],
   ['谷町JCT', -1520, 620], ['霞が関トンネル', -620, -330], ['三宅坂JCT', -995, -995], ['竹橋JCT', 100, -2100], ['神田橋JCT', 787, -1940],
 ];
-export function buildHighway(id, D, side) {
-  const R = D[side].road, N = R.length;
+// 首都高の車線（片側の走行路）。road: [x, z, 高さ, 構造, 地盤]。open=true は片道（ランプ・5号）
+export function buildHighwayLane(id, road, { open = false, hw = 3.25, run = 0.75, terrain = null, signs = [], extra = {} } = {}) {
+  const R = road, N = R.length;
   const C = {
-    id, data: D[side], highway: true, side,
+    id, highway: true, open, ...extra,
     n: N, x: new Float64Array(N), z: new Float64Array(N), y: new Float64Array(N), hw: new Float64Array(N), s: new Float64Array(N),
     tx: new Float64Array(N), tz: new Float64Array(N), curv: new Float64Array(N), kind: new Uint8Array(N), ground: new Float64Array(N),
     runL: new Float64Array(N), runR: new Float64Array(N),
@@ -402,12 +411,12 @@ export function buildHighway(id, D, side) {
   let acc = 0;
   for (let i = 0; i < N; i++) {
     C.x[i] = R[i][0]; C.z[i] = R[i][1]; C.y[i] = R[i][2]; C.kind[i] = R[i][3]; C.ground[i] = R[i][4];
-    C.hw[i] = 3.25; C.runL[i] = C.runR[i] = 0.75;
+    C.hw[i] = typeof hw === 'function' ? hw(i, N) : hw; C.runL[i] = C.runR[i] = run;
     if (i > 0) acc += Math.hypot(C.x[i] - C.x[i - 1], C.z[i] - C.z[i - 1]);
     C.s[i] = acc;
   }
-  C.length = acc + Math.hypot(C.x[0] - C.x[N - 1], C.z[0] - C.z[N - 1]);
-  const w = (i) => ((i % N) + N) % N;
+  C.length = open ? acc : acc + Math.hypot(C.x[0] - C.x[N - 1], C.z[0] - C.z[N - 1]);
+  const w = open ? (i) => Math.max(0, Math.min(N - 1, i)) : (i) => ((i % N) + N) % N;
   for (let i = 0; i < N; i++) {
     const a = w(i - 1), b = w(i + 1), dx = C.x[b] - C.x[a], dz = C.z[b] - C.z[a], l = Math.hypot(dx, dz) || 1;
     C.tx[i] = dx / l; C.tz[i] = dz / l;
@@ -415,11 +424,43 @@ export function buildHighway(id, D, side) {
     const ax = C.x[i] - C.x[p], az = C.z[i] - C.z[p], bx = C.x[q] - C.x[i], bz = C.z[q] - C.z[i];
     C.curv[i] = Math.atan2(ax * bz - az * bx, ax * bx + az * bz) / ((Math.hypot(ax, az) + Math.hypot(bx, bz)) / 2 || 1);
   }
+  if (open) { C.nxt = new Int32Array(N); for (let i = 0; i < N; i++) C.nxt[i] = i < N - 1 ? i + 1 : -1; }
   C.pitWall = [0, 0]; C.stand = [0, 0]; C.crossings = []; C.peaks = [];
-  C.terrain = decodeTerrain(D.terrain);
-  // JCT の看板位置（その車線で一番近い点）。セクターは全長の1/3・2/3
-  C.signs = C1_JCT.map(([name, x, z]) => { let bi = 0, bd = 1e18; for (let i = 0; i < N; i++) { const d = (C.x[i] - x) ** 2 + (C.z[i] - z) ** 2; if (d < bd) { bd = d; bi = i; } } return { name, s: C.s[bi], i: bi, right: false }; }).sort((a, b) => a.s - b.s);
+  C.terrain = terrain;
+  C.signs = signs;
   C.sectorBounds = [C.length / 3, (C.length * 2) / 3];
+  return C;
+}
+export function buildHighway(id, D, side) {
+  const C = buildHighwayLane(id, D[side].road, { terrain: decodeTerrain(D.terrain), extra: { data: D[side], side } });
+  // JCT の看板位置（その車線で一番近い点）
+  C.signs = C1_JCT.map(([name, x, z]) => { let bi = 0, bd = 1e18; for (let i = 0; i < C.n; i++) { const d = (C.x[i] - x) ** 2 + (C.z[i] - z) ** 2; if (d < bd) { bd = d; bi = i; } } return { name, s: C.s[bi], i: bi, right: false }; }).sort((a, b) => a.s - b.s);
+  return C;
+}
+// 車線の一部（s0〜s1）を片道の車線として切り出す（輪の車線は s0>s1 で継ぎ目をまたげる）
+export function sliceLane(C, s0, s1, id) {
+  const road = [];
+  const L = C.length;
+  const inR = (s) => (s0 <= s1 ? s >= s0 && s <= s1 : s >= s0 || s <= s1);
+  let start = 0; for (let i = 0; i < C.n; i++) if (C.s[i] >= s0) { start = i; break; }
+  for (let k = 0; k < C.n; k++) { const i = (start + k) % C.n; if (!inR(C.s[i])) { if (road.length) break; continue; } road.push([C.x[i], C.z[i], C.y[i], C.kind[i], C.ground[i]]); }
+  return buildHighwayLane(id, road, { open: true, hw: C.hw[0], terrain: C.terrain, extra: { parent: C.id, parentS0: s0, parentL: L } });
+}
+// いくつかの車線をまとめた走行ネットワーク（路面の高さ・壁の判定用）。laneOf[i] でどの車線か分かる
+export function makeNet(id, lanes) {
+  let N = 0; for (const c of lanes) N += c.n;
+  const keys = ['x', 'z', 'y', 'hw', 's', 'tx', 'tz', 'curv', 'ground', 'runL', 'runR'];
+  const ukeys = ['kind', 'kerbL', 'kerbR', 'gravelL', 'gravelR', 'pavedL', 'pavedR'];
+  const C = { id, highway: true, net: true, leveled: true, n: N, lanes, laneOf: new Int16Array(N), nxt: new Int32Array(N), crossings: [], pitWall: [0, 0], stand: [0, 0], peaks: [], signs: [], terrain: lanes[0].terrain };
+  for (const k of keys) C[k] = new Float64Array(N);
+  for (const k of ukeys) C[k] = new Uint8Array(N);
+  let o = 0;
+  lanes.forEach((c, li) => {
+    for (const k of [...keys, ...ukeys]) C[k].set(c[k], o);
+    for (let i = 0; i < c.n; i++) { C.laneOf[o + i] = li; C.nxt[o + i] = c.nxt ? (c.nxt[i] < 0 ? -1 : o + c.nxt[i]) : o + ((i + 1) % c.n); }
+    o += c.n;
+  });
+  C.length = 0;
   return C;
 }
 
@@ -427,3 +468,70 @@ export const CIRCUITS = {
   tsukuba: buildCircuit('tsukuba', TSUKUBA), suzuka: buildCircuit('suzuka', SUZUKA), fuji: buildCircuit('fuji', FUJI),
   c1_outer: buildHighway('c1_outer', C1, 'outer'), c1_inner: buildHighway('c1_inner', C1, 'inner'),
 };
+
+// ---------------- 首都高速5号池袋線（北池袋〜竹橋JCT）と竹橋JCTの連絡路 ----------------
+// 座標は C1 と同じ。U：上り本線 / D：下り本線 / UO・UI：上り→C1外回り・内回り / DO・DI：C1外回り・内回り→下り
+const S5T = decodeTerrain(S5.terrain);
+const rampHw = (i, n) => { const e = Math.min(i, n - 1 - i) * 2; return 1.75 + 1.5 * Math.max(0, 1 - e / 60); }; // 1車線。本線との接続部は広げる
+export const SHUTO5 = {
+  terrain: S5T,
+  U: buildHighwayLane('s5_U', S5.U.road, { open: true, terrain: S5T, extra: { lane: 'U' } }),
+  D: buildHighwayLane('s5_D', S5.D.road, { open: true, terrain: S5T, extra: { lane: 'D' } }),
+  UO: buildHighwayLane('s5_UO', S5.UO.road, { open: true, hw: rampHw, terrain: S5T, extra: { lane: 'UO', ramp: true, to: S5.UO.to, toS: S5.UO.toS } }),
+  UI: buildHighwayLane('s5_UI', S5.UI.road, { open: true, hw: rampHw, terrain: S5T, extra: { lane: 'UI', ramp: true, to: S5.UI.to, toS: S5.UI.toS } }),
+  DO: buildHighwayLane('s5_DO', S5.DO.road, { open: true, hw: rampHw, terrain: S5T, extra: { lane: 'DO', ramp: true, from: S5.DO.from, fromS: S5.DO.fromS } }),
+  DI: buildHighwayLane('s5_DI', S5.DI.road, { open: true, hw: rampHw, terrain: S5T, extra: { lane: 'DI', ramp: true, from: S5.DI.from, fromS: S5.DI.fromS } }),
+};
+{
+  const L = SHUTO5;
+  L.U.signs = [{ name: '竹橋JCT', s: L.U.length - 300, board: '竹橋JCT　C1 都心環状線' }, { name: 'fork', s: L.U.length - 60, board: '← 外回り 江戸橋・銀座　　内回り 霞が関・渋谷 →' }];
+  L.D.signs = [{ name: '北池袋', s: L.D.length - 520, board: '北池袋 出口 500m' }];
+  for (const [k, side] of [['DO', 'c1_outer'], ['DI', 'c1_inner']]) {
+    const C = CIRCUITS[side];
+    C.signs.push({ name: '5号', s: (L[k].fromS - 300 + C.length) % C.length, board: '5号池袋線　池袋・高島平　300m' });
+  }
+}
+// 走行ネットワーク：5号エリア（全6車線）／C1エリア（その車線＋連絡路の端）
+const netCache = {};
+export function shuto5Net() { return (netCache.s5 ||= makeNet('net_s5', [SHUTO5.U, SHUTO5.D, SHUTO5.UO, SHUTO5.UI, SHUTO5.DO, SHUTO5.DI])); }
+export const C1_LINK_LEN = 220; // C1 エリアで走れる連絡路の長さ（合流側は終わりの、分岐側は始まりの 220m）
+export function c1Net(side) {
+  if (netCache[side]) return netCache[side];
+  const C = CIRCUITS[side];
+  const inn = side === 'c1_outer' ? SHUTO5.UO : SHUTO5.UI, out = side === 'c1_outer' ? SHUTO5.DO : SHUTO5.DI;
+  const tail = sliceLane(inn, inn.length - C1_LINK_LEN, inn.length, `${inn.id}_tail`);
+  const head = sliceLane(out, 0, C1_LINK_LEN, `${out.id}_head`);
+  tail.lane = inn.lane; head.lane = out.lane;
+  return (netCache[side] = makeNet(`net_${side}`, [C, tail, head]));
+}
+
+// 片道の車線を AI が走るための経路（TougePath と同じインターフェース。テスト・確認用）
+export class LanePath {
+  constructor(C, corridor = null) {
+    for (const k of ['project', 'posAt', 'buildRacingLine', 'normal']) if (!LanePath.prototype[k]) LanePath.prototype[k] = TougePath.prototype[k];
+    this.open = true; this.laps = 1; this.name = C.id; this.C = C;
+    const n = (this.n = C.n);
+    this.x = Float32Array.from(C.x); this.z = Float32Array.from(C.z); this.y = Float32Array.from(C.y);
+    this.hw = Float32Array.from(C.hw); this.s = Float32Array.from(C.s); this.extra = new Float32Array(n);
+    this.tx = Float32Array.from(C.tx); this.tz = Float32Array.from(C.tz);
+    this.length = C.length; this.startS = 0; this.finishS = C.length; this.raceLen = C.length;
+    this.sectorBounds = [C.length / 3, (C.length * 2) / 3];
+    this.corridor = corridor || circuitCorridor(C);
+    this.corners = [];
+    this.buildRacingLine();
+  }
+
+  // 首都高は両側が壁なので控えめに
+  speedProfile(spec, skill) { const v = TougePath.prototype.speedProfile.call(this, spec, skill); for (let i = 0; i < v.length; i++) v[i] *= 0.88; return v; }
+}
+
+// 車線 C の距離 s の位置と向き
+export function lanePose(C, s) {
+  s = C.open ? Math.max(0, Math.min(C.length - 0.01, s)) : ((s % C.length) + C.length) % C.length;
+  let lo = 0, hi = C.n - 1;
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (C.s[m] <= s) lo = m; else hi = m - 1; }
+  const j = C.open ? Math.min(C.n - 1, lo + 1) : (lo + 1) % C.n;
+  const seg = (j === 0 ? C.length : C.s[j]) - C.s[lo], t = seg > 0 ? (s - C.s[lo]) / seg : 0;
+  return { x: C.x[lo] + (C.x[j] - C.x[lo]) * t, z: C.z[lo] + (C.z[j] - C.z[lo]) * t, h: Math.atan2(C.tx[lo], C.tz[lo]) };
+}
+

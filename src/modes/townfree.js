@@ -7,6 +7,8 @@ import { pauseMenu } from './common.js';
 import { TitleMode } from './title.js';
 import { openSetup } from '../ui/setup.js';
 import { savePracticeSetup } from '../save.js';
+import { ShutoFreeMode, lanePose, LINK_SPEED } from './shutofree.js';
+import { SHUTO5 } from '../physics/circuit.js';
 
 export class TownFreeMode {
   constructor(game, opts) { this.game = game; this.opts = opts; }
@@ -21,7 +23,8 @@ export class TownFreeMode {
     this.session = new DriveSession(g, { corridor: g.world.corridor });
     this.P = this.session.addCar({ carId, equipped, setup: this.opts.setup || null, color, isPlayer: true });
     const sp = this.opts.pos || areaStart(area);
-    this.P.car.place(sp.x, sp.z, sp.h, 0);
+    this.P.car.place(sp.x, sp.z, sp.h, this.opts.speed || 0);
+    for (const gm of g.world.gateMarkers || []) gm.group.visible = true; // 首都高入口の看板（FREE RUN のみ）
     g.mirrorModel = this.P.model;
     if (g.rig.mode === 'gallery') g.rig.mode = 'chase';
     g.rig.reset();
@@ -38,7 +41,11 @@ export class TownFreeMode {
     this.session.update(dt);
     // エリア出口
     if (!this.leaving) for (const gm of g.world.gateMarkers) {
-      if (Math.hypot(gm.x - this.P.car.x, gm.z - this.P.car.z) < 9) { this.changeArea(gm.gate.to, arriveSpot(gm.gate)); break; }
+      if (Math.hypot(gm.x - this.P.car.x, gm.z - this.P.car.z) < 9) {
+        if (gm.gate.to === 'shuto5') this.enterShuto(); // 首都高 北池袋入口：5号上りへ（40km/h で走っている状態から）
+        else this.changeArea(gm.gate.to, arriveSpot(gm.gate));
+        break;
+      }
     }
     if (g.input.hit('view')) this.hud.setView(VIEW_NAMES[g.rig.cycle(['chase', 'cockpit', 'hood'])]);
     if (g.input.hit('mirror')) g.mirrorOn = !g.mirrorOn;
@@ -71,6 +78,12 @@ export class TownFreeMode {
       onChange: (S) => { this.opts.setup = S; this.session.applySetup(this.P, S); if (this.opts.setupKey) savePracticeSetup(this.opts.setupKey, S); },
       onClose: () => { g.input.pressed.clear(); this.paused = false; },
     });
+  }
+
+  enterShuto() {
+    const g = this.game, o = this.opts;
+    this.leaving = true;
+    g.transition(() => g.setMode(new ShutoFreeMode(g, { carId: o.carId, equipped: o.equipped, color: o.color, setup: o.setup, setupKey: o.setupKey, area: 'shuto5', pose: lanePose(SHUTO5.U, 12), speed: LINK_SPEED })), 300);
   }
 
   changeArea(to, pos) {

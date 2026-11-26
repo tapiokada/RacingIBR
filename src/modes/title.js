@@ -9,6 +9,17 @@ import { TownFreeMode } from './townfree.js';
 import { ReplayMode } from './replay.js';
 import { getReplay } from '../save.js';
 import { CARS, PLAYER, CAR_IDS, CAR_COLORS } from '../data/cars.js';
+import { ShutoFreeMode } from './shutofree.js';
+import { getCoursePath } from '../physics/track.js';
+
+// PRACTICE のモード：首都高 C1 の FREE RUN は 5号・竹橋JCTへ行き来できる首都高専用のモード
+function practiceMode(g, o, L, kind) {
+  if (kind === 'free' && L.area === 'c1') {
+    const p = getCoursePath(L).posAt(-8, 0);
+    return new ShutoFreeMode(g, { ...o, area: 'c1', lane: L.key, pose: { x: p.x, z: p.z, h: p.h }, speed: 0 });
+  }
+  return new PracticeMode(g, { ...o, layout: L, kind });
+}
 import { GLB_CREDITS } from '../render/glbCars.js';
 
 export class TitleMode {
@@ -112,7 +123,7 @@ export class TitleMode {
       const o = { carId: car && setupKey === 'story' ? car.carId : PLAYER.car, equipped, color, setup, setupKey };
       g.transition(() => g.setMode(kind === 'town'
         ? new TownFreeMode(g, { ...o, area })
-        : new PracticeMode(g, { ...o, layout: L, kind })));
+        : practiceMode(g, o, L, kind)));
     };
     // ★5フルカスタマイズパーツを組んだ練習用の86-GR（フリーランのポーズメニューからセッティング可能）
     const fullEquip = { ...CARS[PLAYER.car].stock, tire: 'tire_high', suspension: 'sus_full', brake: 'brk_full', transmission: 'tm_full', aero: 'aero_wing', muffler: 'muf_sport' };
@@ -129,7 +140,7 @@ export class TitleMode {
     const go = (id) => {
       const g = this.game;
       const o = { carId: id, equipped: { ...CARS[id].stock }, color: CAR_COLORS[id], setup: null, setupKey: null };
-      g.transition(() => g.setMode(kind === 'town' ? new TownFreeMode(g, { ...o, area }) : new PracticeMode(g, { ...o, layout: L, kind })));
+      g.transition(() => g.setMode(kind === 'town' ? new TownFreeMode(g, { ...o, area }) : practiceMode(g, o, L, kind)));
     };
     this.setMenu([
       ...CAR_IDS.map((id) => ({ label: CARS[id].name, sub: `${CARS[id].ref}　${CARS[id].drive}・${CARS[id].mass}kg`, action: () => go(id) })),

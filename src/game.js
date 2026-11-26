@@ -55,8 +55,9 @@ export class Game {
 
   // エリア（西池袋／東池袋）の3Dワールドを切り替える。初回は生成する
   setArea(area) {
-    if (!this.worlds[area]) this.worlds[area] = AREAS[area].touge ? new HarunaWorld(this.renderer, area) : AREAS[area].highway ? new C1World(this.renderer, area) : AREAS[area].circuit ? new CircuitWorld(this.renderer, area) : new World(this.renderer, area);
-    this.world = this.worlds[area];
+    const wkey = AREAS[area].worldKey || area; // 同じシーンを使うエリア（首都高 C1・5号）
+    if (!this.worlds[wkey]) this.worlds[wkey] = AREAS[area].touge ? new HarunaWorld(this.renderer, area) : AREAS[area].highway ? new C1World(this.renderer, area) : AREAS[area].circuit ? new CircuitWorld(this.renderer, area) : new World(this.renderer, area);
+    this.world = this.worlds[wkey];
     this.area = area;
     return this.world;
   }

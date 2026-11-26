@@ -42,6 +42,7 @@ export class TownMode {
     st.area = area;
     g.setArea(area);
     g.world.setCourse(null);
+    for (const gm of g.world.gateMarkers || []) if (gm.gate.freeOnly) gm.group.visible = false; // 首都高入口の看板はストーリーでは出さない
     this.graph = townGraph(area);
     this.session = new DriveSession(g, { corridor: g.world.corridor });
     const mine = activeCar(st);
@@ -155,6 +156,7 @@ export class TownMode {
     // エリア出口（境界の看板の先まで走ると暗転して移動）
     if (!this.dialog && !this.leaving) {
       for (const gm of g.world.gateMarkers) {
+        if (gm.gate.freeOnly) continue; // 首都高入口は FREE RUN のみ
         if (Math.hypot(gm.x - P.car.x, gm.z - P.car.z) < 9) { this.changeArea(gm.gate.to, arriveSpot(gm.gate)); break; }
       }
     }

@@ -96,6 +96,13 @@ export const LANDMARKS = {
 };
 
 export const NODES = Object.fromEntries(Object.entries(N).map(([k, [la, lo]]) => [k, geo(la, lo)]));
+// 首都高5号 北池袋入口（池袋本町・川越街道の上り＝都心方向の左側から上がる）。FREE RUN のみ
+{
+  const A = NODES.K1, B = NODES.AXIA, len = Math.hypot(B.x - A.x, B.z - A.z);
+  const dx = (B.x - A.x) / len, dz = (B.z - A.z) / len, lx = dz, lz = -dx; // 進行方向（南東）の左＝北東
+  NODES.HI_A = { x: A.x + dx * len * 0.3 + lx * 9, z: A.z + dz * len * 0.3 + lz * 9 };
+  NODES.HI_B = { x: A.x + dx * len * 0.68 + lx * 15, z: A.z + dz * len * 0.68 + lz * 15 };
+}
 
 // レースコース用の道路幅（v0.1から変更しない。コース形状はこの値とノード列で決まる）
 const RACE_ROADS = [
@@ -132,6 +139,7 @@ export const WEST_ROADS = [
   // 施設への引き込み・エリア出口（街流しAIは入らない）
   { name: 'ドン・キホーテ駐車場', lanes: 0, laneW: 8.0, median: 0, shoulder: 0.5, ai: false, nodes: ['DQ_E', 'DQ_P'] },
   { name: 'ENEOS入口', lanes: 0, laneW: 8.0, median: 0, shoulder: 0.5, ai: false, nodes: ['GS_E', 'GS_P'] },
+  { name: '首都高5号 北池袋入口', lanes: 0, laneW: 6.0, median: 0, shoulder: 0.5, ai: false, gate: true, nodes: ['HI_A', 'HI_B'] },
   { name: '川越街道（東池袋方面）', lanes: 2, laneW: 3.25, median: 0, shoulder: 0.5, ai: false, gate: true, nodes: ['K4', 'K5'] },
   { name: 'メトロポリタン通り（東池袋方面）', lanes: 1, laneW: 3.25, median: 0, shoulder: 1.5, ai: false, gate: true, nodes: ['EDIT', 'EDIT_OUT'] },
 ];
@@ -281,6 +289,8 @@ export const AREAS = {
     id: 'west', name: '西池袋', roads: WEST_ROADS, pois: WEST_POIS,
     start: { node: 'GS_E', heading: Math.PI, back: 16 },
     gates: [
+      // 首都高（FREE RUN のみ。ストーリーでは看板を出さず、入っても何も起きない）
+      { node: 'HI_B', from: 'HI_A', to: 'shuto5', label: '首都高5号 北池袋入口', freeOnly: true },
       { node: 'K5', from: 'K4', to: 'east', label: '東池袋エリア', arrive: { node: 'GATE_K', toward: 'V0' } },
       { node: 'EDIT_OUT', from: 'EDIT', to: 'east', label: '東池袋エリア', arrive: { node: 'MJ_S', toward: 'MJ_1' } },
     ],
@@ -345,7 +355,9 @@ export const HARUNA_LENGTH = HR_LEN;
 // サーキット（街のエリア移動には出さない。走行会・PRACTICEから）
 AREAS.tsukuba = { id: 'tsukuba', name: 'つくば山麓サーキット', roads: [], pois: [], circuit: 'tsukuba', hidden: true, start: null, gates: [] };
 AREAS.suzuka = { id: 'suzuka', name: '鈴鹿丘陵サーキット', roads: [], pois: [], circuit: 'suzuka', hidden: true, start: null, gates: [] };
-AREAS.c1 = { id: 'c1', name: '首都高 都心環状線', roads: [], pois: [], circuit: 'c1_outer', highway: true, hidden: true, start: null, gates: [] };
+AREAS.c1 = { id: 'c1', name: '首都高 都心環状線', roads: [], pois: [], circuit: 'c1_outer', highway: true, worldKey: 'shuto', hidden: true, start: null, gates: [] };
+// 首都高速5号池袋線（北池袋〜竹橋JCT）：西池袋の FREE RUN の高速入口から。C1 と同じシーンを使う
+AREAS.shuto5 = { id: 'shuto5', name: '首都高 5号池袋線', roads: [], pois: [], circuit: 'c1_outer', highway: true, worldKey: 'shuto', hidden: true, start: null, gates: [] };
 AREAS.fuji = { id: 'fuji', name: '富士山麓サーキット', roads: [], pois: [], circuit: 'fuji', hidden: true, start: null, gates: [] };
 
 export const ALL_ROADS = [...WEST_ROADS, ...EAST_ROADS, ...HARUNA_ROADS];
@@ -407,6 +419,9 @@ export function laneSpot(node, toward, back = 0, heading = null) {
   // 左 = (cos h, -sin h)
   return { x: n.x - f0 * back + Math.cos(h) * o, z: n.z - f1 * back - Math.sin(h) * o, h };
 }
+
+// 首都高5号 北池袋出口から川越街道（熊野町方面・左車線）に出る位置
+export function shutoExitSpot() { return { ...laneSpot('AXIA', 'K1', -45), area: 'west' }; }
 
 // エリアの開始位置
 export function areaStart(area) {

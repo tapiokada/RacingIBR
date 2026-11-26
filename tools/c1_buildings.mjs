@@ -1,5 +1,6 @@
 // 都心環状線（C1）沿いの建物の外形（国土地理院 基盤地図情報 建築物の外周線 BldL）をゲーム用に変換する
-// usage: node tools/c1_buildings.mjs <dataDir> src/data/c1.js src/data/c1_buildings.js
+// usage: node tools/c1_buildings.mjs <dataDir> src/data/c1.js src/data/c1_buildings.js [src/data/shuto5.js]
+//   shuto5.js を渡すと 5号池袋線・竹橋JCT連絡路の沿線も含める
 //   dataDir/fgd18/{x}_{y}.geojson : experimental_fgd z18（C1 の両側約300mの範囲）
 // 外周線はタイルの境界で切れているので、同じ fid の線分を端点でつないで閉じた輪にする。
 // 高さのデータはないので、種別（普通建物／堅ろう建物／無壁舎）と建築面積から推定（fid で決まる乱数で個体差）。
@@ -7,14 +8,16 @@
 import fs from 'fs';
 import path from 'path';
 
-const [dataDir, c1File, outFile] = process.argv.slice(2);
+const [dataDir, c1File, outFile, s5File] = process.argv.slice(2);
 const C1 = (await import(path.resolve(c1File))).default;
+const S5 = s5File ? (await import(path.resolve(s5File))).default : null;
 const [LAT0, LON0] = C1.origin, KX = Math.cos((LAT0 * Math.PI) / 180) * 111320, KZ = 110574;
 const toXZ = ([lo, la]) => [(lo - LON0) * KX, -(la - LAT0) * KZ];
 
 // 本線までの距離（格子で近傍の点を探す）
 const G = 80, grid = new Map();
-for (const k of ['outer', 'inner']) for (const p of C1[k].road) { const key = Math.floor(p[0] / G) * 7919 + Math.floor(p[1] / G); (grid.get(key) || grid.set(key, []).get(key)).push(p); }
+const ROADS = [C1.outer.road, C1.inner.road, ...(S5 ? ['U', 'D', 'UO', 'UI', 'DO', 'DI'].map((k) => S5[k].road) : [])];
+for (const r of ROADS) for (const p of r) { const key = Math.floor(p[0] / G) * 7919 + Math.floor(p[1] / G); (grid.get(key) || grid.set(key, []).get(key)).push(p); }
 const roadDist = (x, z) => { let bd = 1e9; const gx = Math.floor(x / G), gz = Math.floor(z / G); for (let a = -4; a <= 4; a++) for (let b = -4; b <= 4; b++) for (const p of grid.get((gx + a) * 7919 + gz + b) || []) bd = Math.min(bd, Math.hypot(p[0] - x, p[1] - z)); return bd; };
 
 // ---- 線分を fid ごとに集める ----

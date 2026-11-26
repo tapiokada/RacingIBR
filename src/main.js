@@ -4,6 +4,9 @@ import { TitleMode } from './modes/title.js';
 import { PracticeMode } from './modes/practice.js';
 import { TownMode } from './modes/town.js';
 import { TrackDayMode } from './modes/trackday.js';
+import { ShutoFreeMode } from './modes/shutofree.js';
+import * as CIRC from './physics/circuit.js';
+import { lanePose } from './modes/shutofree.js';
 import { TownFreeMode } from './modes/townfree.js';
 import { newGameState } from './save.js';
 import { BattleMode } from './modes/battle.js';
@@ -19,4 +22,4 @@ import { loadGlbCars } from './render/glbCars.js';
 const game = new Game(document.getElementById('app'));
 // 実車の3Dモデル（86-GR・Z-32）を読み込んでから開始（失敗時は簡易モデル）
 loadGlbCars().then(() => game.setMode(new TitleMode(game)));
-if (location.search.includes('debug')) { window.__dbg = { game, RaceAI }; window.__dbgMap = MAP; window.__dbgModes = { PracticeMode, TownMode, TownFreeMode, BattleMode, ReplayMode, TrackDayMode, newGameState, RIVAL_BY_ID }; window.__dbgTHREE = { Box3, Matrix4, Vector3 }; window.__dbgClear = courseClearance; window.__dbgStock = stockEquip; }
+if (location.search.includes('debug')) { window.__dbg = { game, RaceAI }; window.__dbgMap = MAP; window.__dbgModes = { PracticeMode, TownMode, TownFreeMode, ShutoFreeMode, BattleMode, ReplayMode, TrackDayMode, newGameState, RIVAL_BY_ID }; window.__dbgTHREE = { Box3, Matrix4, Vector3 }; window.__dbgClear = courseClearance; window.__dbgStock = stockEquip; window.__dbgCircuit = CIRC; window.__dbgLanePose = lanePose; }
