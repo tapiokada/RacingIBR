@@ -1,6 +1,6 @@
 // サーキットレース（8台出走）：クラス分けのレギュレーション、参加者の選び方、賞金、ライバルのタイムの見積もり
 import { ALL_RIVALS, RIVAL_BY_ID } from './rivals.js';
-import { CIRCUIT_LAYOUTS } from './map.js';
+import { STORY_CIRCUIT_LAYOUTS } from './map.js';
 import { REF_TIMES } from './reftimes.js';
 import { buildSpec } from '../physics/spec.js';
 
@@ -20,7 +20,7 @@ export const RACE_FORMAT = {
   fuji: { laps: 3, k: 1.35 },
 };
 export const SESSION_LEN = { practice: 15 * 60, qualify: 15 * 60 };
-export const RACE_LAYOUTS = CIRCUIT_LAYOUTS;
+export const RACE_LAYOUTS = STORY_CIRCUIT_LAYOUTS;
 
 // 参加費・賞金（クラス・サーキットの格で増える）
 const BASE_PRIZE = [400000, 250000, 180000, 130000, 100000, 80000, 60000, 50000];

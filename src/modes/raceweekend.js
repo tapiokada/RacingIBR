@@ -13,7 +13,7 @@ import { openSetup } from '../ui/setup.js';
 import { VIEW_NAMES } from '../render/cameras.js';
 import { LapTracker, pauseMenu } from './common.js';
 import { coursePath } from './town.js';
-import { areaOfLayout, CIRCUIT_LAYOUTS } from '../data/map.js';
+import { areaOfLayout, STORY_CIRCUIT_LAYOUTS } from '../data/map.js';
 import { CLASSES, classOfPwr, pwrOf, pickEntrants, raceMoney, RACE_FORMAT, SESSION_LEN, refLap, simSession } from '../data/races.js';
 
 const PHASE_NAME = { practice: 'プラクティス', qualify: '予選', race: '決勝' };
@@ -25,7 +25,7 @@ export function raceEntryItems(game, { returnPos, townMode, close, onCancel }) {
   const mine = activeCar(st);
   const pwr = pwrOf(mine.carId, mine.equipped, mine.setup);
   const cls = classOfPwr(pwr);
-  return CIRCUIT_LAYOUTS.map((L) => {
+  return STORY_CIRCUIT_LAYOUTS.map((L) => {
     const cid = L.course.circuit;
     const m = raceMoney(cls.id, cid);
     const rec = st.raceRecords?.[`${L.key}_${cls.id}`];

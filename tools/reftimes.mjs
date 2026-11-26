@@ -20,6 +20,7 @@ const t0 = Date.now();
 for (const L of LAYOUTS) {
   const area = areaOfLayout(L);
   if (ONLY === 'circuit' && !L.course.circuit) continue;
+  if (L.course.practiceOnly) continue; // C1 などの PRACTICE 専用コースはライバルが走らない
   if (L.course.circuit) { out[L.key] = circuitRef(L); console.log(L.key, JSON.stringify(out[L.key]), ((Date.now() - t0) / 1000).toFixed(0) + 's'); continue; }
   const path = getCoursePath(L);
   const total = path.open ? path.raceLen : path.length * L.course.laps;

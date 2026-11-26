@@ -7,6 +7,7 @@
 import TSUKUBA from '../data/tsukuba.js';
 import SUZUKA from '../data/suzuka.js';
 import FUJI from '../data/fuji.js';
+import C1 from '../data/c1.js';
 import { Corridor, CoursePath } from './track.js';
 
 // 路面の種類と摩擦係数倍率・転がり抵抗（荷重比）
@@ -304,7 +305,26 @@ export class CircuitPath {
   // サーキットはコース外が芝・グラベルで、はみ出すと立て直せないため、ブレーキングに余裕を持たせる
   speedProfile(spec, skill) {
     const v = CoursePath.prototype.speedProfile.call(this, { ...spec, brakeTorque: spec.brakeTorque * CIRCUIT_BRAKE_K }, skill);
-    for (let i = 0; i < v.length; i++) v[i] *= CIRCUIT_V_K;
+    // 首都高は両側が壁で余裕がないので、さらに控えめに
+    const VK = this.C.highway ? CIRCUIT_V_K * 0.94 : CIRCUIT_V_K;
+    for (let i = 0; i < v.length; i++) v[i] *= VK;
+    // 縦断の凸（クレスト）では荷重が抜けて横グリップが落ちる：有効な重力 g + v²κv（κv<0）
+    const n = this.n, mu = spec.mu * (0.74 + 0.2 * skill) * VK * VK;
+    let changed = false;
+    for (let i = 0; i < n; i++) {
+      const a = (i - 10 + n) % n, b = (i + 10) % n;
+      const sa = this.s[i] - this.s[a] || 20, sb = this.s[b] - this.s[i] || 20;
+      const ds1 = sa > 0 ? sa : sa + this.length, ds2 = sb > 0 ? sb : sb + this.length;
+      const kv = ((this.y[b] - this.y[i]) / ds2 - (this.y[i] - this.y[a]) / ds1) / ((ds1 + ds2) / 2);
+      if (kv >= 0) continue;
+      const k = Math.abs(this.curv[i]);
+      const vmax = Math.sqrt((mu * 9.81) / Math.max(1e-5, k + mu * -kv));
+      if (vmax < v[i]) { v[i] = vmax; changed = true; }
+    }
+    if (changed) {
+      const brakeA = mu * 9.81 * (0.62 + 0.25 * skill) * Math.min(1.25, (spec.brakeTorque * CIRCUIT_BRAKE_K) / (spec.mass * 3.4));
+      for (let pass = 0; pass < 2; pass++) for (let k = n - 1; k >= 0; k--) { const j = (k + 1) % n; v[k] = Math.min(v[k], Math.sqrt(v[j] * v[j] + 2 * brakeA * (this.lseg[k] || 2))); }
+    }
     return v;
   }
 
@@ -363,4 +383,47 @@ function buildCorners(C) {
   C.signs = list;
 }
 
-export const CIRCUITS = { tsukuba: buildCircuit('tsukuba', TSUKUBA), suzuka: buildCircuit('suzuka', SUZUKA), fuji: buildCircuit('fuji', FUJI) };
+// ---------------- 首都高速 都心環状線（C1）：外回り（時計回り）・内回り（反時計回り）の片側車線 ----------------
+// 幅員：2車線（3.25m×2）＋路肩0.75m。両側は壁（高架の剛性防護柵・掘割の擁壁・トンネルの側壁）
+export const C1_JCT = [
+  ['江戸橋JCT', 1946, -1272], ['京橋JCT', 1600, -250], ['汐留JCT', 760, 940], ['浜崎橋JCT', 480, 1950], ['一ノ橋JCT', -1620, 1760],
+  ['谷町JCT', -1520, 620], ['霞が関トンネル', -620, -330], ['三宅坂JCT', -995, -995], ['竹橋JCT', 100, -2100], ['神田橋JCT', 787, -1940],
+];
+export function buildHighway(id, D, side) {
+  const R = D[side].road, N = R.length;
+  const C = {
+    id, data: D[side], highway: true, side,
+    n: N, x: new Float64Array(N), z: new Float64Array(N), y: new Float64Array(N), hw: new Float64Array(N), s: new Float64Array(N),
+    tx: new Float64Array(N), tz: new Float64Array(N), curv: new Float64Array(N), kind: new Uint8Array(N), ground: new Float64Array(N),
+    runL: new Float64Array(N), runR: new Float64Array(N),
+    kerbL: new Uint8Array(N), kerbR: new Uint8Array(N), gravelL: new Uint8Array(N), gravelR: new Uint8Array(N),
+    pavedL: new Uint8Array(N).fill(1), pavedR: new Uint8Array(N).fill(1),
+  };
+  let acc = 0;
+  for (let i = 0; i < N; i++) {
+    C.x[i] = R[i][0]; C.z[i] = R[i][1]; C.y[i] = R[i][2]; C.kind[i] = R[i][3]; C.ground[i] = R[i][4];
+    C.hw[i] = 3.25; C.runL[i] = C.runR[i] = 0.75;
+    if (i > 0) acc += Math.hypot(C.x[i] - C.x[i - 1], C.z[i] - C.z[i - 1]);
+    C.s[i] = acc;
+  }
+  C.length = acc + Math.hypot(C.x[0] - C.x[N - 1], C.z[0] - C.z[N - 1]);
+  const w = (i) => ((i % N) + N) % N;
+  for (let i = 0; i < N; i++) {
+    const a = w(i - 1), b = w(i + 1), dx = C.x[b] - C.x[a], dz = C.z[b] - C.z[a], l = Math.hypot(dx, dz) || 1;
+    C.tx[i] = dx / l; C.tz[i] = dz / l;
+    const p = w(i - 5), q = w(i + 5);
+    const ax = C.x[i] - C.x[p], az = C.z[i] - C.z[p], bx = C.x[q] - C.x[i], bz = C.z[q] - C.z[i];
+    C.curv[i] = Math.atan2(ax * bz - az * bx, ax * bx + az * bz) / ((Math.hypot(ax, az) + Math.hypot(bx, bz)) / 2 || 1);
+  }
+  C.pitWall = [0, 0]; C.stand = [0, 0]; C.crossings = []; C.peaks = [];
+  C.terrain = decodeTerrain(D.terrain);
+  // JCT の看板位置（その車線で一番近い点）。セクターは全長の1/3・2/3
+  C.signs = C1_JCT.map(([name, x, z]) => { let bi = 0, bd = 1e18; for (let i = 0; i < N; i++) { const d = (C.x[i] - x) ** 2 + (C.z[i] - z) ** 2; if (d < bd) { bd = d; bi = i; } } return { name, s: C.s[bi], i: bi, right: false }; }).sort((a, b) => a.s - b.s);
+  C.sectorBounds = [C.length / 3, (C.length * 2) / 3];
+  return C;
+}
+
+export const CIRCUITS = {
+  tsukuba: buildCircuit('tsukuba', TSUKUBA), suzuka: buildCircuit('suzuka', SUZUKA), fuji: buildCircuit('fuji', FUJI),
+  c1_outer: buildHighway('c1_outer', C1, 'outer'), c1_inner: buildHighway('c1_inner', C1, 'inner'),
+};

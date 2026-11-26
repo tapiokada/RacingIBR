@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { DriveSession } from '../session.js';
 import { Hud } from '../ui/hud.js';
 import { el, Menu, panel } from '../ui/ui.js';
-import { NODES, AREAS, LAYOUTS, COURSES, TOUGE_LAYOUTS, HARUNA_UNLOCK_WINS, CIRCUIT_LAYOUTS, townRoadBetween, laneOffset, areaStart, arriveSpot } from '../data/map.js';
+import { NODES, AREAS, LAYOUTS, COURSES, TOUGE_LAYOUTS, HARUNA_UNLOCK_WINS, CIRCUIT_LAYOUTS, STORY_CIRCUIT_LAYOUTS, townRoadBetween, laneOffset, areaStart, arriveSpot } from '../data/map.js';
 import { TrackDayMode, SESSION_TIME } from './trackday.js';
 import { raceEntryItems } from './raceweekend.js';
 import { pauseMenu } from './common.js';
@@ -409,7 +409,7 @@ export class TownMode {
           pauseMenu(g, 'サーキットレース', [...raceEntryItems(g, { returnPos, townMode: TownMode, close: () => {}, onCancel: cancel }), { label: '戻る', action: cancel }], cancel);
         },
       },
-      ...CIRCUIT_LAYOUTS.map((L) => {
+      ...STORY_CIRCUIT_LAYOUTS.map((L) => {
         const best = st.trackday?.[L.key]?.best;
         const fee = L.course.fee, poor = st.money < fee;
         return {

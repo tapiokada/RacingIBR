@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { World } from './render/world.js';
 import { HarunaWorld } from './render/haruna.js';
 import { CircuitWorld } from './render/circuit.js';
+import { C1World } from './render/c1.js';
 import { AREAS } from './data/map.js';
 import { CameraRig } from './render/cameras.js';
 import { Input, loadSettings } from './input.js';
@@ -54,7 +55,7 @@ export class Game {
 
   // エリア（西池袋／東池袋）の3Dワールドを切り替える。初回は生成する
   setArea(area) {
-    if (!this.worlds[area]) this.worlds[area] = AREAS[area].touge ? new HarunaWorld(this.renderer, area) : AREAS[area].circuit ? new CircuitWorld(this.renderer, area) : new World(this.renderer, area);
+    if (!this.worlds[area]) this.worlds[area] = AREAS[area].touge ? new HarunaWorld(this.renderer, area) : AREAS[area].highway ? new C1World(this.renderer, area) : AREAS[area].circuit ? new CircuitWorld(this.renderer, area) : new World(this.renderer, area);
     this.world = this.worlds[area];
     this.area = area;
     return this.world;

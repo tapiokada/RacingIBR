@@ -28,14 +28,16 @@ for (const cr of CIRCUIT.crossings) {
   ground.refY = ya; const ha = ground.h(x, z); ground.refY = yb; const hb = ground.h(x, z); ground.refY = null;
   ok(Math.abs(ha - ya) < 0.5 && Math.abs(hb - yb) < 0.5 && Math.abs(ya - yb) > 6, `crossing levels ${ya.toFixed(1)}m / ${yb.toFixed(1)}m`);
 }
-ok(Math.abs(path.length - (CIRCUIT.data.official || 2045)) / path.length < 0.05, `length ${path.length.toFixed(0)}m（公表 ${CIRCUIT.data.official || 2045}m）`);
+const OFFICIAL = CIRCUIT.highway ? 14800 : CIRCUIT.data.official || 2045;
+ok(Math.abs(path.length - OFFICIAL) / path.length < (CIRCUIT.highway ? 0.1 : 0.05), `length ${path.length.toFixed(0)}m（公表 ${OFFICIAL}m）`);
+const LAPS = CIRCUIT.highway ? 1 : 3;
 const ids = process.argv.slice(2).length ? process.argv.slice(2) : ['86-GR', 'SWIFT-S', 'R34-GTR'];
 for (const id of ids) {
   const car = new Vehicle(buildSpec(id, CARS[id].stock, null), { auto: true, ground });
   const p = path.posAt(-30, 0); car.place(p.x, p.z, p.h, 0);
   const ai = new RaceAI(car, path, +(process.env.SKILL || 1.0), { mistakes: false });
   let t = 0, dist = -30, hint = -1, prevS = null, laps = [], lapT = null, hits = 0, maxOff = 0, offT = 0, vmax = 0;
-  while (t < 900 && laps.length < 3) {
+  while (t < 900 && laps.length < LAPS) {
     ai.update(dt); car.step(dt); if (resolveWalls(car, path.corridor) > 0) hits++; t += dt;
     const pr = path.project(car.x, car.z, hint); hint = pr.i;
     if (prevS != null) { let ds = pr.s - prevS; if (ds < -path.length / 2) ds += path.length; if (ds > path.length / 2) ds -= path.length; if (Math.abs(ds) < 30) dist += ds; }
@@ -47,6 +49,6 @@ for (const id of ids) {
   }
   const best = Math.min(...laps);
   console.log(`${id}: laps ${laps.map((x) => `${Math.floor(x / 60)}'${(x % 60).toFixed(2)}`).join(' ')}  wallhits ${hits}  maxOff ${maxOff.toFixed(1)}m  offTime ${offT.toFixed(1)}s  vmax ${(vmax * 3.6).toFixed(0)}`);
-  ok(laps.length === 3 && best > 50 && best < 300, `${id} completes 3 laps`);
+  ok(laps.length === LAPS && best > 50 && best < 600, `${id} completes ${LAPS} laps`);
 }
 process.exit(fail ? 1 : 0);
