@@ -35,7 +35,7 @@ export class TrackDayMode {
     // ホームストレートのグリッド後方からスタート（1周目はアウトラップ）
     const sp = path.posAt(-110, -2.5);
     P.car.place(sp.x, sp.z, sp.h, 0);
-    // 走行会は1枠15分を走り切れるように、燃料は実燃費どおりに減る（街・バトルは実燃費の10倍）
+    // 走行会は1枠15分を走り切れるように、燃料は実燃費どおりに減る（街・バトルは実燃費の5倍）
     P.car.fuelRate = 1;
     this.P = P;
     this.tracker = new LapTracker(path, -110);
