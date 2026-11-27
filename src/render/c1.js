@@ -3,6 +3,7 @@
 // 剛性防護柵（コンクリート壁）、遮音壁、道路照明、JCTの案内標識・速度標識、
 // 沿線の建物（国土地理院 基盤地図情報の外形から押し出し。高さは推定）、東京タワーのような電波塔（名称なし）
 import * as THREE from 'three';
+import { carveTerrain, meshHeight } from './carve.js';
 import { AREAS } from '../data/map.js';
 import { CIRCUITS, SHUTO5, CircuitGround, circuitCorridor, makeNet, terrainAt } from '../physics/circuit.js';
 import BLD from '../data/c1_buildings.js';
@@ -171,22 +172,11 @@ export class C1World {
       const v = 0.07 + r() * 0.03;
       col[k * 3] = v * 1.1; col[k * 3 + 1] = v; col[k * 3 + 2] = v * 0.95;
     }
-    // 地面より低い道路（掘割・トンネル）の上に地面がかぶらないように：
-    // 掘割は道路の周り（約16m）の地面を路面より下へ下げ、トンネルは地面を天井（路面＋5.6m）より上に保つ
+    // 地面より低い道路（掘割・トンネル・地盤より低い連絡路）の上に地面がかぶらないように削る（src/render/carve.js）
+    const CH = (this.carvedH = carveTerrain(T, this.lanes));
     let roadMin = 0;
-    for (const C of this.lanes) for (let i = 0; i < C.n; i++) {
-      roadMin = Math.min(roadMin, C.y[i]);
-      const kind = C.kind[i];
-      if (kind === 0 || i % 2) continue;
-      const ci = Math.round((C.x[i] - T.x0) / T.cell), cj = Math.round((C.z[i] - T.z0) / T.cell);
-      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
-        const gi = ci + di, gj = cj + dj; if (gi < 0 || gj < 0 || gi >= nx || gj >= nz) continue;
-        const k = gj * nx + gi, d = Math.hypot(pos[k * 3] - C.x[i], pos[k * 3 + 2] - C.z[i]);
-        if (d > 16) continue;
-        if (kind === 1) pos[k * 3 + 1] = Math.min(pos[k * 3 + 1], C.y[i] - 1.0);
-        else pos[k * 3 + 1] = Math.max(pos[k * 3 + 1], C.y[i] + 6.2);
-      }
-    }
+    for (const C of this.lanes) for (let i = 0; i < C.n; i++) roadMin = Math.min(roadMin, C.y[i]);
+    for (let k = 0; k < nx * nz; k++) pos[k * 3 + 1] = CH[k];
     const idx = new Uint32Array((nx - 1) * (nz - 1) * 6);
     let q = 0;
     for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) { const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1; idx[q++] = a; idx[q++] = c; idx[q++] = b; idx[q++] = b; idx[q++] = c; idx[q++] = d; }
@@ -362,14 +352,17 @@ export class C1World {
     const lowTex = canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#2a2a2c'; g.fillRect(0, 0, w, h); const r = rng(5); for (let k = 0; k < 6; k++) { g.fillStyle = r() < 0.5 ? '#c9a46a' : '#3a3d44'; g.fillRect(4 + (k % 3) * 20, 8 + Math.floor(k / 3) * 30, 12, 14); } });
     const chunks = new Map();
     const getChunk = (x, z, t) => { const key = `${Math.floor(x / 400)},${Math.floor(z / 400)},${t === 1 ? 1 : 0}`; let c = chunks.get(key); if (!c) chunks.set(key, (c = { pos: [], uv: [], idx: [], roof: [] })); return c; };
-    const T = this.C.terrain;
+    const T = this.C.terrain, T0 = this.terrain;
     let k = 0;
     while (k < n) {
       const t = I[k], h = I[k + 1] / 10, m = I[k + 2]; k += 3;
       const pts = [];
       for (let j = 0; j < m; j++) { pts.push([I[k] / 10, I[k + 1] / 10]); k += 2; }
       let cx = 0, cz = 0; for (const p of pts) { cx += p[0]; cz += p[1]; } cx /= m; cz /= m;
-      const gy = this.terrainY(cx, cz) - 0.3;
+      const top = this.terrainY(cx, cz) - 0.3;
+      // 下端は削った地面（掘割の周り）まで延ばす（建物が浮いて見えないように）。屋根の高さは元の地面から
+      let gy = top; for (const p of pts) gy = Math.min(gy, meshHeight(T0, this.carvedH, p[0], p[1]) - 0.2);
+      const hh = h + (top - gy);
       const c = getChunk(cx, cz, t);
       // 側面（u：周長[m]／v：高さ[m]、窓1つ＝約3m）
       let per = 0;
@@ -377,8 +370,8 @@ export class C1World {
         const a = pts[j], b = pts[(j + 1) % m];
         const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
         const v0 = c.pos.length / 3;
-        c.pos.push(a[0], gy, a[1], b[0], gy, b[1], b[0], gy + h, b[1], a[0], gy + h, a[1]);
-        const u0 = per / 3.2 / 16, u1 = (per + len) / 3.2 / 16, vt = h / 3.4 / 16;
+        c.pos.push(a[0], gy, a[1], b[0], gy, b[1], b[0], gy + hh, b[1], a[0], gy + hh, a[1]);
+        const u0 = per / 3.2 / 16, u1 = (per + len) / 3.2 / 16, vt = hh / 3.4 / 16;
         c.uv.push(u0, 0, u1, 0, u1, vt, u0, vt);
         c.idx.push(v0, v0 + 1, v0 + 2, v0, v0 + 2, v0 + 3);
         per += len;
@@ -388,7 +381,7 @@ export class C1World {
       let tris;
       try { tris = THREE.ShapeUtils.triangulateShape(contour, []); } catch { tris = []; }
       const v0 = c.pos.length / 3;
-      for (const p of pts) { c.pos.push(p[0], gy + h, p[1]); c.uv.push(0.01, 0.01); }
+      for (const p of pts) { c.pos.push(p[0], gy + hh, p[1]); c.uv.push(0.01, 0.01); }
       for (const tr of tris) c.idx.push(v0 + tr[0], v0 + tr[2], v0 + tr[1]);
     }
     const hiMat = new THREE.MeshLambertMaterial({ map: winTex, emissiveMap: winTex, emissive: 0xffffff, emissiveIntensity: 0.9, color: 0x9aa0aa });
