@@ -3,7 +3,7 @@
 // - 4輪を車体から分離（回転・操舵用に車輪中心を原点としたノード wheel_FL/FR/RL/RR）
 // - 透過（transmission）ガラスは半透明に置き換え（描画負荷対策）
 // - テクスチャを1024px WebPに縮小、メッシュをmeshopt圧縮
-// usage: node tools/car_model.mjs <gr86|z32|wrx|nd|supra|swift|s2k|brz|evo|r34|na1|na2|fc|fd|r33> <in.glb> <out.glb>
+// usage: node tools/car_model.mjs <gr86|z32|wrx|nd|supra|swift|s2k|brz|evo|r34|na1|na2|fc|fd|r33|r32> <in.glb> <out.glb>
 import { NodeIO, getBounds } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTMeshoptCompression } from '@gltf-transform/extensions';
 import { dedup, prune, weld, textureCompress, meshopt, reorder, simplify } from '@gltf-transform/functions';
@@ -102,6 +102,12 @@ const CONFIGS = {
     wheels: [{ name: 'wheel_FL', p: [2.547, 1.15, 4.5995] }, { name: 'wheel_FR', p: [-2.547, 1.15, 4.5995] }, { name: 'wheel_RL', p: [2.547, 1.15, -3.9355] }, { name: 'wheel_RR', p: [-2.547, 1.15, -3.9355] }],
     side: (x, y, z) => x, along: (x, y, z) => [z, y],
   },
+  // "1989 Nissan Skyline GT-R (R32)" by Ddiaz Design (CC BY-NC-SA 4.0)：Y-up・前が+z・左が+x・縮尺約1/200。
+  // 車輪はノード名（Ani_Wheel_Scale_FL/FR・Ani_Wheel_BL/BR。キャリパーは車体側）。ボンネットの中のエンジン（約5.7万ポリゴン）は使わない
+  r32: {
+    world: true, map: (x, y, z) => [x, y, z], wb: 2.615, ground: 0, wheelRe: [/Ani_Wheel_Scale_FL/, /Ani_Wheel_Scale_FR/, /Ani_Wheel_BL/, /Ani_Wheel_BR/], wheelCenter: /Tyre/,
+    drop: /SM_Engine_/, simplify: 0.3, simplifyError: 0.002,
+  },
   // "Nissan Skyline GTR r33" by Black Snow (CC BY 4.0)：Y-up・前が+z・左が+x。約29万ポリゴン（間引く）
   r33: {
     world: true, map: (x, y, z) => [x, y, z], wb: 2.72, cut: 0.262, inner: 0.62, ground: 0.107, simplify: 0.25, simplifyError: 0.003,
@@ -168,7 +174,7 @@ let tris = 0, wtris = 0;
 // 処理単位：world=true ならメッシュを持つノードごと（ワールド行列と車輪の所属を付ける）、そうでなければメッシュごと
 const isAnc = (anc, n) => { for (let p = n; p; p = p.getParentNode()) if (p === anc) return true; return false; };
 const items = C.world
-  ? root.listNodes().filter((n) => n.getMesh()).map((n) => ({ mesh: n.getMesh(), M: n.getWorldMatrix(), wheel: C.wheelRe ? C.wheelRe.findIndex((re) => re.test(n.getName())) : C.wheelNodes ? C.wheels.findIndex((w) => isAnc(w.node, n)) : C.noWheel && C.noWheel.test(n.getName()) ? -1 : null }))
+  ? root.listNodes().filter((n) => n.getMesh() && !(C.drop && C.drop.test(n.getName()))).map((n) => ({ mesh: n.getMesh(), M: n.getWorldMatrix(), wheel: C.wheelRe ? C.wheelRe.findIndex((re) => re.test(n.getName())) : C.wheelNodes ? C.wheels.findIndex((w) => isAnc(w.node, n)) : C.noWheel && C.noWheel.test(n.getName()) ? -1 : null }))
   : root.listMeshes().map((mesh) => ({ mesh, M: null, wheel: null }));
 const xf = (M, v, dir) => {
   if (!M) return v;

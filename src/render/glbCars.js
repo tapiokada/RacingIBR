@@ -14,6 +14,7 @@
 //  RX7-FC："1990 Mazda RX-7 Savanna Infini III FC3S" by Galaxy Car Showroom（Sketchfab, CC BY 4.0）
 //  RX7-FD："1999 Mazda RX-7 FD" by OUTPISTON（Sketchfab, CC BY-NC-SA 4.0 — 非営利・継承）
 //  R33-GTR："Nissan Skyline GTR r33" by Black Snow（Sketchfab, CC BY 4.0）
+//  R32-GTR："1989 Nissan Skyline GT-R (R32)" by Ddiaz Design（Sketchfab, CC BY-NC-SA 4.0 — 非営利・継承）
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
@@ -32,6 +33,7 @@ import NA2 from '../../assets/models/na2.glb';
 import FC from '../../assets/models/fc.glb';
 import FD from '../../assets/models/fd.glb';
 import R33 from '../../assets/models/r33.glb';
+import R32 from '../../assets/models/r32.glb';
 
 // paint: 塗装色を置き換えるマテリアル名、head/tail: ヘッドライト・テールランプのマテリアル名
 // glass: 不透明で作られている窓ガラスのマテリアル名（半透明にする）
@@ -97,6 +99,11 @@ export const GLB_CARS = {
     data: R33, paint: /^body$/, head: /(?!)/, tail: /^rl33$|^rr33$/, driverX: -0.37, belt: 0.7, wsBase: 0.8, wingY: 0.95,
     credit: 'R33-GTRの3Dモデル："Nissan Skyline GTR r33" by Black Snow (Sketchfab) — CC BY 4.0',
   },
+  'R32-GTR': {
+    data: R32, paint: /^R32MI_1221010001_004$/, finish: { metalness: 0.45, roughness: 0.32 }, // 元は鏡のような金属（metalness 1）
+    head: /(?!)/, tail: /(?!)/, driverX: -0.37, belt: 0.72, wsBase: 0.82, wingY: 0.95,
+    credit: 'R32-GTRの3Dモデル："1989 Nissan Skyline GT-R (R32)" by Ddiaz Design (Sketchfab) — CC BY-NC-SA 4.0（非営利・継承）',
+  },
 };
 export const GLB_CREDITS = Object.values(GLB_CARS).map((c) => c.credit);
 const templates = {};
@@ -136,7 +143,7 @@ export function buildGlbCarModel(carDef, color, opts = {}) {
     if (!matCache.has(m)) {
       const c = m.clone();
       const n = m.name || '';
-      if (cfg.paint.test(n)) c.color.copy(paint); // ボディ塗装
+      if (cfg.paint.test(n)) { c.color.copy(paint); if (cfg.finish) Object.assign(c, cfg.finish); } // ボディ塗装（finish：金属感・つやの上書き）
       if (cfg.glass && cfg.glass.test(n)) { c.color.set(0x0c1016); c.transparent = true; c.opacity = 0.35; c.depthWrite = false; c.metalness = 0.2; c.roughness = 0.05; } // 不透明で作られた窓ガラス
       if (cfg.head.test(n)) { c.emissive = new THREE.Color(0xfff2cc); c.emissiveIntensity = 1.4; c.emissiveMap = c.map; lightsFront.push({ material: c }); }
       // テールランプ（レンズ）：ブレーキで明るく

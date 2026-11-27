@@ -114,7 +114,7 @@ npx esbuild --servedir=. --serve=8080   # http://localhost:8080
 | R32-GTR | ニッサン スカイラインGT-R（BNR32 5MT）RB26DETT | 280PS/6800rpm・353N·m/4400rpm | 1430kg | AWD |
 | R33-GTR | ニッサン スカイラインGT-R Vスペック（BCNR33 5MT）RB26DETT | 280PS/6800rpm・368N·m/4400rpm | 1540kg | AWD |
 
-RX-7（FD/FC）・NSX（NA1/NA2）・スカイラインGT-R（R33）は実車の3Dモデル（下の「出典」）、R32-GTR の外観はまだ手続き的に作った仮のモデルです。NSX はミッドシップ（前後重量配分 42:58・ヨー慣性小さめ）の後輪駆動として計算しています。
+RX-7（FD/FC）・NSX（NA1/NA2）・スカイラインGT-R（R32/R33）は実車の3Dモデルです（下の「出典」）。NSX はミッドシップ（前後重量配分 42:58・ヨー慣性小さめ）の後輪駆動として計算しています。
 
 寸法・ホイールベース・トレッド・ギア比・ファイナル・タイヤサイズは公表値。**推定値**：重心高、Cd（スープラ以外）、前面投影面積、ブレーキ容量、ヨー慣性、ZC33Sのファイナル比（3.944）、各ターボ車の「過給前トルクカーブ」（純正タービン装着時に公表値になるよう逆算）。
 
@@ -361,6 +361,7 @@ tools/                 物理・AI・ブラウザのテストスクリプト、�
 - **RX7-FC の3Dモデル**："1990 Mazda RX-7 Savanna Infini III FC3S" by Galaxy Car Showroom（https://sketchfab.com/3d-models/1990-mazda-rx-7-savanna-infini-iii-fc3s-24326358102f4c09b331a8839b370d1d）、CC BY 4.0。ゲーム用に縮尺（約1/4・ホイールベース2430mm）・向きと原点の補正・位置による4輪の分離・テクスチャ縮小・メッシュ圧縮（`tools/car_model.mjs fc`）。
 - **RX7-FD の3Dモデル**："1999 Mazda RX-7 FD" by OUTPISTON（https://sketchfab.com/3d-models/1999-mazda-rx-7-fd-6ea4245c67c1438189fe37ca91516d78）、ライセンス **CC BY-NC-SA 4.0**＝**非営利利用のみ・改変物（`assets/models/fd.glb`）も同ライセンス**。ゲーム用に縮尺（約0.28倍・ホイールベース2425mm）・位置による4輪の分離、約65万ポリゴンを約11万に間引き（タイヤは頂点を共有しない三角形の集まりなので、頂点をまとめて法線を作り直してから間引く）、メッシュ圧縮（`tools/car_model.mjs fd`）。リトラクタブルライトは上げた状態。
 - **R33-GTR の3Dモデル**："Nissan Skyline GTR r33" by Black Snow（https://sketchfab.com/3d-models/nissan-skyline-gtr-r33-6df98cc48f5a4c3192950e5a91e74b96）、CC BY 4.0。ゲーム用に縮尺（ホイールベース2720mm）・位置による4輪の分離・約29万ポリゴンを約14万に間引き・テクスチャ縮小・メッシュ圧縮（`tools/car_model.mjs r33`）。エアロ付きの外観。
+- **R32-GTR の3Dモデル**："1989 Nissan Skyline GT-R (R32)" by Ddiaz Design（https://sketchfab.com/3d-models/1989-nissan-skyline-gt-r-r32-ba48a6529b8e47eeb43a6e19c227abfd）、ライセンス **CC BY-NC-SA 4.0**＝**非営利利用のみ・改変物（`assets/models/r32.glb`）も同ライセンス**。ゲーム用に縮尺（約100倍・ホイールベース2615mm）・部品名による4輪の分離（キャリパーは車体側）、ボンネット内のエンジン（約5.7万ポリゴン）を除いて約35万ポリゴンを約10万に間引き、テクスチャ縮小・メッシュ圧縮（`tools/car_model.mjs r32`）。塗装は元の鏡のような金属感を通常のメタリックに調整。
 
 
 榛名山の道路・標高データは、国土地理院のベクトルタイル（道路中心線）および基盤地図情報 数値標高モデル（5mメッシュ）を加工して作成しました（国土地理院コンテンツ利用規約に基づく）。
