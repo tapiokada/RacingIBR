@@ -515,7 +515,9 @@ export class ShutoFreeMode {
     const name = this.cur ? LANE_NAME[this.cur.lane] || '' : '';
     if (story) {
       this.hud.tl.innerHTML = `<div class="who">${PLAYER.name}　<span>${CARS[this.P.carId].name}</span></div><div>${name}</div><div>所持金 <b>${fmtMoney(st.money)}</b></div><div>戦績 <b>${st.wins}</b>勝 ${st.losses}敗</div>`;
-      if (this.bt && this.bt.phase === 'race') this.hud.tr.innerHTML = this.gaugeHtml();
+      // バトル中だけ SP ゲージを表示（終わったら消す）
+      const tr = this.bt && this.bt.phase === 'race' ? this.gaugeHtml() : '';
+      if (this.hud.tr.innerHTML !== tr) this.hud.tr.innerHTML = tr;
     } else this.hud.tl.innerHTML = `<div class="who">${name}</div><div class="hint">FREE RUN（首都高）　R:リセット　Esc:メニュー</div>`;
     this.hud.mapZoom = this.bt ? 500 : 1200; this.hud.mapCenter = { x: this.P.car.x, z: this.P.car.z };
     const st2 = story ? st : null;

@@ -103,12 +103,27 @@ export class C1World {
   }
 
   // 点 p（車線 C の i 番目の点から lat の位置）が、別の車線の路面（＋0.3m）の上か
-  onOther(C, p) {
+  // 合流・分岐でつながる車線の組（並んでいる間は向かい合う側の壁を作らない）。外回りと内回り、5号の上りと下りは別の道路なので含めない
+  static PARTNERS = {
+    c1_outer: ['s5_UO', 's5_DO'], c1_inner: ['s5_UI', 's5_DI'],
+    s5_U: ['s5_UO', 's5_UI'], s5_D: ['s5_DO', 's5_DI'],
+    s5_UO: ['c1_outer', 's5_U', 's5_UI'], s5_UI: ['c1_inner', 's5_U', 's5_UO'],
+    s5_DO: ['c1_outer', 's5_D', 's5_DI'], s5_DI: ['c1_inner', 's5_D', 's5_DO'],
+  };
+  onPartner(C, p, tol) {
+    const q = this.allGround.nearest(p.x, p.z, p.y);
+    if (!q) return false;
+    const L = this.all.lanes[this.all.laneOf[q.i]];
+    if (L === C || !(C1World.PARTNERS[C.id] || []).includes(L.id)) return false;
+    return Math.abs(q.lat) < this.all.hw[q.i] + 0.75 && Math.abs(this.all.y[q.i] - p.y) < tol;
+  }
+
+  onOther(C, p, tol = 3) {
     const q = this.allGround.nearest(p.x, p.z, p.y);
     if (!q) return false;
     const L = this.all.lanes[this.all.laneOf[q.i]];
     if (L === C) return false;
-    return Math.abs(q.lat) < this.all.hw[q.i] + 0.75 && Math.abs(this.all.y[q.i] - p.y) < 3;
+    return Math.abs(q.lat) < this.all.hw[q.i] + 0.75 && Math.abs(this.all.y[q.i] - p.y) < tol;
   }
 
   build() {
@@ -190,17 +205,28 @@ export class C1World {
     const ci = (i) => (C.open ? Math.max(0, Math.min(N - 1, i)) : ((i % N) + N) % N);
     const HF = (i) => C.hw[ci(i)] + 0.75; // 路面の半幅（車線＋路肩）
     const WL = (i) => HF(i) + 0.15; // 防護柵の位置
-    const other = (i, lat) => this.onOther(C, P(C, i, lat, 0)); // 別の車線の路面の上（合流・分岐部）には壁を作らない
+    const other0 = (i, lat) => this.onOther(C, P(C, i, lat, 0)); // 別の車線の路面の上（合流・分岐部）には壁を作らない
+    // 合流・分岐で並ぶ別の車線（路面の端どうしのすき間 4m 以内・高さの差 1.5m 以内）がある側：
+    // 向かい合う側の壁・外側線は作らず、路面をすき間まで広げてつなぐ（壁が途切れ途切れに残ったり、白線が交差したりしないように）
+    const gapRaw = [new Float32Array(N).fill(-1), new Float32Array(N).fill(-1)];
+    for (let i = 0; i < N; i++) for (const [k, side] of [[0, -1], [1, 1]]) {
+      for (let d = 0; d <= 4; d += 0.5) if (this.onPartner(C, P(C, i, side * (C.hw[i] + 0.75 + d), 0), 1.5)) { gapRaw[k][i] = d; break; }
+    }
+    // 前後3点（約6m）に広げて、細切れの壁が残らないようにする
+    const gap = gapRaw.map((g) => g.map((_, i) => { let m = -1; for (let k = -3; k <= 3; k++) { const v = g[ci(i + k)]; if (v >= 0) m = Math.max(m, v); } return m; }));
+    const open = (i, side) => gap[side < 0 ? 0 : 1][ci(i)] >= 0;
+    const ext = (i, side) => (open(i, side) ? gap[side < 0 ? 0 : 1][ci(i)] + 0.3 : 0);
+    const other = (i, lat) => other0(i, lat) || open(i, Math.sign(lat));
     const kindAt = (i) => C.kind[((i % N) + N) % N];
     const isV = (i) => kindAt(i) === 0, isT = (i) => kindAt(i) === 2, isTr = (i) => kindAt(i) === 1;
     // 路面
     const road = new Builder();
-    road.strip(C, (i) => { const a = P(C, i, -HF(i), 0.02), b = P(C, i, HF(i), 0.02); return { a: [a.x, a.y, a.z], b: [b.x, b.y, b.z], u: 1.6 }; }, 0.08);
+    road.strip(C, (i) => { const a = P(C, i, -HF(i) - ext(i, -1), 0.02), b = P(C, i, HF(i) + ext(i, 1), 0.02); return { a: [a.x, a.y, a.z], b: [b.x, b.y, b.z], u: 1.6 }; }, 0.08);
     const asp = asphaltTex();
     S.add(road.mesh(new THREE.MeshStandardMaterial({ map: asp, color: 0x6d7078, roughness: 0.85, metalness: 0.05 })));
     // 区画線：外側線（実線）・車線境界線（破線）
     const lines = new Builder();
-    for (const sd of [-1, 1]) lines.strip(C, (i) => { const lat = sd * (HF(i) - 0.65); const a = P(C, i, lat - 0.08, 0.04), b = P(C, i, lat + 0.08, 0.04); return { a: [a.x, a.y, a.z], b: [b.x, b.y, b.z] }; });
+    for (const sd of [-1, 1]) lines.strip(C, (i) => { if (open(i, sd)) return null; const lat = sd * (HF(i) - 0.65); const a = P(C, i, lat - 0.08, 0.04), b = P(C, i, lat + 0.08, 0.04); return { a: [a.x, a.y, a.z], b: [b.x, b.y, b.z] }; });
     lines.strip(C, (i) => { if (Math.floor(C.s[i] / 6) % 3 !== 0 || C.hw[i] < 3) return null; const a = P(C, i, -0.08, 0.04), b = P(C, i, 0.08, 0.04); return { a: [a.x, a.y, a.z], b: [b.x, b.y, b.z] }; });
     S.add(lines.mesh(new THREE.MeshBasicMaterial({ color: 0xd8d8d0 })));
     // 照明の光だまり（路面に薄いオレンジ）
