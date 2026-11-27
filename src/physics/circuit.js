@@ -532,6 +532,6 @@ export function lanePose(C, s) {
   while (lo < hi) { const m = (lo + hi + 1) >> 1; if (C.s[m] <= s) lo = m; else hi = m - 1; }
   const j = C.open ? Math.min(C.n - 1, lo + 1) : (lo + 1) % C.n;
   const seg = (j === 0 ? C.length : C.s[j]) - C.s[lo], t = seg > 0 ? (s - C.s[lo]) / seg : 0;
-  return { x: C.x[lo] + (C.x[j] - C.x[lo]) * t, z: C.z[lo] + (C.z[j] - C.z[lo]) * t, h: Math.atan2(C.tx[lo], C.tz[lo]) };
+  return { x: C.x[lo] + (C.x[j] - C.x[lo]) * t, z: C.z[lo] + (C.z[j] - C.z[lo]) * t, h: Math.atan2(C.tx[lo], C.tz[lo]), y: C.y ? C.y[lo] + (C.y[j] - C.y[lo]) * t : null };
 }
 

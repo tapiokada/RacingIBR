@@ -32,6 +32,7 @@ export class Vehicle {
     this.x = 0; this.z = 0; this.h = 0;
     this.vu = 0; this.vv = 0; this.w = 0;
     this.steer = 0;
+    this.draft = 0; // スリップストリーム（前の車の後流）：空気抵抗の減少率 0〜（session.js が毎フレーム決める）
     this.rpm = spec.idle; this.gear = 1;
     this.shiftTimer = 0; this.boost = 0;
     this.axF = 0; this.ayF = 0;
@@ -145,8 +146,10 @@ export class Vehicle {
     this.heave = this.y - this.gy;
   }
 
-  place(x, z, h, speed = 0) {
+  // y：置く路面の高さの目安（立体交差でどの高さの路面に置くかを選ぶ。省略すると今の高さに近い路面）
+  place(x, z, h, speed = 0, y = null) {
     this.x = x; this.z = z; this.h = h;
+    if (y != null) this.y = y;
     this.vu = speed; this.vv = 0; this.w = 0;
     const R = this.spec.tireRadius;
     this.om.fill(speed / R);
@@ -298,8 +301,10 @@ export class Vehicle {
     this.sampleRoad(yr);
     const v2 = this.vu * this.vu;
     const q = 0.5 * RHO * v2;
-    const dfF = q * s.area * s.clF;
-    const dfR = q * s.area * s.clR;
+    // 後流の中ではダウンフォースも少し抜ける（乱れた空気）
+    const wake = 1 - 0.35 * (this.draft || 0);
+    const dfF = q * s.area * s.clF * (s.clF < 0 ? wake : 1);
+    const dfR = q * s.area * s.clR * (s.clR < 0 ? wake : 1);
     const loads = this.wheelLoads;
     const W = this.m * G;
     let sumN = 0;
@@ -539,7 +544,7 @@ export class Vehicle {
     const sV = ((yr[1] - yr[0]) / s.trackF + (yr[3] - yr[2]) / s.trackR) / 2; // 右上がり正
     Fu -= sumN * sU;
     Fv -= sumN * sV;
-    const dragF = 0.5 * RHO * s.cd * s.area * speed * speed;
+    const dragF = 0.5 * RHO * s.cd * s.area * speed * speed * (1 - (this.draft || 0)); // スリップストリームで減る
     if (speed > 0.01) {
       Fu -= (dragF * this.vu) / speed;
       Fv -= (dragF * this.vv) / speed;

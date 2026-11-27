@@ -5,6 +5,7 @@ import { getCoursePath, resolveWalls } from '../src/physics/track.js';
 import { CircuitGround, CIRCUITS } from '../src/physics/circuit.js';
 import { buildSpec } from '../src/physics/spec.js';
 import { Vehicle, collideCars } from '../src/physics/vehicle.js';
+import { updateDraft } from '../src/physics/draft.js';
 import { RaceAI } from '../src/ai.js';
 import { RIVAL_BY_ID } from '../src/data/rivals.js';
 import { pickEntrants, RACE_FORMAT, refLap, simSession } from '../src/data/races.js';
@@ -29,6 +30,7 @@ let t = 0, contacts = 0;
 const pairs = new Set();
 while (t < 1200 && cars.some((c) => c.fin == null)) {
   for (const c of cars) c.ai.update(dt * 1, cars.filter((x) => x !== c).map((x) => x.car));
+  updateDraft(cars.map((c) => c.car), dt); // スリップストリーム
   for (let k = 0; k < 1; k++) {
     for (const c of cars) { c.car.step(dt); if (resolveWalls(c.car, path.corridor) > 0) c.hits++; }
     for (let i = 0; i < cars.length; i++) for (let j = i + 1; j < cars.length; j++) {

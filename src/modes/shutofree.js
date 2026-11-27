@@ -71,7 +71,7 @@ export class ShutoFreeMode {
       g.story.area = 'west'; // 首都高の上ではセーブしない（タイトルから続けると西池袋から）
     } else this.P = this.session.addCar({ carId: o.carId, equipped: o.equipped, setup: o.setup || null, color: o.color, isPlayer: true });
     const p = o.pose;
-    this.P.car.place(p.x, p.z, p.h, o.speed || 0);
+    this.P.car.place(p.x, p.z, p.h, o.speed || 0, p.y ?? null);
     if (this.path) {
       const pr = this.path.project(p.x, p.z, -1);
       // スタートラインの手前から始まる＝すぐ計測。途中から入ったときは次にラインを通過してから
@@ -140,11 +140,13 @@ export class ShutoFreeMode {
     for (let tries = 0; tries < 20; tries++) {
       const ahead = Math.random() < 0.65;
       const ds = (ahead ? 1 : -1) * (initial ? 220 + Math.random() * 450 : 380 + Math.random() * 300);
-      const pos = path.posAt(ps + ds, (Math.random() - 0.5) * 3);
+      const lat = (Math.random() - 0.5) * 3;
+      const lp = lanePose(path.C, ps + ds); // 路面の高さ（立体交差で別の高さの道に置かない）
+      const pos = { x: lp.x + Math.cos(lp.h) * lat, z: lp.z - Math.sin(lp.h) * lat, h: lp.h, y: lp.y };
       if (s.entries.some((e) => Math.hypot(e.car.x - pos.x, e.car.z - pos.z) < 40)) continue;
       const cruise = (CRUISE[0] + Math.random() * (CRUISE[1] - CRUISE[0])) / 3.6;
       const e = s.addCar({ carId: r.car, equipped: r.parts, setup: r.setup || null, color: r.color, name: r.name });
-      e.car.place(pos.x, pos.z, pos.h, cruise);
+      e.car.place(pos.x, pos.z, pos.h, cruise, pos.y);
       e.ai = new RaceAI(e.car, path, r.skill, { margin: r.margin, vmax: cruise });
       e.cruise = cruise; e.rival = r; e.cool = 0;
       e.rating = buildSpec(r.car, r.parts, r.setup || null).rating;
@@ -333,7 +335,7 @@ export class ShutoFreeMode {
     const w = this.where();
     if (!w) return;
     this.cur = w;
-    const car = this.P.car, pose = { x: car.x, z: car.z, h: car.h };
+    const car = this.P.car, pose = { x: car.x, z: car.z, h: car.h, y: car.y };
     if (this.area === 'shuto5') {
       // 竹橋JCT：連絡路の終わりの区間（C1 エリアで走れる部分）に入ったら C1 へ
       if ((w.lane === 'UO' || w.lane === 'UI') && w.s > w.C.length - C1_LINK_LEN + 30) {
@@ -434,7 +436,7 @@ export class ShutoFreeMode {
       ], () => { this.paused = false; });
       return;
     }
-    const c1Start = (lane) => { const p = getCoursePath(LAYOUTS.find((l) => l.key === lane)).posAt(-8, 0); return { x: p.x, z: p.z, h: p.h }; };
+    const c1Start = (lane) => lanePose(getCoursePath(LAYOUTS.find((l) => l.key === lane)).C, -8);
     pauseMenu(g, 'PAUSE', [
       { label: '再開', action: () => { this.paused = false; } },
       { label: 'セッティング', sub: '足回り・ブレーキ・ギア比・LSD・ダウンフォースの調整とパワー/トルク曲線', action: () => this.openSetting() },

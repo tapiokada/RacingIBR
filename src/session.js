@@ -1,3 +1,4 @@
+import { updateDraft } from './physics/draft.js';
 // 走行セッション：車両・物理・カメラ・音の管理
 import { Vehicle, collideCars } from './physics/vehicle.js';
 import { resolveWalls } from './physics/track.js';
@@ -92,7 +93,8 @@ export class DriveSession {
     const car = this.player.car;
     let x, z, h;
     const rp = this.resetPose && this.resetPose(back); // モードが決める向き（首都高：車線の進行方向。逆走にしない）
-    if (rp) { x = rp.x; z = rp.z; h = rp.h; }
+    let y = null;
+    if (rp) { x = rp.x; z = rp.z; h = rp.h; y = rp.y ?? null; }
     else if (this.path) {
       const pr = this.path.project(car.x, car.z, -1);
       const p = this.path.posAt(pr.s + back, 0);
@@ -110,7 +112,7 @@ export class DriveSession {
       const sgn = best.dx * f0 + best.dz * f1 >= 0 ? 1 : -1;
       x = best.px; z = best.pz; h = Math.atan2(best.dx * sgn, best.dz * sgn);
     }
-    car.place(x, z, h, 0);
+    car.place(x, z, h, 0, y);
     car.input = { throttle: 0, brake: 0, steer: 0 };
     car.steer = 0;
     car.gear = 1;
@@ -126,6 +128,7 @@ export class DriveSession {
     }
     const others = (e) => this.entries.filter((x) => x !== e).map((x) => x.car);
     for (const e of this.entries) if (e.ai && !this.frozen) e.ai.update(dt, others(e));
+    updateDraft(this.entries.map((e) => e.car), dt);
     this.acc += Math.min(dt, 0.05);
     let n = 0;
     while (this.acc >= PHYS_DT && n < 40) {
@@ -187,3 +190,4 @@ export class Recorder {
     return { ...meta, rate: this.rate, stride: REPLAY_STRIDE, frames: this.frames, data: new Float32Array(this.buf) };
   }
 }
+

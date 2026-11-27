@@ -99,6 +99,18 @@ export class Hud {
     if ((car.tcsCut || 0) > 0.05 && car.input.throttle > 0.05) tags.push(['TCS', '#ffb020']);
     if ((car.assistCut || 0) > 0.05) tags.push(['ASSIST', '#33e1ff']);
     if ((car.input?.handbrake || 0) > 0.3) tags.push(['HAND', '#ff4d6d']);
+    // スリップストリーム（後流に入っている間）
+    if ((car.draft || 0) > 0.06) {
+      const k = Math.min(1, car.draft / 0.42);
+      const x0 = 8, y0 = car.fuel ? 50 : 22; // 回転計の弧の外（燃料計の下）
+      c.font = 'bold 13px "Orbitron","Segoe UI",sans-serif'; c.textAlign = 'left';
+      c.fillStyle = `rgba(120,255,170,${0.55 + 0.45 * k})`;
+      c.shadowColor = '#3ddc6a'; c.shadowBlur = 8 * k;
+      c.fillText('SLIPSTREAM', x0, y0);
+      c.shadowBlur = 0;
+      c.fillStyle = 'rgba(255,255,255,0.15)'; c.fillRect(x0, y0 + 5, 80, 5);
+      c.fillStyle = '#3ddc6a'; c.fillRect(x0, y0 + 5, 80 * k, 5);
+    }
     c.font = 'bold 11px sans-serif'; c.textAlign = 'left';
     tags.forEach(([t, col], i) => { c.fillStyle = col; c.fillText(t, cx - 110 + i * 46, cy - 64); });
   }
