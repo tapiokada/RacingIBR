@@ -8,7 +8,7 @@ import { el, Menu, panel } from '../ui/ui.js';
 import { RaceAI } from '../ai.js';
 import { CARS, PLAYER } from '../data/cars.js';
 import { RIVAL_BY_ID } from '../data/rivals.js';
-import { activeCar, fuelState, fmtMoney, fmtTime } from '../save.js';
+import { activeCar, fuelState, fmtMoney, fmtTime, recordCircuitLap } from '../save.js';
 import { openSetup } from '../ui/setup.js';
 import { VIEW_NAMES } from '../render/cameras.js';
 import { LapTracker, pauseMenu } from './common.js';
@@ -214,7 +214,7 @@ export class RaceWeekendMode {
       if (ev && ev.type === 'lap') {
         // チェッカー後に始めた周は数えない
         const startT = this.t - ev.time;
-        if (this.endT == null || startT <= this.endT) o.laps.push(ev.time);
+        if (this.endT == null || startT <= this.endT) { o.laps.push(ev.time); if (e === this.P) recordCircuitLap(this.game.story, this.wk.layout.key, ev.time, this.mine, this.phase, this.P.car.spec.pwr); }
         if (e === this.P) { this.hud.flash(fmtTime(ev.time), 1.8, ev.time === Math.min(...o.laps) ? 'BEST LAP' : `LAP ${o.laps.length}`); if (this.state === 'checker') this.endTimed(false); }
         else if (this.endT != null) tr.started = false; // ライバルもチェッカーで終了
       }
@@ -317,6 +317,7 @@ export class RaceWeekendMode {
       const ev = o.tr.update(e.car, this.raceT);
       if (ev && ev.type === 'lap' && this.state !== 'grid') {
         o.laps.push(ev.time);
+        if (e === this.P && o.finish == null) recordCircuitLap(this.game.story, this.wk.layout.key, ev.time, this.mine, 'race', this.P.car.spec.pwr);
         if (o.finish == null && o.tr.lap >= this.laps) {
           o.finish = this.raceT;
           if (e === this.P) this.playerFinished();

@@ -138,3 +138,13 @@ export function fmtTime(t) {
 }
 
 export function fmtMoney(v) { return '¥' + Math.round(v).toLocaleString('ja-JP'); }
+
+// サーキット（筑波・鈴鹿・富士）の自己ベストラップ（ガレージのタイムランキング用）
+// src: 'trackday'（走行会）／'practice'・'qualify'・'race'（サーキットレース）。pwr はその時の車のパワーウェイトレシオ（クラス表示）
+export function recordCircuitLap(st, key, time, car, src, pwr) {
+  st.circuitLaps ||= {};
+  const prev = st.circuitLaps[key];
+  if (prev && prev.time <= time) return false;
+  st.circuitLaps[key] = { time: +time.toFixed(3), carId: car.carId, pwr: pwr != null ? +pwr.toFixed(2) : null, src, date: new Date().toISOString() };
+  return true;
+}

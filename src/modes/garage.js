@@ -6,6 +6,7 @@ import { PART_BY_ID, CATEGORIES } from '../data/parts.js';
 import { buildSpec } from '../physics/spec.js';
 import { buildCarModel, syncCarModel } from '../render/carModel.js';
 import { activeCar } from '../save.js';
+import { openCircuitRanking } from '../ui/ranking.js';
 import { openSetup } from '../ui/setup.js';
 import { powerGraph } from '../ui/graph.js';
 import { canvasTex } from '../render/world.js';
@@ -154,7 +155,7 @@ export class GarageMode {
     const info = el('div', { class: 'stats garage-spec' }, ...rows.map(([k, v]) => (v === '' ? el('div', { class: 'key-sep' }, k) : el('div', { class: 'stat' }, el('span', {}, k), el('b', {}, v)))));
     const parts = el('div', { class: 'garage-parts' }, ...CATEGORIES.map((c) => { const p = car.equipped[c.id] ? PART_BY_ID[car.equipped[c.id]] : null; return p ? el('span', {}, `${c.name}：${p.name}`) : ''; }));
     const left = panel(`GARAGE（${st.garage.length}台）`, list,
-      el('div', { class: 'hint' }, '↑↓：車を選ぶ　Enter：乗り換え／セッティング　Esc：街へ戻る'),
+      el('div', { class: 'hint' }, '↑↓：車を選ぶ　Enter：乗り換え／セッティング／タイムランキング　T：サーキットのタイムランキング　Esc：街へ戻る'),
       el('div', { class: 'hint' }, '←→：回転　Z/X：上下　C/V：寄る/離れる　1〜6：前/後/左/右/真上/真下　G：シャシー表示　ドラッグ・ホイールでも操作'));
     const right = panel(`${def.name}`, el('div', { class: 'hint' }, def.ref), info,
       el('div', { class: 'key-sep' }, 'パワー・トルク曲線（点線：純正）'), powerGraph(sp, buildSpec(car.carId, def.stock), { w: 300, h: 140 }), parts,
@@ -204,10 +205,19 @@ export class GarageMode {
           });
         },
       },
+      { label: 'サーキットのタイムランキング', sub: '筑波・鈴鹿・富士：ライバルの参考ラップと、あなたの自己ベスト（走行会・サーキットレース）', action: () => { close(); this.openRanking(); } },
       { label: 'キャンセル', action: () => close() },
     ], { onBack: () => close() });
     box.appendChild(menu.root);
     g.ui.appendChild(dlg);
+  }
+
+  // サーキット（筑波・鈴鹿・富士）のタイムランキング
+  openRanking() {
+    const g = this.game;
+    this.busy = true;
+    this.root.style.display = 'none';
+    openCircuitRanking(g, () => { g.input.pressed.clear(); this.busy = false; this.root.style.display = ''; });
   }
 
   update(dt) {
@@ -219,6 +229,7 @@ export class GarageMode {
       if (inp.hitCode('ArrowDown')) { this.idx = (this.idx + 1) % st.garage.length; this.showCar(); }
       if (inp.hitCode('ArrowUp')) { this.idx = (this.idx - 1 + st.garage.length) % st.garage.length; this.showCar(); }
       if (inp.hitCode('Enter')) this.openActions();
+      if (inp.hitCode('KeyT')) this.openRanking();
       if (inp.hitCode('KeyG')) { this.chassisView = !this.chassisView; this.helpers.visible = this.chassisView; }
       for (const [k, [y, p, name]] of Object.entries(VIEWS)) if (inp.hitCode(k)) { this.tYaw = y; this.tPitch = p; this.autoSpin = false; this.viewLabel.textContent = name; }
       const rot = (inp.down.has('ArrowLeft') ? 1 : 0) - (inp.down.has('ArrowRight') ? 1 : 0);

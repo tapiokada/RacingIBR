@@ -5,7 +5,7 @@ import { DriveSession } from '../session.js';
 import { Hud } from '../ui/hud.js';
 import { el, Menu, panel } from '../ui/ui.js';
 import { CARS, PLAYER } from '../data/cars.js';
-import { activeCar, fuelState, fmtMoney, fmtTime } from '../save.js';
+import { activeCar, fuelState, fmtMoney, fmtTime, recordCircuitLap } from '../save.js';
 import { openSetup } from '../ui/setup.js';
 import { VIEW_NAMES } from '../render/cameras.js';
 import { LapTracker, pauseMenu } from './common.js';
@@ -101,6 +101,7 @@ export class TrackDayMode {
         this.prevBest = ev.time;
         this.game.story.trackday[this.opts.layout.key] = { best: ev.time, carId: this.mine.carId, date: new Date().toISOString() };
       }
+      recordCircuitLap(this.game.story, this.opts.layout.key, ev.time, this.mine, 'trackday', this.P.car.spec.pwr);
       if (this.state === 'checker') this.finish();
     }
   }
