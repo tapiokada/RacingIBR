@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { DriveSession } from '../session.js';
 import { el, Menu, panel } from '../ui/ui.js';
 import { RaceAI } from '../ai.js';
-import { ALL_RIVALS } from '../data/rivals.js';
+import { ALL_RIVALS, RIVAL_BY_ID } from '../data/rivals.js';
 import { CARS, PLAYER } from '../data/cars.js';
 import { PART_BY_ID, CATEGORY_NAME, RANK_STARS } from '../data/parts.js';
 import { buildSpec } from '../physics/spec.js';
@@ -20,7 +20,7 @@ import { openSetup } from '../ui/setup.js';
 import { savePracticeSetup, fmtTime } from '../save.js';
 import { LAYOUTS, shutoExitSpot } from '../data/map.js';
 import { getCoursePath } from '../physics/track.js';
-import { CIRCUITS, SHUTO5, shuto5Net, c1Net, C1_LINK_LEN, lanePose } from '../physics/circuit.js';
+import { CIRCUITS, SHUTO5, shuto5Net, c1Net, C1_LINK_LEN, lanePose, LanePath } from '../physics/circuit.js';
 export { lanePose };
 import { TownFreeMode } from './townfree.js';
 import { TitleMode } from './title.js';
@@ -89,11 +89,12 @@ export class ShutoFreeMode {
     this.labels = el('div', { class: 'labels' });
     g.ui.appendChild(this.labels);
     this.bt = null; this.dialog = null; this.spawnT = 0;
+    if (o.battle) this.continueBattle(o.battle); // 竹橋JCTで2台とも 5号へ：バトルの続き
     if (o.story && this.area === 'c1') for (let i = 0; i < MAX_HWY_RIVALS; i++) this.spawnRival(true);
     this.t = 0;
     this.laneName = '';
     const title = this.area === 'c1' ? LANE_NAME[o.lane] : '首都高速5号池袋線';
-    this.hud.flash(title, 2, o.story ? (this.area === 'c1' ? `ライバルの後ろでパッシング（${keyName(g, 'flash')}）してバトルを挑め！` : '') : o.speed ? '' : 'FREE RUN　Escでメニュー');
+    if (!o.battle) this.hud.flash(title, 2, o.story ? (this.area === 'c1' ? `ライバルの後ろでパッシング（${keyName(g, 'flash')}）してバトルを挑め！` : '') : o.speed ? '' : 'FREE RUN　Escでメニュー');
   }
 
   mapLines() {
@@ -121,9 +122,9 @@ export class ShutoFreeMode {
   carOpts() { const o = this.opts; return o.story ? { story: true } : { carId: o.carId, equipped: o.equipped, color: o.color, setup: o.setup, setupKey: o.setupKey }; }
 
   // 北池袋出口 → 西池袋（ストーリーは街のモードへ）
-  toWest(speed) {
+  toWest(speed, message = '西池袋エリア') {
     const g = this.game;
-    if (this.opts.story) return new TownMode(g, { area: 'west', returnPos: { ...shutoExitSpot(), area: 'west' }, speed, message: '西池袋エリア' });
+    if (this.opts.story) return new TownMode(g, { area: 'west', returnPos: { ...shutoExitSpot(), area: 'west' }, speed, message });
     return new TownFreeMode(g, { ...this.carOpts(), area: 'west', pos: shutoExitSpot(), speed });
   }
 
@@ -180,12 +181,35 @@ export class ShutoFreeMode {
   }
 
   // プレイヤーの車も AI が運転する（パッシング後の並走・バトル後）
+  // 5号の連絡路・本線を走る AI（DO/DI の終わりで D へ乗り継ぐ：followLanes）
+  laneAI(e, key, skill, opts) {
+    e.laneKey = key;
+    e.ai = new RaceAI(e.car, new LanePath(SHUTO5[key], this.session.corridor), skill, opts);
+    return e.ai;
+  }
+  followLanes(e) {
+    if (!e.ai || !(e.laneKey === 'DO' || e.laneKey === 'DI')) return;
+    const s = e.ai.path.project(e.car.x, e.car.z, -1).s;
+    if (s > SHUTO5[e.laneKey].length - 15) { const old = e.ai; this.laneAI(e, 'D', old.skill, { margin: old.margin, vmax: old.vmax, mistakes: false }); }
+  }
+  // 5号下り方向の通し距離（D の s。DO/DI は D の始点の手前なので負）
+  routeS(car) {
+    const q = this.game.world.ground.nearest(car.x, car.z, car.y);
+    if (!q) return null;
+    const C = this.net.lanes ? this.net.lanes[this.net.laneOf[q.i]] : this.net;
+    const k = C.lane || C.id;
+    if (k === 'D') return q.s;
+    if (k === 'DO' || k === 'DI') return q.s - C.length;
+    return null;
+  }
+
   autoOn() {
+    if (!this.P.ai && !this.path) { const w = this.where(); this.laneAI(this.P, w && ['DO', 'DI', 'D'].includes(w.lane) ? w.lane : 'D', 0.9, { vmax: AUTO_V, mistakes: false, margin: 1.2 }); }
     if (!this.P.ai) this.P.ai = new RaceAI(this.P.car, this.path, 0.9, { vmax: AUTO_V, mistakes: false, margin: 1.2 });
     this.P.ai.vmax = AUTO_V;
     this.session.controlsEnabled = false;
   }
-  autoOff() { this.P.ai = null; this.session.controlsEnabled = true; this.game.input.pressed.clear(); }
+  autoOff() { this.P.ai = null; this.P.laneKey = null; this.session.controlsEnabled = true; this.game.input.pressed.clear(); }
 
   // パッシング → 双方 80km/h の自動走行 → ウィンドウ
   challenge(e) {
@@ -245,11 +269,19 @@ export class ShutoFreeMode {
 
   // バトル中：差・SP ゲージ・決着
   updateBattle(dt) {
-    const bt = this.bt, P = this.P, R = bt.e, path = this.path, L = path.length;
+    const bt = this.bt, P = this.P, R = bt.e, path = this.path, L = path ? path.length : 0;
     bt.t += dt;
-    // 進んだ距離の差（周回の折り返しを考慮して積算）
-    const adv = (car, key) => { const s = path.project(car.x, car.z, -1).s; let d = s - bt[key]; if (d > L / 2) d -= L; if (d < -L / 2) d += L; bt[key] = s; return d; };
-    bt.gap += adv(P.car, 'sP') - adv(R.car, 'sR');
+    if (this.area === 'c1') {
+      // 進んだ距離の差（周回の折り返しを考慮して積算）
+      const adv = (car, key) => { const s = path.project(car.x, car.z, -1).s; let d = s - bt[key]; if (d > L / 2) d -= L; if (d < -L / 2) d += L; bt[key] = s; return d; };
+      bt.gap += adv(P.car, 'sP') - adv(R.car, 'sR');
+    } else {
+      // 5号：下り方向の通し距離の差
+      const a = this.routeS(P.car), b = this.routeS(R.car);
+      if (a != null && b != null) bt.gap = a - b;
+      // ライバルが先に高速を降りた
+      if (b != null && b > SHUTO5.D.length - 30) { this.endBattle('draw', `${R.rival.name}が高速を降りた（引き分け）`); this.removeRival(R); return; }
+    }
     const gap = Math.abs(bt.gap), drain = spDrain(gap) * dt;
     if (bt.gap > 0) bt.spR -= drain; else bt.spP -= drain;
     // 壁への接触
@@ -258,13 +290,62 @@ export class ShutoFreeMode {
     if (R.impact > 2 && bt.wallR <= 0) { bt.spR -= spWall(R.impact); bt.wallR = SP_WALL.cool; }
     P.impact = 0; R.impact = 0;
     bt.spP = Math.max(0, bt.spP); bt.spR = Math.max(0, bt.spR);
-    // 決着：竹橋JCTで別の分岐（プレイヤーが 5号への連絡路へ）＝引き分け
-    if (this.cur && (this.cur.lane === 'DO' || this.cur.lane === 'DI')) return this.endBattle('draw');
+    if (bt.spP <= 0) return this.endBattle('lose');
+    if (bt.spR <= 0) return this.endBattle('win');
+    // 竹橋JCT：ライバルも分岐するか。別の方向へ分かれたら引き分け（2台とも 5号へ入ったら checkLinks でバトルごと 5号エリアへ）
+    if (this.area === 'c1') return this.jctBattle();
     if (bt.spP <= 0) return this.endBattle('lose');
     if (bt.spR <= 0) return this.endBattle('win');
   }
 
-  endBattle(res) {
+  // 竹橋JCT（C1 → 5号下り）での分岐の判断（バトル中）
+  //  ライバルが大きく（60m以上）リードしているとき：JCTの手前約350mで 30% の確率で 5号へ行くと決める
+  //  それ以外（後ろ・接戦）：プレイヤーが連絡路に入るのを見て 80% の確率でついて行く（先に分岐点に着いたら 30% で 5号へ）
+  jctBattle() {
+    const bt = this.bt, R = bt.e, path = this.path, L = path.length;
+    const fork = (this.fork ||= (() => { const lane = this.opts.lane === 'c1_outer' ? 'DO' : 'DI', C = SHUTO5[lane]; return { lane, s: path.project(C.x[0], C.z[0], -1).s }; })());
+    const toFork = (car) => (((fork.s - path.project(car.x, car.z, -1).s) % L) + L) % L; // 分岐点までの距離（過ぎると L 近く）
+    const rd = toFork(R.car), pd = toFork(this.P.car);
+    const pOn = this.cur && this.cur.lane === fork.lane;
+    if (!R.branch) {
+      if (R.plan == null && rd < 350) R.plan = bt.gap < -60 ? (Math.random() < 0.3 ? 'branch' : 'stay') : 'react';
+      if (R.plan === 'react' && pOn) R.plan = Math.random() < 0.8 ? 'branch' : 'stay';
+      if (R.plan === 'react' && rd < 30) R.plan = Math.random() < 0.3 ? 'branch' : 'stay';
+      if (R.plan === 'react' && pd > L - 300 && pd < L - 40) R.plan = 'stay'; // プレイヤーは C1 をそのまま進んだ
+      if (R.plan === 'branch' && rd < 25) { this.laneAI(R, fork.lane, R.rival.skill, { margin: R.rival.margin, mistakes: false }); R.branch = true; }
+      if (R.plan != null && rd > 600 && rd < L - 600) R.plan = null; // 分岐点を十分に過ぎたら次の周に備える
+    }
+    const passed = (d) => d > L - 300 && d < L - 40;
+    if (pOn && !R.branch && R.plan === 'stay' && passed(rd)) return this.endBattle('draw', `${R.rival.name}は C1 をそのまま進んだ（引き分け）`);
+    if (R.branch && !pOn && passed(pd)) return this.endBattle('draw', `${R.rival.name}は 5号へ分かれた（引き分け）`);
+  }
+
+  // 5号エリアに入ったところでバトルを続ける：SP・おおよその間隔を保って、2台とも 80km/h から
+  continueBattle(b) {
+    const g = this.game, r = RIVAL_BY_ID[b.rivalId];
+    const w = this.where();
+    const pR = w ? this.routeS(this.P.car) : -100;
+    let rs = pR - b.gap; // ライバルの通し距離
+    if (Math.abs(b.gap) < 9) rs = pR - (b.gap >= 0 ? 9 : -9); // 重ならないように
+    const lane = rs < 0 ? b.lane : 'D';
+    const C = SHUTO5[lane];
+    const sOn = lane === 'D' ? Math.min(rs, C.length - 40) : Math.max(0, rs + C.length);
+    const lp = lanePose(C, sOn);
+    const e = this.session.addCar({ carId: r.car, equipped: r.parts, setup: r.setup || null, color: r.color, name: r.name });
+    e.car.place(lp.x, lp.z, lp.h, AUTO_V, lp.y);
+    this.laneAI(e, lane, r.skill, { margin: r.margin, mistakes: false });
+    e.rival = r; e.cruise = AUTO_V; e.cool = 0; e.branch = true;
+    e.rating = buildSpec(r.car, r.parts, r.setup || null).rating;
+    e.label = el('div', { class: 'rival-tag' }, el('b', {}, r.name), el('span', {}, `${CARS[r.car].name}　戦闘力 ${e.rating}`));
+    this.labels.appendChild(e.label);
+    this.bt = { e, phase: 'race', t: b.t, spP: b.spP, spR: b.spR, gap: b.gap, wallP: 0, wallR: 0 };
+    this.P.impact = 0; e.impact = 0;
+    this.session.resetRule = 'battle';
+    g.audio.playBgm('battle');
+    this.hud.flash('BATTLE CONTINUE', 2.2, `${r.name}と 5号池袋線へ！　SP・差はそのまま（高速を降りたら引き分け）`);
+  }
+
+  endBattle(res, drawMsg = null) {
     const g = this.game, st = g.story, bt = this.bt, e = bt.e, r = e.rival;
     bt.phase = 'result';
     this.session.resetRule = null;
@@ -272,7 +353,7 @@ export class ShutoFreeMode {
     e.cool = 60;
     e.ai.vmax = res === 'win' ? 60 / 3.6 : e.cruise; // 負けたライバルはペースを落として離れていく
     if (res === 'draw') {
-      this.hud.flash('DRAW', 2.5, `${r.name}と別の方向へ分かれた（引き分け）`);
+      this.hud.flash('DRAW', 2.5, drawMsg || `${r.name}と別の方向へ分かれた（引き分け）`);
       g.audio.beep(800, 0.4, 0.25);
       this.bt = null;
       return;
@@ -344,11 +425,28 @@ export class ShutoFreeMode {
       }
       // 北池袋出口：下りの終わりで西池袋タウンへ
       if (w.lane === 'D' && w.s > w.C.length - 20) {
-        this.switchTo(() => this.toWest(LINK_SPEED));
+        // バトル中に高速を降りたら引き分け
+        const draw = this.bt && this.bt.phase === 'race';
+        if (draw) { this.bt = null; this.session.resetRule = null; }
+        this.switchTo(() => this.toWest(LINK_SPEED, draw ? 'バトル終了：高速を降りた（引き分け）' : '西池袋エリア'));
       }
-    } else if ((w.lane === 'DO' || w.lane === 'DI') && w.s > 120) {
-      // C1 から 5号への分岐に入ったら 5号エリアへ
-      this.switchTo(() => new ShutoFreeMode(this.game, { ...this.carOpts(), area: 'shuto5', pose, speed: LINK_SPEED }));
+    } else {
+      // C1 から 5号への分岐に入ったら 5号エリアへ（バトル中でライバルも分岐に入っていれば、バトルごと）
+      const bt = this.bt && this.bt.phase === 'race' ? this.bt : null;
+      const R = bt && bt.e;
+      const rS = R && R.branch ? R.ai.path.project(R.car.x, R.car.z, -1).s : null;
+      const onBranch = w.lane === 'DO' || w.lane === 'DI';
+      if (onBranch && (w.s > 120 || (rS != null && rS > 150))) {
+        let battle = null;
+        if (rS != null) {
+          // 連絡路の上での間隔（ライバルがまだ分岐点の手前ならC1での差）
+          const gap = rS > 1 ? w.s - rS : Math.max(w.s, bt.gap);
+          battle = { rivalId: R.rival.id, lane: w.lane, spP: bt.spP, spR: bt.spR, gap, t: bt.t };
+        } else if (bt) this.endBattle('draw', `${R.rival.name}は C1 をそのまま進んだ（引き分け）`);
+        this.switchTo(() => new ShutoFreeMode(this.game, { ...this.carOpts(), area: 'shuto5', pose, speed: battle ? AUTO_V : LINK_SPEED, battle }));
+      }
+      // 分岐に入ったライバルが C1 エリアの端まで行った（バトル以外）→ 消す
+      for (const e of this.session.entries) if (e.rival && e.branch && (!bt || bt.e !== e) && e.ai.path.project(e.car.x, e.car.z, -1).s > 180) this.removeRival(e);
     }
   }
 
@@ -378,6 +476,16 @@ export class ShutoFreeMode {
       if (bt && bt.phase === 'auto') { bt.t -= dt; if (bt.t <= 0) this.openEncounter(); }
       else if (bt && bt.phase === 'count') bt.countdown.update(dt);
       else if (bt && bt.phase === 'race') this.updateBattle(dt);
+    }
+    if (story && this.area === 'shuto5' && !this.leaving) {
+      // 5号に入ってからのバトルの続き
+      for (const e of this.session.entries) { this.followLanes(e); if (e.rival) e.cool -= dt; }
+      if (this.bt && this.bt.phase === 'race') this.updateBattle(dt);
+      // バトルが終わったライバルは離れたら消す
+      for (const e of this.session.entries.filter((x) => x.rival && (!this.bt || this.bt.e !== x))) {
+        const rs = this.routeS(e.car);
+        if (Math.hypot(e.car.x - this.P.car.x, e.car.z - this.P.car.z) > 600 || (rs != null && rs > SHUTO5.D.length - 30)) this.removeRival(e);
+      }
     }
     // C1 の周回計測（コース上にいるときだけ）
     let lapHtml = '';
