@@ -3,7 +3,7 @@
 // - 4輪を車体から分離（回転・操舵用に車輪中心を原点としたノード wheel_FL/FR/RL/RR）
 // - 透過（transmission）ガラスは半透明に置き換え（描画負荷対策）
 // - テクスチャを1024px WebPに縮小、メッシュをmeshopt圧縮
-// usage: node tools/car_model.mjs <gr86|z32|wrx|nd|supra|swift|s2k|brz|evo|r34> <in.glb> <out.glb>
+// usage: node tools/car_model.mjs <gr86|z32|wrx|nd|supra|swift|s2k|brz|evo|r34|na1|na2|fc|fd|r33> <in.glb> <out.glb>
 import { NodeIO, getBounds } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTMeshoptCompression } from '@gltf-transform/extensions';
 import { dedup, prune, weld, textureCompress, meshopt, reorder, simplify } from '@gltf-transform/functions';
@@ -80,8 +80,45 @@ const CONFIGS = {
     world: true, map: (x, y, z) => [x, y, z], wb: 2.665,
     wheelNodes: ['Wheel_104', 'wheel_290', 'wheel_525', 'wheel_764'],
   },
+  // "1990 Honda NSX" by lilModels (CC BY 4.0)：Y-up・前が+z・左が+x・縮尺約2/3。車輪は複数の部品なので位置で分離
+  na1: {
+    world: true, map: (x, y, z) => [x, y, z], wb: 2.53, cut: 0.215, inner: 0.44, ground: 0.019,
+    wheels: [{ name: 'wheel_FL', p: [0.527, 0.2235, -0.635] }, { name: 'wheel_FR', p: [-0.527, 0.2235, -0.635] }, { name: 'wheel_RL', p: [0.527, 0.2235, -2.3435] }, { name: 'wheel_RR', p: [-0.527, 0.2235, -2.3435] }],
+    side: (x, y, z) => x, along: (x, y, z) => [z, y],
+  },
+  // "2002 Honda NSX-R NA2" by SIU Car Garage (CC BY-NC 4.0)：Y-up・前が+z・左が+x。車輪の部品はノード名が FL_/FR_/RL_/RR_ で始まる
+  na2: {
+    world: true, map: (x, y, z) => [x, y, z], wb: 2.53, ground: -0.002, wheelRe: [/^FL_/, /^FR_/, /^RL_/, /^RR_/], wheelCenter: /tyre/,
+  },
+  // "1990 Mazda RX-7 Savanna Infini III FC3S" by Galaxy Car Showroom (CC BY 4.0)：Y-up・前が−z・原点がずれていて縮尺約4倍
+  fc: {
+    world: true, map: (x, y, z) => [-x, y, -z], wb: 2.43, cut: 1.22, inner: 2.45, centerX: true, ground: 0.068,
+    wheels: [{ name: 'wheel_FL', p: [14.55, 1.284, -38.11] }, { name: 'wheel_FR', p: [20.572, 1.284, -38.11] }, { name: 'wheel_RL', p: [14.55, 1.32, -28.38] }, { name: 'wheel_RR', p: [20.572, 1.32, -28.38] }],
+    side: (x, y, z) => x - 17.561, along: (x, y, z) => [z, y],
+  },
+  // "1999 Mazda RX-7 FD" by OUTPISTON (CC BY-NC-SA 4.0)：Y-up・前が+z・左が+x・縮尺約3.5倍・約65万ポリゴン（間引く）
+  fd: {
+    world: true, map: (x, y, z) => [x, y, z], wb: 2.425, cut: 1.18, inner: 2.1, ground: 0, simplify: 0.12, simplifyError: 0.002, smoothRe: /^Material\.005$/,
+    wheels: [{ name: 'wheel_FL', p: [2.547, 1.15, 4.5995] }, { name: 'wheel_FR', p: [-2.547, 1.15, 4.5995] }, { name: 'wheel_RL', p: [2.547, 1.15, -3.9355] }, { name: 'wheel_RR', p: [-2.547, 1.15, -3.9355] }],
+    side: (x, y, z) => x, along: (x, y, z) => [z, y],
+  },
+  // "Nissan Skyline GTR r33" by Black Snow (CC BY 4.0)：Y-up・前が+z・左が+x。約29万ポリゴン（間引く）
+  r33: {
+    world: true, map: (x, y, z) => [x, y, z], wb: 2.72, cut: 0.262, inner: 0.62, ground: 0.107, simplify: 0.25, simplifyError: 0.003,
+    wheels: [{ name: 'wheel_FL', p: [0.7695, 0.359, 1.2925] }, { name: 'wheel_FR', p: [-0.7635, 0.359, 1.2925] }, { name: 'wheel_RL', p: [0.7695, 0.359, -1.2985] }, { name: 'wheel_RR', p: [-0.7635, 0.359, -1.2985] }],
+    side: (x, y, z) => x, along: (x, y, z) => [z, y],
+  },
 };
 const C = CONFIGS[model];
+if (C.wheelRe) {
+  // 車輪の部品をノード名で振り分け、タイヤの外接箱の中心を車輪中心にする
+  C.wheels = C.wheelRe.map((re, k) => {
+    const nodes = root.listNodes().filter((n) => re.test(n.getName()) && n.getMesh());
+    const tyre = nodes.find((n) => C.wheelCenter.test(n.getName())) || nodes[0];
+    const b = getBounds(tyre);
+    return { name: ['wheel_FL', 'wheel_FR', 'wheel_RL', 'wheel_RR'][k], p: b.min.map((v, i) => (v + b.max[i]) / 2), re };
+  });
+}
 if (C.world && C.wheelNodes) {
   // 車輪ノードの外接箱の中心を車輪中心に、シーン最下点を接地面にする
   C.wheels = C.wheelNodes.map((nm, k) => {
@@ -131,7 +168,7 @@ let tris = 0, wtris = 0;
 // 処理単位：world=true ならメッシュを持つノードごと（ワールド行列と車輪の所属を付ける）、そうでなければメッシュごと
 const isAnc = (anc, n) => { for (let p = n; p; p = p.getParentNode()) if (p === anc) return true; return false; };
 const items = C.world
-  ? root.listNodes().filter((n) => n.getMesh()).map((n) => ({ mesh: n.getMesh(), M: n.getWorldMatrix(), wheel: C.wheelNodes ? C.wheels.findIndex((w) => isAnc(w.node, n)) : C.noWheel && C.noWheel.test(n.getName()) ? -1 : null }))
+  ? root.listNodes().filter((n) => n.getMesh()).map((n) => ({ mesh: n.getMesh(), M: n.getWorldMatrix(), wheel: C.wheelRe ? C.wheelRe.findIndex((re) => re.test(n.getName())) : C.wheelNodes ? C.wheels.findIndex((w) => isAnc(w.node, n)) : C.noWheel && C.noWheel.test(n.getName()) ? -1 : null }))
   : root.listMeshes().map((mesh) => ({ mesh, M: null, wheel: null }));
 const xf = (M, v, dir) => {
   if (!M) return v;
@@ -176,12 +213,31 @@ for (const item of items) {
         }
         I.push(remap.get(i));
       }
+      // smoothRe に合うマテリアル（頂点を共有しない三角形の集まりで間引きが効かない部品。タイヤなど）：
+      // 頂点を位置でまとめ、法線を面積で重み付けした平均で作り直す（UV・頂点カラーは捨てる）
+      if (C.smoothRe && C.smoothRe.test(prim.getMaterial()?.getName() || '')) {
+        const key = new Map(), P2 = [], I2 = [];
+        const q = (v) => Math.round(v * 2e4);
+        for (let t = 0; t < P.length / 3; t++) { const k = `${q(P[t * 3])},${q(P[t * 3 + 1])},${q(P[t * 3 + 2])}`; if (!key.has(k)) { key.set(k, P2.length / 3); P2.push(P[t * 3], P[t * 3 + 1], P[t * 3 + 2]); } I2[t] = key.get(k); }
+        const idx2 = I.map((v) => I2[v]);
+        const N2 = new Float32Array(P2.length);
+        for (let t = 0; t < idx2.length; t += 3) {
+          const [i0, i1, i2] = [idx2[t], idx2[t + 1], idx2[t + 2]];
+          const ax = P2[i1 * 3] - P2[i0 * 3], ay = P2[i1 * 3 + 1] - P2[i0 * 3 + 1], az = P2[i1 * 3 + 2] - P2[i0 * 3 + 2];
+          const bx = P2[i2 * 3] - P2[i0 * 3], by = P2[i2 * 3 + 1] - P2[i0 * 3 + 1], bz = P2[i2 * 3 + 2] - P2[i0 * 3 + 2];
+          const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+          for (const v of [i0, i1, i2]) { N2[v * 3] += nx; N2[v * 3 + 1] += ny; N2[v * 3 + 2] += nz; }
+        }
+        for (let v = 0; v < N2.length; v += 3) { const l = Math.hypot(N2[v], N2[v + 1], N2[v + 2]) || 1; N2[v] /= l; N2[v + 1] /= l; N2[v + 2] /= l; }
+        const put = (A, B) => { A.length = 0; for (let k = 0; k < B.length; k++) A.push(B[k]); };
+        put(P, P2); put(N, N2); put(I, idx2); U.length = 0; K.length = 0;
+      }
       if (g < 4) wtris += I.length / 3;
       const np = doc.createPrimitive().setMaterial(g === 5 ? paintMat() : g === 6 ? glassMat() : prim.getMaterial()).setMode(prim.getMode());
       if (K.length) np.setAttribute('COLOR_0', doc.createAccessor().setType('VEC4').setArray(new Float32Array(K)).setBuffer(buffer));
       np.setAttribute('POSITION', doc.createAccessor().setType('VEC3').setArray(new Float32Array(P)).setBuffer(buffer));
-      if (nor) np.setAttribute('NORMAL', doc.createAccessor().setType('VEC3').setArray(new Float32Array(N)).setBuffer(buffer));
-      if (uv) np.setAttribute('TEXCOORD_0', doc.createAccessor().setType('VEC2').setArray(new Float32Array(U)).setBuffer(buffer));
+      if (N.length) np.setAttribute('NORMAL', doc.createAccessor().setType('VEC3').setArray(new Float32Array(N)).setBuffer(buffer));
+      if (U.length) np.setAttribute('TEXCOORD_0', doc.createAccessor().setType('VEC2').setArray(new Float32Array(U)).setBuffer(buffer));
       np.setIndices(doc.createAccessor().setType('SCALAR').setArray(new Uint32Array(I)).setBuffer(buffer));
       (g < 4 ? wheelNodes[g].mesh : bodyMesh).addPrimitive(np);
     });
@@ -203,7 +259,7 @@ for (const m of root.listMaterials()) {
 }
 await doc.transform(
   prune(), dedup(), weld(),
-  ...(C.simplify ? [simplify({ simplifier: MeshoptSimplifier, ratio: C.simplify, error: 0.0008 })] : []),
+  ...(C.simplify ? [simplify({ simplifier: MeshoptSimplifier, ratio: C.simplify, error: C.simplifyError || 0.0008 })] : []),
   reorder({ encoder: MeshoptEncoder }),
   textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [1024, 1024], quality: 82 }),
   meshopt({ encoder: MeshoptEncoder, level: 'medium' }),

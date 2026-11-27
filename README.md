@@ -114,7 +114,7 @@ npx esbuild --servedir=. --serve=8080   # http://localhost:8080
 | R32-GTR | ニッサン スカイラインGT-R（BNR32 5MT）RB26DETT | 280PS/6800rpm・353N·m/4400rpm | 1430kg | AWD |
 | R33-GTR | ニッサン スカイラインGT-R Vスペック（BCNR33 5MT）RB26DETT | 280PS/6800rpm・368N·m/4400rpm | 1540kg | AWD |
 
-RX-7（FD/FC）・NSX（NA1/NA2）・スカイラインGT-R（R32/R33）の外観は、まだ手続き的に作った仮のモデルです。NSX はミッドシップ（前後重量配分 42:58・ヨー慣性小さめ）の後輪駆動として計算しています。
+RX-7（FD/FC）・NSX（NA1/NA2）・スカイラインGT-R（R33）は実車の3Dモデル（下の「出典」）、R32-GTR の外観はまだ手続き的に作った仮のモデルです。NSX はミッドシップ（前後重量配分 42:58・ヨー慣性小さめ）の後輪駆動として計算しています。
 
 寸法・ホイールベース・トレッド・ギア比・ファイナル・タイヤサイズは公表値。**推定値**：重心高、Cd（スープラ以外）、前面投影面積、ブレーキ容量、ヨー慣性、ZC33Sのファイナル比（3.944）、各ターボ車の「過給前トルクカーブ」（純正タービン装着時に公表値になるよう逆算）。
 
@@ -356,6 +356,11 @@ tools/                 物理・AI・ブラウザのテストスクリプト、�
 - **EVO-IX の3Dモデル**："2006 Mitsubishi Lancer Evolution IX MR" by OUTPISTON（https://sketchfab.com/3d-models/2006-mitsubishi-lancer-evolution-ix-mr-6838fd1852a54ca48f40456e4f4df01e）、ライセンス **CC BY-NC-SA 4.0**＝**非営利利用のみ・改変物（`assets/models/evo.glb`）も同ライセンス**。ゲーム用に縮尺（ホイールベース2625mm）・ノード変換の焼き込み・4輪の分離・テクスチャ縮小・メッシュ圧縮（`tools/car_model.mjs evo`）。左ハンドル。
 - **R34-GTR の3Dモデル**："2002_nissan_skyline_r34_gt-r" by 007（https://sketchfab.com/3d-models/2002-nissan-skyline-r34-gt-r-f14008361c7c4914aae0cdac1b12399d）、CC BY 4.0。ゲーム用に縮尺（ホイールベース2665mm）・ノード変換の焼き込み・4輪の分離・テクスチャ縮小・メッシュ圧縮（`tools/car_model.mjs r34`）。右ハンドル。
 - **WRX-IMP の3Dモデル**："2012 Varis Subaru Impreza WRX STI GRB Ver." by Ddiaz Design（https://sketchfab.com/3d-models/2012-varis-subaru-impreza-wrx-sti-grb-ver-4cebf7bb114b4b1eb6cea80bb29a5568）、ライセンス **CC BY-NC-SA 4.0**（http://creativecommons.org/licenses/by-nc-sa/4.0/）＝**非営利利用のみ・改変物は同じライセンスで公開**。変換後の `assets/models/wrx.glb` も CC BY-NC-SA 4.0 です。ゲーム用に縮尺（ホイールベース2625mm）・ノード変換の焼き込み・4輪の分離・テクスチャ縮小・メッシュ圧縮を行っています（`tools/car_model.mjs wrx`）。GRB型（ハッチバック）にVarisのワイドボディキット・カーボンボンネット・ウイングが付いた外観。左ハンドル。車両データもGRB型の諸元。
+- **NSX-NA1 の3Dモデル**："1990 Honda NSX" by lilModels（https://sketchfab.com/3d-models/1990-honda-nsx-b9c541ef47004870868bb3a2f767b85d）、CC BY 4.0。ゲーム用に縮尺（約1.48倍・ホイールベース2530mm）・位置による4輪の分離・メッシュ圧縮（`tools/car_model.mjs na1`）。不透明で作られている窓ガラスは半透明に。
+- **NSX-NA2 の3Dモデル**："2002 Honda NSX-R NA2" by SIU Car Garage（https://sketchfab.com/3d-models/2002-honda-nsx-r-na2-d739f06174d04493a0a04a4db3be5645）、ライセンス **CC BY-NC 4.0**＝**非営利利用のみ**。ゲーム用に4輪の分離（部品名 FL_/FR_/RL_/RR_）・テクスチャ縮小・メッシュ圧縮（`tools/car_model.mjs na2`）。
+- **RX7-FC の3Dモデル**："1990 Mazda RX-7 Savanna Infini III FC3S" by Galaxy Car Showroom（https://sketchfab.com/3d-models/1990-mazda-rx-7-savanna-infini-iii-fc3s-24326358102f4c09b331a8839b370d1d）、CC BY 4.0。ゲーム用に縮尺（約1/4・ホイールベース2430mm）・向きと原点の補正・位置による4輪の分離・テクスチャ縮小・メッシュ圧縮（`tools/car_model.mjs fc`）。
+- **RX7-FD の3Dモデル**："1999 Mazda RX-7 FD" by OUTPISTON（https://sketchfab.com/3d-models/1999-mazda-rx-7-fd-6ea4245c67c1438189fe37ca91516d78）、ライセンス **CC BY-NC-SA 4.0**＝**非営利利用のみ・改変物（`assets/models/fd.glb`）も同ライセンス**。ゲーム用に縮尺（約0.28倍・ホイールベース2425mm）・位置による4輪の分離、約65万ポリゴンを約11万に間引き（タイヤは頂点を共有しない三角形の集まりなので、頂点をまとめて法線を作り直してから間引く）、メッシュ圧縮（`tools/car_model.mjs fd`）。リトラクタブルライトは上げた状態。
+- **R33-GTR の3Dモデル**："Nissan Skyline GTR r33" by Black Snow（https://sketchfab.com/3d-models/nissan-skyline-gtr-r33-6df98cc48f5a4c3192950e5a91e74b96）、CC BY 4.0。ゲーム用に縮尺（ホイールベース2720mm）・位置による4輪の分離・約29万ポリゴンを約14万に間引き・テクスチャ縮小・メッシュ圧縮（`tools/car_model.mjs r33`）。エアロ付きの外観。
 
 
 榛名山の道路・標高データは、国土地理院のベクトルタイル（道路中心線）および基盤地図情報 数値標高モデル（5mメッシュ）を加工して作成しました（国土地理院コンテンツ利用規約に基づく）。

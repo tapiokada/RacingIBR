@@ -9,6 +9,11 @@
 //  EVO-IX："2006 Mitsubishi Lancer Evolution IX MR" by OUTPISTON（Sketchfab, CC BY-NC-SA 4.0 — 非営利・継承）
 //  R34-GTR："2002_nissan_skyline_r34_gt-r" by 007（Sketchfab, CC BY 4.0）
 //  WRX-IMP："2012 Varis Subaru Impreza WRX STI GRB Ver." by Ddiaz Design（Sketchfab, CC BY-NC-SA 4.0 — 非営利・継承）
+//  NSX-NA1："1990 Honda NSX" by lilModels（Sketchfab, CC BY 4.0）
+//  NSX-NA2："2002 Honda NSX-R NA2" by SIU Car Garage（Sketchfab, CC BY-NC 4.0 — 非営利のみ）
+//  RX7-FC："1990 Mazda RX-7 Savanna Infini III FC3S" by Galaxy Car Showroom（Sketchfab, CC BY 4.0）
+//  RX7-FD："1999 Mazda RX-7 FD" by OUTPISTON（Sketchfab, CC BY-NC-SA 4.0 — 非営利・継承）
+//  R33-GTR："Nissan Skyline GTR r33" by Black Snow（Sketchfab, CC BY 4.0）
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
@@ -22,8 +27,14 @@ import S2K from '../../assets/models/s2k.glb';
 import BRZ from '../../assets/models/brz.glb';
 import EVO from '../../assets/models/evo.glb';
 import R34 from '../../assets/models/r34.glb';
+import NA1 from '../../assets/models/na1.glb';
+import NA2 from '../../assets/models/na2.glb';
+import FC from '../../assets/models/fc.glb';
+import FD from '../../assets/models/fd.glb';
+import R33 from '../../assets/models/r33.glb';
 
 // paint: 塗装色を置き換えるマテリアル名、head/tail: ヘッドライト・テールランプのマテリアル名
+// glass: 不透明で作られている窓ガラスのマテリアル名（半透明にする）
 // driverX: 運転席の左右位置（+が左）、belt/wsBase: カメラ位置の基準（cameras.js）
 export const GLB_CARS = {
   '86-GR': {
@@ -66,6 +77,26 @@ export const GLB_CARS = {
     data: WRX, paint: /^wrxM_CarPaint(Normal)?_Max1$/, head: /^wrxM_LightGlassNormal_Clear_Low1$/, tail: /^wrxM_LightGlass_Red_Low1$|^varisM_Light_Taillight/, driverX: 0.37, belt: 0.72, wsBase: 0.78, wingY: 0.95,
     credit: 'WRX-IMPの3Dモデル："2012 Varis Subaru Impreza WRX STI GRB Ver." by Ddiaz Design (Sketchfab) — CC BY-NC-SA 4.0（非営利・継承）',
   },
+  'NSX-NA1': {
+    data: NA1, paint: /^Material\.005$/, glass: /^Material\.033$/, head: /(?!)/, tail: /(?!)/, driverX: -0.37, belt: 0.62, wsBase: 0.95, wingY: 0.82,
+    credit: 'NSX-NA1の3Dモデル："1990 Honda NSX" by lilModels (Sketchfab) — CC BY 4.0',
+  },
+  'NSX-NA2': {
+    data: NA2, paint: /^Vehicle_Exterior_mm_ext$/, head: /(?!)/, tail: /(?!)/, driverX: -0.37, belt: 0.62, wsBase: 0.95, wingY: 0.82,
+    credit: 'NSX-NA2の3Dモデル："2002 Honda NSX-R NA2" by SIU Car Garage (Sketchfab) — CC BY-NC 4.0（非営利）',
+  },
+  'RX7-FC': {
+    data: FC, paint: /^RX-7_FC_Paint$/, head: /(?!)/, tail: /^Red_Glass$/, driverX: -0.37, belt: 0.64, wsBase: 0.62, wingY: 0.85,
+    credit: 'RX7-FCの3Dモデル："1990 Mazda RX-7 Savanna Infini III FC3S" by Galaxy Car Showroom (Sketchfab) — CC BY 4.0',
+  },
+  'RX7-FD': {
+    data: FD, paint: /^Material$/, head: /(?!)/, tail: /^redglass$/, driverX: -0.37, belt: 0.62, wsBase: 0.66, wingY: 0.85,
+    credit: 'RX7-FDの3Dモデル："1999 Mazda RX-7 FD" by OUTPISTON (Sketchfab) — CC BY-NC-SA 4.0（非営利・継承）',
+  },
+  'R33-GTR': {
+    data: R33, paint: /^body$/, head: /(?!)/, tail: /^rl33$|^rr33$/, driverX: -0.37, belt: 0.7, wsBase: 0.8, wingY: 0.95,
+    credit: 'R33-GTRの3Dモデル："Nissan Skyline GTR r33" by Black Snow (Sketchfab) — CC BY 4.0',
+  },
 };
 export const GLB_CREDITS = Object.values(GLB_CARS).map((c) => c.credit);
 const templates = {};
@@ -106,6 +137,7 @@ export function buildGlbCarModel(carDef, color, opts = {}) {
       const c = m.clone();
       const n = m.name || '';
       if (cfg.paint.test(n)) c.color.copy(paint); // ボディ塗装
+      if (cfg.glass && cfg.glass.test(n)) { c.color.set(0x0c1016); c.transparent = true; c.opacity = 0.35; c.depthWrite = false; c.metalness = 0.2; c.roughness = 0.05; } // 不透明で作られた窓ガラス
       if (cfg.head.test(n)) { c.emissive = new THREE.Color(0xfff2cc); c.emissiveIntensity = 1.4; c.emissiveMap = c.map; lightsFront.push({ material: c }); }
       // テールランプ（レンズ）：ブレーキで明るく
       if (cfg.tail.test(n)) { c.emissive = new THREE.Color(0xff1a10); if (c.map) c.emissiveMap = c.map; c.emissiveIntensity = 0.7; tailMats.push(c); }
