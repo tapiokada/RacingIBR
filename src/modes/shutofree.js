@@ -303,7 +303,13 @@ export class ShutoFreeMode {
   //  それ以外（後ろ・接戦）：プレイヤーが連絡路に入るのを見て 80% の確率でついて行く（先に分岐点に着いたら 30% で 5号へ）
   jctBattle() {
     const bt = this.bt, R = bt.e, path = this.path, L = path.length;
-    const fork = (this.fork ||= (() => { const lane = this.opts.lane === 'c1_outer' ? 'DO' : 'DI', C = SHUTO5[lane]; return { lane, s: path.project(C.x[0], C.z[0], -1).s }; })());
+    const fork = (this.fork ||= (() => {
+      // 分岐点：連絡路が C1 の線から実際に離れ始める所（連絡路の始まりの約60mは C1 の線に重なっている）
+      const lane = this.opts.lane === 'c1_outer' ? 'DO' : 'DI', C = SHUTO5[lane];
+      let k = 0;
+      for (let i = 0; i < C.n; i++) { const pr = path.project(C.x[i], C.z[i], -1); if (Math.abs(pr.lat) > 3) { k = i; break; } }
+      return { lane, s: path.project(C.x[k], C.z[k], -1).s };
+    })());
     const toFork = (car) => (((fork.s - path.project(car.x, car.z, -1).s) % L) + L) % L; // 分岐点までの距離（過ぎると L 近く）
     const rd = toFork(R.car), pd = toFork(this.P.car);
     const pOn = this.cur && this.cur.lane === fork.lane;

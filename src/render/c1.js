@@ -87,6 +87,21 @@ export class C1World {
     this.ground = new CircuitGround(net);
   }
 
+  // 高架の下（橋脚・横梁の位置）を別の車線がくぐっているか：(x,z) から reach[m] 以内に、高さ yTop より 3m 以上低い別の車線の路面
+  underRoad(C, x, z, yTop, reach) {
+    const A = this.all, G = 24;
+    if (!this.under) {
+      this.under = new Map();
+      for (let i = 0; i < A.n; i++) { const k = Math.floor(A.x[i] / G) * 7919 + Math.floor(A.z[i] / G); (this.under.get(k) || this.under.set(k, []).get(k)).push(i); }
+    }
+    const gx = Math.floor(x / G), gz = Math.floor(z / G);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const i of this.under.get((gx + a) * 7919 + gz + b) || []) {
+      if (A.lanes[A.laneOf[i]] === C || A.y[i] > yTop - 3) continue;
+      if (Math.hypot(A.x[i] - x, A.z[i] - z) < A.hw[i] + 0.75 + reach) return true;
+    }
+    return false;
+  }
+
   // 点 p（車線 C の i 番目の点から lat の位置）が、別の車線の路面（＋0.3m）の上か
   onOther(C, p) {
     const q = this.allGround.nearest(p.x, p.z, p.y);
@@ -212,6 +227,7 @@ export class C1World {
       const p = P(C, i, 0), gy = C.ground[i];
       const h = p.y - DECK - gy;
       if (h < 2) continue;
+      if (this.underRoad(C, p.x, p.z, p.y, 5.5)) continue; // 下を別の車線（連絡路）がくぐる所には橋脚を立てない
       deck.box(p.x, gy - 0.5, p.z, 2.2, h + 0.5, 2.0, Math.atan2(p.tx, p.tz));
       deck.box(p.x, p.y - DECK - 1.2, p.z, 9.6, 1.2, 1.8, Math.atan2(p.tx, p.tz)); // 横梁
     }

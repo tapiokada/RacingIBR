@@ -33,7 +33,7 @@ module.exports = async (pg, OUT) => {
   };
   // ---- 1) 2台とも 5号へ ----
   await setup(true);
-  for (let k = 0; k < 40; k++) { await pg.evaluate(() => window.__dbg.game.debugStep(1)); const s = await st(); if (k % 4 === 0) console.log(' c1', JSON.stringify(s)); if (s.area === 'shuto5') break; }
+  for (let k = 0; k < 40; k++) { await pg.evaluate(() => window.__dbg.game.debugStep(1)); const s = await st(); if (k % 4 === 0 || !s.bt) console.log(' c1', JSON.stringify(s), await pg.evaluate(() => window.__dbg.game.mode.hud.sub.textContent)); if (s.area === 'shuto5') break; }
   await pg.waitForTimeout(1500);
   const s1 = await st(); console.log('into 5', JSON.stringify(s1));
   await pg.screenshot({ path: OUT + '/jct_continue.png' });
@@ -61,5 +61,6 @@ module.exports = async (pg, OUT) => {
   await pg.screenshot({ path: OUT + '/jct_exit.png' });
   // ---- 2) プレイヤーだけ 5号へ ----
   await setup(false);
-  for (let k = 0; k < 40; k++) { await pg.evaluate(() => window.__dbg.game.debugStep(1)); const s = await st(); if (!s.bt || s.area === 'shuto5') { console.log('split', JSON.stringify(s), await pg.evaluate(() => window.__dbg.game.mode.hud.sub.textContent)); break; } }
+  await pg.evaluate(() => { const h = window.__dbg.game.mode.hud; const f = h.flash.bind(h); window.__fl = []; h.flash = (a, b, c) => { window.__fl.push([a, c]); f(a, b, c); }; });
+  for (let k = 0; k < 40; k++) { await pg.evaluate(() => window.__dbg.game.debugStep(1)); const s = await st(); if (!s.bt || s.area === 'shuto5') { console.log('split', JSON.stringify(s), await pg.evaluate(() => JSON.stringify(window.__fl))); break; } }
 };

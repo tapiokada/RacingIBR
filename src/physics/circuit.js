@@ -217,11 +217,13 @@ export class CircuitGround {
       let t = l2 > 0 ? ((x - ax) * dx + (z - az) * dz) / l2 : 0;
       t = t < 0 ? 0 : t > 1 ? 1 : t;
       const yi = C.y[i] + (C.y[j] - C.y[i]) * t;
-      if (Math.abs(yi - y0) > 4) continue; // 立体交差の別の階層
+      const dyi = Math.abs(yi - y0);
+      if (dyi > 4) continue; // 立体交差の別の階層
       const d = Math.hypot(x - ax - dx * t, z - az - dz * t);
       const e = (d - q.d) / 3;
       if (e > 3) continue;
-      const w = Math.exp(-e * e);
+      // 高さの差が 1.5〜4m の区間（分かれて上り下りしていく連絡路など）は重みを徐々に減らす（急に外れると段差になる）
+      const w = Math.exp(-e * e) * (dyi < 1.5 ? 1 : (4 - dyi) / 2.5);
       sw += w; sy += w * yi;
     }
     return sw > 0 ? sy / sw : y0;

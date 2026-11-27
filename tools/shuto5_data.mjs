@@ -110,7 +110,11 @@ function separate(A, B, sep) {
 const MAIN = [[-4191, -7512], [-4094, -7444], [-3920, -7338], [-3742, -7221], [-3609, -7028], [-3496, -6858], [-3453, -6570], [-3443, -6290], [-3401, -6074], [-3309, -5989], [-3145, -5860], [-2991, -5741], [-2889, -5552], [-2787, -5314], [-2588, -5200], [-2461, -4936], [-2369, -4717], [-2282, -4503], [-2162, -4295], [-1963, -4181], [-1800, -4111], [-1499, -4053], [-1206, -4001], [-1072, -3947], [-1007, -3751], [-953, -3554], [-893, -3456], [-700, -3428], [-476, -3400], [-415, -3328], [-372, -3237], [-264, -2987], [-233, -2841], [-212, -2690], [-153, -2522], [-96, -2464], [26, -2412]];
 const FORK = [95, -2348], JOIN = [40, -2395];
 const A_UO = [FORK, [150, -2290], [200, -2230], [255, -2170], [320, -2138], [400, -2132], [470, -2127]];
-const A_UI = [FORK, [85, -2290], [83, -2250], [68, -2195], [30, -2152], [-40, -2116], [-120, -2075], [-200, -2036], [-290, -1995]];
+// UI：分岐から南へ。C1（外回り・内回り）の下をくぐり、内回りの左側（南）を西へ進んで内回りに左から合流
+const A_UI = [FORK, [85, -2290], [83, -2250]];
+const UI_TAIL = [[72, -2200], [56, -2160], [48, -2128], [40, -2098], [12, -2084], [-30, -2068], [-75, -2050], [-120, -2031], [-160, -2014], [-195, -2002], [-225, -1993], [-250, -1984], [-275, -1974]];
+// DI：内回りから右（中央側）へ分かれ、外回りの下をくぐって北西へ。東側の連絡路（UO と並走）を通り、分岐部の下をくぐって下り本線の始まりへ
+const DI_HEAD = [[618, -2054], [598, -2068], [559, -2095], [537, -2105], [514, -2112], [490, -2120], [460, -2125], [428, -2127.5], [400, -2139], [366, -2153]]; // 外回りとの間が広い（約18m）所で中央側へ
 const A_DO = [[-290, -2010], [-200, -2050], [-110, -2090], [-20, -2128], [40, -2163], [72, -2218], [76, -2285], [65, -2335], JOIN];
 const A_DI = [[470, -2108], [400, -2110], [330, -2104], [260, -2163], [200, -2228], [160, -2265], [120, -2315], JOIN];
 
@@ -118,15 +122,57 @@ const up = openRoute([...MAIN, FORK]);
 const dn = openRoute([JOIN, ...[...MAIN].reverse()]);
 let U = up.P, D = dn.P;
 const forkPix = up.S[up.S.length - 1], joinPix = dn.S[0];
+// Catmull-Rom（アンカーを通るなめらかな曲線）
+function spline(A, step = 2) {
+  const out = [];
+  for (let i = 0; i < A.length - 1; i++) {
+    const p0 = A[Math.max(0, i - 1)], p1 = A[i], p2 = A[i + 1], p3 = A[Math.min(A.length - 1, i + 2)];
+    const n = Math.max(2, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / step));
+    for (let k = i ? 1 : 0; k <= n; k++) {
+      const t = k / n, t2 = t * t, t3 = t2 * t;
+      const f = (a, b, c, d) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
+      out.push([f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])]);
+    }
+  }
+  return out;
+}
 let UO = openRoute(A_UO, { range: 14, startPix: forkPix }).P;
 let UI = openRoute(A_UI, { range: 14, startPix: forkPix }).P;
+UI = [...UI, ...spline([UI[UI.length - 1], ...UI_TAIL]).slice(1)];
 let DO = openRoute(A_DO, { range: 14, endPix: joinPix }).P;
-let DI = openRoute(A_DI, { range: 14, endPix: joinPix }).P;
 const prep = (P, r = 6) => resample(smooth(resample(P, 2), r), 2);
-U = prep(U); D = prep(D); UO = prep(UO, 4); UI = prep(UI, 4); DO = prep(DO, 4); DI = prep(DI, 4);
+U = prep(U); D = prep(D); UO = prep(UO, 4); UI = prep(UI, 4); DO = prep(DO, 4);
+// 東側の連絡路は実際には上下2方向で1本の道路（中心線も1本）：UO（上り→外回り）の道をたどって、DI はその逆向き＋東の端は自前の線形
+let DI;
+{
+  const R = [...UO].reverse(); // 外回り側 → 分岐部
+  const k0 = R.findIndex((p) => p[0] < 345); // 外回りに乗る手前で切る
+  const D0 = D[0], dt = tang(D, 0);
+  const tail = spline([R[R.length - 1], [(R[R.length - 1][0] + D0[0]) / 2 - dt[0] * 10, (R[R.length - 1][1] + D0[1]) / 2 - dt[1] * 10], [D0[0] - dt[0] * 12, D0[1] - dt[1] * 12], D0]);
+  DI = resample(smooth(resample([...spline(DI_HEAD), ...R.slice(k0), ...tail.slice(1)], 2), 5), 2);
+}
 for (let it = 0; it < 3; it++) {
   const u2 = separate(U, D, 9.5), d2 = separate(D, U, 9.5); U = resample(smooth(u2, 4), 2); D = resample(smooth(d2, 4), 2);
-  const a2 = separate(UI, DO, 8.5), b2 = separate(DO, UI, 8.5); UI = resample(smooth(a2, 3), 2); DO = resample(smooth(b2, 3), 2);
+  // 東側の連絡路：上り（UO）は左（北東）、下り（DI）は左（南西）に分ける（左側通行の対面）
+  const a2 = separate(UO, DI, 9.5), b2 = separate(DI, UO, 9.5); UO = resample(smooth(a2, 3), 2); DI = resample(smooth(b2, 3), 2);
+  // 西側：UI（南へ）と DO（北へ）も対面で並ぶので離す
+  const c2 = separate(UI, DO, 9.5), e2 = separate(DO, UI, 9.5); UI = resample(smooth(c2, 3), 2); DO = resample(smooth(e2, 3), 2);
+}
+// ---- 分岐部・合流部の形を整える ----
+// 経路探索の端（分岐点・合流点の画素）で線が鉤状に折れるので、本線の端を少し切り、連絡路は本線の向きのまま滑らかに分かれる／入るようにする
+{
+  const cum = (P) => { const c = [0]; for (let i = 1; i < P.length; i++) c.push(c[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1])); return c; };
+  const cutEnd = (P, len) => { const c = cum(P), L = c[c.length - 1]; return P.filter((_, i) => c[i] <= L - len); };
+  const cutStart = (P, len) => { const c = cum(P); return P.filter((_, i) => c[i] >= len); };
+  U = cutEnd(U, 20);
+  const F = U[U.length - 1], T = tang(U, U.length - 1);
+  // 分岐：本線の端 F から、本線の向き T に 15m 進んでから連絡路の線へ
+  const branch = (R) => { const r = cutStart(R, 60); return resample(smooth(resample([...spline([F, [F[0] + T[0] * 22, F[1] + T[1] * 22], r[0], r[1]]), ...r.slice(2)], 2), 4), 2); };
+  UO = branch(UO); UI = branch(UI);
+  // 合流：下り本線の始まり G へ、本線の向き S で入る
+  const G = D[0], S = tang(D, 0);
+  const join = (R) => { const r = cutEnd(R, 40); const a = r[r.length - 2], b = r[r.length - 1]; return resample([...r.slice(0, -2), ...spline([a, b, [G[0] - S[0] * 15, G[1] - S[1] * 15], G])], 2); };
+  DO = join(DO); DI = join(DI);
 }
 
 // ---- C1 の車線との接続（合流・分岐点で C1 の線へ乗せる） ----
@@ -214,6 +260,12 @@ function rampify(P, prof, atStart) {
 }
 const rU = rampify(U, pU, true), rD = rampify(D, pD, false);
 U = rU.P; D = rD.P; pU.y = rU.y; pD.y = rD.y;
+// 竹橋JCTの分岐部：上り本線は2層目（下り側の連絡路 DI がその下をくぐる）。分岐の手前約260mで上がる
+const FORK_Y = 17.5;
+{
+  const N = U.length, c = cum(U), L = c[N - 1], d = FORK_Y - pU.y[N - 1];
+  for (let i = 0; i < N; i++) { const t = (c[i] - (L - 260)) / 240; if (t > 0) pU.y[i] += d * ss(t); }
+}
 const yAt = (L, i) => L[i][2];
 const pUO = profile(UO, { y0: pU.y[pU.y.length - 1], y1: yAt(OUTER, (mUO.attach + 30) % OUTER.length), grade: 0.07, win: 12 });
 const pUI = profile(UI, { y0: pU.y[pU.y.length - 1], y1: yAt(INNER, (mUI.attach + 30) % INNER.length), grade: 0.07, win: 12 });
@@ -232,6 +284,51 @@ function glueStart(prof, L, attach) {
   for (let k = 1; k <= 40 && 30 + k < prof.y.length; k++) prof.y[30 + k] += d * (1 - k / 41);
 }
 glueEnd(pUO, OUTER, mUO.attach); glueEnd(pUI, INNER, mUI.attach); glueStart(pDO, OUTER, dDO.attach); glueStart(pDI, INNER, dDI.attach);
+
+// 分岐直後の約30mは2本とも本線の高さのまま（並んで分かれていく区間）
+for (const pr of [pUO, pUI]) { const y0 = pr.y[0]; for (let i = 0; i < 25; i++) pr.y[i] = y0 + (pr.y[i] - y0) * Math.max(0, (i - 12) / 13); }
+// ---- 立体交差の高さ：下をくぐる車線を、上の道路の路面から 6.0m 以上下げる（桁の下に約4.5m の空間）----
+// 平面で路面が重なる（中心間 < 半幅の和 + 2.4m）点ごとに上限を決め、勾配 7% 以内でなめらかにつなぐ（端の接続部は固定）
+const CLEAR_Y = 6.0, HW_MAIN = 3.25, HW_RAMP = 1.75;
+// partners：合流・分岐でつながる車線。平面で重なっている間はその路面の高さ（±0.4m）に合わせる
+function underpass(P, prof, hwSelf, uppers, fixHead, fixTail, partners = []) {
+  const N = P.length, ceil = new Float64Array(N).fill(Infinity), floor = new Float64Array(N).fill(-Infinity);
+  for (const u of uppers) for (let i = 0; i < N; i++) for (let j = 0; j < u.P.length; j++) {
+    const d = Math.hypot(P[i][0] - u.P[j][0], P[i][1] - u.P[j][1]);
+    if (d < hwSelf + u.hw + 2.4) ceil[i] = Math.min(ceil[i], u.y[j] - CLEAR_Y);
+  }
+  for (const u of partners) for (let i = 0; i < N; i++) {
+    let bd = Infinity, by = 0;
+    for (let j = 0; j < u.P.length; j++) { const d = Math.hypot(P[i][0] - u.P[j][0], P[i][1] - u.P[j][1]); if (d < bd) { bd = d; by = u.y[j]; } }
+    if (bd < hwSelf + u.hw + 1.4) { ceil[i] = Math.min(ceil[i], by + 0.4); floor[i] = Math.max(floor[i], by - 0.4); } // 路面が重なっている間
+  }
+  const y = prof.y, lim = 2 * 0.07;
+  // 上限・下限を勾配 7% のなだらかな包絡線にする（どこでも勾配の制限を守ったまま上限・下限に収まる）
+  const U = Float64Array.from(ceil), Lo = Float64Array.from(floor);
+  for (let i = 0; i < N; i++) if (i < fixHead || i >= N - fixTail) { U[i] = y[i]; Lo[i] = y[i]; } // 固定する端も包絡線に入れる（つなぎ目で急にならない）
+  for (let i = 1; i < N; i++) { U[i] = Math.min(U[i], U[i - 1] + lim); Lo[i] = Math.max(Lo[i], Lo[i - 1] - lim); }
+  for (let i = N - 2; i >= 0; i--) { U[i] = Math.min(U[i], U[i + 1] + lim); Lo[i] = Math.max(Lo[i], Lo[i + 1] - lim); }
+  for (let i = fixHead; i < N - fixTail; i++) y[i] = Math.max(Lo[i], Math.min(y[i], U[i]));
+  // 勾配の折れをなめらかに（包絡線は守る）
+  for (let it = 0; it < 6; it++) for (let i = fixHead + 1; i < N - fixTail - 1; i++) y[i] = Math.max(Lo[i], Math.min(U[i], (y[i - 1] + 2 * y[i] + y[i + 1]) / 4));
+  let worst = Infinity; for (let i = 0; i < N; i++) if (ceil[i] < Infinity) worst = Math.min(worst, ceil[i] + CLEAR_Y - y[i]);
+  return worst;
+}
+const lane3 = (P, prof, hw) => ({ P, y: prof.y, hw });
+const C1o = { P: OUTER, y: OUTER.map((p) => p[2]), hw: HW_MAIN }, C1i = { P: INNER, y: INNER.map((p) => p[2]), hw: HW_MAIN };
+// 合流側の C1 は、合流の手前 260m だけ「つながる車線」、それより前は「くぐる相手」
+const part = (L, P, fromEnd) => { const N = P.length; return { near: (i) => (fromEnd ? i >= N - 130 : i < 130) }; };
+function split(Lane, P, fromEnd) { const k = part(Lane, P, fromEnd); return k; }
+{
+  const N = UI.length, cut = N - 130; // 合流の 260m 手前
+  const head = UI.slice(0, cut), yh = { y: pUI.y.slice(0, cut) };
+  console.log('UI under C1: min clearance', underpass(head, yh, HW_RAMP, [C1o, C1i], 16, 0).toFixed(2));
+  for (let i = 0; i < cut; i++) pUI.y[i] = yh.y[i];
+  underpass(UI, pUI, HW_RAMP, [C1o], cut, 31, [C1i]);
+}
+console.log('DI under outer/UO/U/UI: min clearance', underpass(DI, pDI, HW_RAMP, [C1o, lane3(UO, pUO, HW_RAMP), lane3(U, pU, HW_MAIN), lane3(UI, pUI, HW_RAMP)], 31, 6, [C1i]).toFixed(2));
+underpass(UO, pUO, HW_RAMP, [], 30, 31, [C1o]);
+underpass(DO, pDO, HW_RAMP, [], 31, 30, [C1o]);
 
 const pack = (P, prof, extra = {}) => {
   const L = lenOf(P);
