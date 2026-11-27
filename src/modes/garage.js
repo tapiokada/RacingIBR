@@ -132,7 +132,7 @@ export class GarageMode {
       const s2 = i === this.idx ? sp : buildSpec(c.carId, c.equipped, c.setup || null);
       const row = el('div', { class: 'garage-row' + (i === this.idx ? ' sel' : ''), onclick: () => { this.idx = i; this.showCar(); } },
         el('b', {}, CARS[c.carId].name), i === st.active ? el('span', { class: 'tag' }, '乗車中') : '',
-        el('small', {}, `${CARS[c.carId].drive}　${s2.maxPowerPS.toFixed(0)}PS　${s2.mass.toFixed(0)}kg　戦闘力 ${s2.rating}`),
+        el('small', {}, `${CARS[c.carId].driveName || CARS[c.carId].drive}　${s2.maxPowerPS.toFixed(0)}PS　${s2.mass.toFixed(0)}kg　戦闘力 ${s2.rating}`),
         el('small', {}, `${c.year ? c.year + '年式　' : ''}${c.colorName ? c.colorName + '　' : ''}走行 ${Math.round(c.km || 0).toLocaleString('ja-JP')}km　燃料 ${(typeof c.fuel === 'number' ? c.fuel : CARS[c.carId].tank).toFixed(0)}/${CARS[c.carId].tank}L`));
       list.appendChild(row);
     });
@@ -140,7 +140,7 @@ export class GarageMode {
     const fw = sp.frontWeight;
     const rows = [
       ['シャシー', ''],
-      ['駆動方式', DRIVE_NAME[sp.drive] + (sp.center ? `　センターデフ 前${Math.round(sp.center.split * 100)}:後${Math.round(100 - sp.center.split * 100)}${sp.center.visc ? '（後輪空転で前へ伝達）' : ''}` : '')],
+      ['駆動方式', (CARS[sp.carId || car?.carId]?.driveName === 'MR' ? 'MR（ミッドシップ・後輪駆動）' : DRIVE_NAME[sp.drive]) + (sp.center ? `　センターデフ 前${Math.round(sp.center.split * 100)}:後${Math.round(100 - sp.center.split * 100)}${sp.center.visc ? '（後輪空転で前へ伝達）' : ''}` : '')],
       ['ホイールベース／トレッド前後', `${sp.wheelbase.toFixed(3)} m ／ ${sp.trackF.toFixed(3)}・${sp.trackR.toFixed(3)} m`],
       ['車両重量／前後重量配分', `${sp.mass.toFixed(0)} kg ／ ${Math.round(fw * 100)} : ${Math.round(100 - fw * 100)}`],
       ['重心高', `${(sp.cgHeight * 1000).toFixed(0)} mm`],

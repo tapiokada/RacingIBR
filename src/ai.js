@@ -31,6 +31,7 @@ export class RaceAI {
     this.stuck = 0; this.reverseT = 0;
     this.boost = 1;
     this.margin = opts.margin ?? 0.8;
+    this.vmax = opts.vmax ?? Infinity; // 速度の上限[m/s]（首都高の巡航・バトル前の自動走行）
     // ミスの起こりやすさ（コーナー1つあたり）：腕が上がるほど減り、トップクラス（0.955以上）はほぼゼロ
     this.mistakeRate = opts.mistakes === false ? 0 : clamp((0.955 - skill) * 1.6, 0, 0.22);
     this.mistake = null; // { type: 'late'|'throttle', until, apex }
@@ -120,7 +121,7 @@ export class RaceAI {
     // 速度
     let vt = 1e9;
     for (let k = 1, d = 0; d < 8; k++) { const j = path.open ? Math.min(n - 1, pr.i + k) : (pr.i + k) % n; vt = Math.min(vt, this.profile[j]); d += path.lseg[j]; if (path.open && j === n - 1) break; }
-    vt *= this.boost;
+    vt = Math.min(vt * this.boost, this.vmax);
     // ---- ミス（オーバーラン・立ち上がりでアクセルを開けすぎる）----
     {
       let jMin = -1, vMin = 1e9;

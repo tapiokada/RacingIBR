@@ -20,6 +20,7 @@ export class Game {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.applyBrightness();
+    this.applyHudScale();
     container.appendChild(this.renderer.domElement);
     this.ui = el('div', { class: 'ui-root' });
     container.appendChild(this.ui);
@@ -43,6 +44,11 @@ export class Game {
   }
 
   // 明るさ（設定の倍率 × 基準露出）
+  // HUD（マップ・タコメーター/速度・順位などの表示）の大きさ（CommonSetting）
+  applyHudScale() {
+    document.documentElement.style.setProperty('--hud', String(this.settings.hudScale || 1.3));
+  }
+
   applyBrightness() {
     this.renderer.toneMappingExposure = 1.4 * (this.settings.brightness || 1);
   }

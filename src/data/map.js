@@ -308,6 +308,7 @@ export const AREAS = {
 // ===== 榛名山（県道33号 渋川松井田線：ゆうすげ入口〜伊香保温泉石段街）=====
 // 座標は実寸（メートル）。標高は src/physics/touge.js の路面データを使う。
 export const HARUNA_UNLOCK_WINS = 10; // 榛名山エリアが解放される勝利数
+export const SHUTO_UNLOCK_WINS = 12; // 首都高（西池袋の北池袋入口）が解放される勝利数
 const HR_STEP = 5; // データ2m間隔 → ノード10m間隔
 const HR_RAW = HARUNA_DATA.road;
 const HR_IDS = [];

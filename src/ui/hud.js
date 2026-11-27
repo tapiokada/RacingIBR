@@ -11,8 +11,8 @@ export class Hud {
     this.msg = el('div', { class: 'hud-msg' });
     this.sub = el('div', { class: 'hud-submsg' });
     this.prompt = el('div', { class: 'hud-prompt' });
-    this.tach = el('canvas', { class: 'hud-tach', width: 320, height: 200 });
-    this.map = el('canvas', { class: 'hud-map', width: 240, height: 240 });
+    this.tach = el('canvas', { class: 'hud-tach', width: 640, height: 400 }); // 拡大表示でもにじまないよう2倍の解像度で描く
+    this.map = el('canvas', { class: 'hud-map', width: 480, height: 480 });
     this.mirrorFrame = el('div', { class: 'hud-mirror' });
     this.viewLabel = el('div', { class: 'hud-view' });
     this.root.append(this.tl, this.tc, this.tr, this.msg, this.sub, this.prompt, this.tach, this.map, this.mirrorFrame, this.viewLabel);
@@ -40,7 +40,8 @@ export class Hud {
 
   drawTach(car) {
     const c = this.tach.getContext('2d');
-    const W = this.tach.width, H = this.tach.height;
+    const W = 320, H = 200;
+    c.setTransform(2, 0, 0, 2, 0, 0);
     c.clearRect(0, 0, W, H);
     const s = car.spec;
     const max = Math.ceil((s.limiter + 500) / 1000) * 1000;
@@ -109,7 +110,8 @@ export class Hud {
 
   drawMap(cars, pois = []) {
     const c = this.map.getContext('2d');
-    const W = this.map.width, H = this.map.height;
+    const W = 240, H = 240;
+    c.setTransform(2, 0, 0, 2, 0, 0);
     c.clearRect(0, 0, W, H);
     if (!this.mapBounds) {
       let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;

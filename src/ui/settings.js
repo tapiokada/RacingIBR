@@ -66,6 +66,19 @@ export function openSettings(game, onClose) {
       rows.push({ row, act: () => {}, left: () => { range.value = Math.max(0.5, s.brightness - 0.05); range.oninput(); }, right: () => { range.value = Math.min(2, s.brightness + 0.05); range.oninput(); } });
       list.appendChild(row);
     }
+    {
+      const STEPS = [1.0, 1.15, 1.3, 1.5, 1.7];
+      const idx = () => { const v = s.hudScale || 1.3; let b = 0; STEPS.forEach((x, i) => { if (Math.abs(x - v) < Math.abs(STEPS[b] - v)) b = i; }); return b; };
+      const val = el('span', { class: 'lv-val' });
+      const show = () => { val.textContent = `${['小', 'やや小', '標準', '大', '特大'][idx()]}（×${STEPS[idx()].toFixed(2).replace(/0$/, '')}）`; };
+      const set = (i) => { s.hudScale = STEPS[Math.max(0, Math.min(STEPS.length - 1, i))]; show(); game.applyHudScale(); saveSettings(s); };
+      const minus = el('button', { class: 'arrow', onclick: () => set(idx() - 1) }, '◀');
+      const plus = el('button', { class: 'arrow', onclick: () => set(idx() + 1) }, '▶');
+      const row = el('div', { class: 'key-row' }, el('span', { class: 'key-name' }, 'HUDの大きさ', el('small', { class: 'lv-note' }, 'マップ・速度・順位表示')), el('span', { class: 'lv' }, minus, val, plus));
+      rows.push({ row, act: () => set((idx() + 1) % STEPS.length), left: () => set(idx() - 1), right: () => set(idx() + 1) });
+      list.appendChild(row);
+      show();
+    }
     list.appendChild(el('div', { class: 'key-sep' }, 'サウンド'));
     vol('BGM音量', 'bgm');
     vol('効果音・エンジン音量', 'se');

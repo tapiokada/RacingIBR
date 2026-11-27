@@ -91,7 +91,9 @@ export class DriveSession {
   resetPlayer(back = 0) {
     const car = this.player.car;
     let x, z, h;
-    if (this.path) {
+    const rp = this.resetPose && this.resetPose(back); // モードが決める向き（首都高：車線の進行方向。逆走にしない）
+    if (rp) { x = rp.x; z = rp.z; h = rp.h; }
+    else if (this.path) {
       const pr = this.path.project(car.x, car.z, -1);
       const p = this.path.posAt(pr.s + back, 0);
       x = p.x; z = p.z; h = p.h;

@@ -143,7 +143,7 @@ export class TitleMode {
       g.transition(() => g.setMode(kind === 'town' ? new TownFreeMode(g, { ...o, area }) : practiceMode(g, o, L, kind)));
     };
     this.setMenu([
-      ...CAR_IDS.map((id) => ({ label: CARS[id].name, sub: `${CARS[id].ref}　${CARS[id].drive}・${CARS[id].mass}kg`, action: () => go(id) })),
+      ...CAR_IDS.map((id) => ({ label: CARS[id].name, sub: `${CARS[id].ref}　${CARS[id].driveName || CARS[id].drive}・${CARS[id].mass}kg`, action: () => go(id) })),
       { label: '戻る', action: () => this.pickSetup(kind, L, area) },
     ], () => this.pickSetup(kind, L, area), '車種選択');
   }

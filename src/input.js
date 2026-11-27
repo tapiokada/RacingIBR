@@ -23,6 +23,7 @@ export const DEFAULT_SETTINGS = {
   bgm: 0.6, se: 0.7, transmission: 'AT', absLevel: 10, tcsLevel: 10, spinAssist: false, mirror: true,
   defaultsRev: 2,
   brightness: 1.0,
+  hudScale: 1.3, // HUD の大きさ（1.0 / 1.15 / 1.3 / 1.5 / 1.7）
 };
 
 export function loadSettings() {

@@ -42,13 +42,14 @@ export function pickEntrants(cls, wins, seed) {
   const pw = rivalPwr();
   const r = seeded(seed * 7919 + cls.charCodeAt(0));
   const score = (x) => Math.abs((x.minWins || 0) - wins) * 0.25 + r() * 2.2;
-  const inCls = ALL_RIVALS.filter((x) => classOfPwr(pw[x.id]).id === cls).sort((a, b) => score(a) - score(b));
+  const POOL = ALL_RIVALS.filter((x) => x.area !== 'c1'); // 首都高のライバルはサーキットには出ない
+  const inCls = POOL.filter((x) => classOfPwr(pw[x.id]).id === cls).sort((a, b) => score(a) - score(b));
   let list = inCls.slice(0, 7);
   if (list.length < 7) {
     const c = CLASSES.find((x) => x.id === cls);
     const lo = CLASSES[CLASSES.indexOf(c) - 1]?.max ?? 0;
     const mid = Math.min(c.max, 7) - (Math.min(c.max, 7) - lo) / 2;
-    const rest = ALL_RIVALS.filter((x) => !list.includes(x)).sort((a, b) => Math.abs(pw[a.id] - mid) - Math.abs(pw[b.id] - mid));
+    const rest = POOL.filter((x) => !list.includes(x)).sort((a, b) => Math.abs(pw[a.id] - mid) - Math.abs(pw[b.id] - mid));
     list = [...list, ...rest.slice(0, 7 - list.length)];
   }
   return list.map((x) => x.id);

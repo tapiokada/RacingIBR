@@ -117,7 +117,7 @@ export function openShop(game, state, area, onClose) {
         const extra = L.special ? `　★${L.special}：${L.extras.map((pid) => PART_BY_ID[pid].name).join('・')}（パーツ定価 ${fmtMoney(L.partsValue)}相当）` : '';
         const r = el('div', { class: 'part-row car-row' + (can ? '' : ' dim') + (L.special ? ' special' : '') },
           el('span', { class: 'cat' }, swatch(L.color), ` ${L.colorName}`),
-          el('span', { class: 'pname' }, `${c.name}　${L.year}年式　${L.km.toLocaleString('ja-JP')}km`, el('small', {}, `　${c.ref}　${sp.maxPowerPS.toFixed(0)}PS・${c.drive}・${sp.mass.toFixed(0)}kg${extra}`)),
+          el('span', { class: 'pname' }, `${c.name}　${L.year}年式　${L.km.toLocaleString('ja-JP')}km`, el('small', {}, `　${c.ref}　${sp.maxPowerPS.toFixed(0)}PS・${c.driveName || c.drive}・${sp.mass.toFixed(0)}kg${extra}`)),
           el('span', { class: 'cnt' }, L.left > 0 ? `在庫 ${L.left}台` : 'SOLD OUT'),
           el('button', { class: 'buy', onclick: buy }, fmtMoney(L.price)));
         rows.push({ row: r, act: buy, preview: L });
@@ -173,7 +173,7 @@ export function openShop(game, state, area, onClose) {
     preview.show(L.carId, L.color, L.equipped);
     const c = CARS[L.carId], sp = buildSpec(L.carId, L.equipped);
     previewInfo.innerHTML = '';
-    for (const [k, v] of [['車種', `${c.name}（${c.ref}）`], ['年式・走行', `${L.year}年式　${L.km.toLocaleString('ja-JP')}km`], ['色', L.colorName], ['性能', `${sp.maxPowerPS.toFixed(0)}PS・${sp.mass.toFixed(0)}kg・${c.drive}　戦闘力 ${sp.rating}`], ['価格', fmtMoney(L.price)]])
+    for (const [k, v] of [['車種', `${c.name}（${c.ref}）`], ['年式・走行', `${L.year}年式　${L.km.toLocaleString('ja-JP')}km`], ['色', L.colorName], ['性能', `${sp.maxPowerPS.toFixed(0)}PS・${sp.mass.toFixed(0)}kg・${c.driveName || c.drive}　戦闘力 ${sp.rating}`], ['価格', fmtMoney(L.price)]])
       previewInfo.appendChild(el('div', { class: 'stat' }, el('span', {}, k), el('b', {}, v)));
   };
   const hl = () => { rows.forEach((r, i) => r.row.classList.toggle('sel', i === index)); showPreview(); };

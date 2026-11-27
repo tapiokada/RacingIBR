@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { DriveSession } from '../session.js';
 import { Hud } from '../ui/hud.js';
 import { el, Menu, panel } from '../ui/ui.js';
-import { NODES, AREAS, LAYOUTS, COURSES, TOUGE_LAYOUTS, HARUNA_UNLOCK_WINS, CIRCUIT_LAYOUTS, STORY_CIRCUIT_LAYOUTS, townRoadBetween, laneOffset, areaStart, arriveSpot } from '../data/map.js';
+import { NODES, AREAS, LAYOUTS, COURSES, TOUGE_LAYOUTS, HARUNA_UNLOCK_WINS, SHUTO_UNLOCK_WINS, CIRCUIT_LAYOUTS, STORY_CIRCUIT_LAYOUTS, townRoadBetween, laneOffset, areaStart, arriveSpot } from '../data/map.js';
 import { TrackDayMode, SESSION_TIME } from './trackday.js';
 import { raceEntryItems } from './raceweekend.js';
 import { pauseMenu } from './common.js';
@@ -22,6 +22,8 @@ import { openRanking } from '../ui/ranking.js';
 import { VIEW_NAMES } from '../render/cameras.js';
 import { BattleMode } from './battle.js';
 import { TitleMode } from './title.js';
+import { ShutoFreeMode, lanePose, LINK_SPEED } from './shutofree.js';
+import { SHUTO5 } from '../physics/circuit.js';
 
 export function coursePath(layout) {
   return getCoursePath(layout);
@@ -42,14 +44,14 @@ export class TownMode {
     st.area = area;
     g.setArea(area);
     g.world.setCourse(null);
-    for (const gm of g.world.gateMarkers || []) if (gm.gate.freeOnly) gm.group.visible = false; // 首都高入口の看板はストーリーでは出さない
+    for (const gm of g.world.gateMarkers || []) if (gm.gate.freeOnly) gm.group.visible = st.wins >= SHUTO_UNLOCK_WINS; // 首都高入口の看板（ストーリーでは解放後だけ）
     this.graph = townGraph(area);
     this.session = new DriveSession(g, { corridor: g.world.corridor });
     const mine = activeCar(st);
     const p = this.session.addCar({ carId: mine.carId, equipped: mine.equipped, setup: mine.setup || null, color: mine.color, isPlayer: true, name: PLAYER.name, fuel: fuelState(mine) });
     const saved = st.pos && (st.pos.area || 'west') === area ? st.pos : null;
     const pos = this.opts.returnPos || saved || areaStart(area);
-    p.car.place(pos.x, pos.z, pos.h, 0);
+    p.car.place(pos.x, pos.z, pos.h, this.opts.speed || 0);
     p.color = '#33e1ff';
     g.mirrorModel = p.model;
     g.rig.mode = this.opts.view || 'chase';
@@ -156,8 +158,14 @@ export class TownMode {
     // エリア出口（境界の看板の先まで走ると暗転して移動）
     if (!this.dialog && !this.leaving) {
       for (const gm of g.world.gateMarkers) {
-        if (gm.gate.freeOnly) continue; // 首都高入口は FREE RUN のみ
-        if (Math.hypot(gm.x - P.car.x, gm.z - P.car.z) < 9) { this.changeArea(gm.gate.to, arriveSpot(gm.gate)); break; }
+        if (Math.hypot(gm.x - P.car.x, gm.z - P.car.z) >= 9) continue;
+        if (gm.gate.to === 'shuto5') {
+          // 首都高 北池袋入口：解放後は自動で5号上りへ（40km/hで走っている状態から）
+          if (st.wins >= SHUTO_UNLOCK_WINS) this.enterShuto();
+          else if (!this.shutoMsgT || this.shutoMsgT < this.game.story.playtime) { this.hud.flash('', 2, `首都高は${SHUTO_UNLOCK_WINS}勝で解放（あと${SHUTO_UNLOCK_WINS - st.wins}勝）`); this.shutoMsgT = st.playtime + 4; }
+          break;
+        }
+        this.changeArea(gm.gate.to, arriveSpot(gm.gate)); break;
       }
     }
 
@@ -295,6 +303,13 @@ export class TownMode {
     const P = this.session.player.car;
     const ret = { x: P.x, z: P.z, h: P.h, area: this.area };
     g.transition(() => g.setMode(new BattleMode(g, { rival: e.rival, layout, returnPos: ret })));
+  }
+
+  // 首都高へ（ストーリー）：5号上り 北池袋入口から
+  enterShuto() {
+    const g = this.game;
+    this.leaving = true;
+    g.transition(() => g.setMode(new ShutoFreeMode(g, { story: true, area: 'shuto5', pose: lanePose(SHUTO5.U, 12), speed: LINK_SPEED })), 300);
   }
 
   // エリア移動（暗転→向こうのエリアの対応する道路に速度0で出る）

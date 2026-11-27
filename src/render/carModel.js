@@ -108,7 +108,7 @@ function buildProcCarModel(carDef, color, opts = {}) {
       const len = Math.hypot(dx, dy);
       const p = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, len), paint);
       p.position.set(sx * W * 0.42, (pts[0][1] + pts[1][1]) / 2, (pts[0][0] + pts[1][0]) / 2);
-      p.rotation.x = -Math.atan2(dy, Math.abs(dx));
+      p.rotation.x = Math.atan2(dy, Math.abs(dx)); // 前（+z）ほど低い
       body.add(p);
       exterior.push(p);
     }
